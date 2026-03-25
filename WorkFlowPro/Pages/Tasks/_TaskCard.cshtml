@@ -1,0 +1,51 @@
+@model WorkFlowPro.ViewModels.TaskCardVm
+
+@{
+    var priorityLower = Model.Priority.ToString().ToLowerInvariant();
+    var badgeClass = priorityLower switch
+    {
+        "low" => "bg-success",
+        "medium" => "bg-primary",
+        "high" => "bg-warning text-dark",
+        "critical" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    var dueStr = Model.DueDateUtc.HasValue
+        ? Model.DueDateUtc.Value.ToString("yyyy-MM-dd")
+        : "-";
+
+    var avatarHtml = Model.AssigneeAvatarUrl is not null
+        ? $"<img src=\"{Model.AssigneeAvatarUrl}\" class=\"wf-avatar\" alt=\"avatar\" />"
+        : $"<div class=\"wf-avatar wf-avatar--text\">{(string.IsNullOrWhiteSpace(Model.AssigneeDisplayName) ? "?" : Model.AssigneeDisplayName[0].ToString()).ToUpperInvariant()}</div>";
+}
+
+<div class="card wf-task-card mb-2 @(Model.IsOverdue ? "border border-danger" : "")"
+     data-task-id="@Model.TaskId"
+     data-title="@Model.Title"
+     data-status="@Model.Status"
+     data-can-drag="@(Model.CanDrag ? "1" : "0")"
+     draggable="@(Model.CanDrag ? "true" : "false")">
+    <div class="card-body p-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <a href="/Tasks/Details/@Model.TaskId" class="text-decoration-none">
+                <div class="fw-semibold"
+                     style="max-width: 220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    @Model.Title
+                </div>
+            </a>
+            <span class="badge @badgeClass">@Model.Priority</span>
+        </div>
+
+        <div class="mt-1 small text-muted">
+            Due:
+            <span class="@(Model.IsOverdue ? "text-danger fw-semibold" : "")">@dueStr</span>
+        </div>
+
+        <div class="mt-2 d-flex align-items-center gap-2">
+            @Html.Raw(avatarHtml)
+            <div class="small">@Model.AssigneeDisplayName</div>
+        </div>
+    </div>
+</div>
+

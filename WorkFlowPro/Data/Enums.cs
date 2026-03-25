@@ -1,4 +1,4 @@
-﻿namespace WorkFlowPro.Data;
+namespace WorkFlowPro.Data;
 
 public enum WorkspaceMemberRole
 {
@@ -53,9 +53,21 @@ public enum NotificationType
     TaskDoneNeedsEvaluation = 4,
     TaskEvaluated = 5,
     RoleChanged = 6,
-    WorkspaceInvite = 7,  
+    WorkspaceInvite = 7,
     DeadlineReminder = 8,
     ProjectCreated = 9,
     ProjectDeleted = 10,
-    LevelChanged = 11
+    LevelChanged = 11,
+
+    /// <summary>UC-11: Task được kéo trên Kanban.</summary>
+    TaskKanbanMoved = 12,
+
+    /// <summary>UC-11: Comment mới trên task.</summary>
+    TaskCommentAdded = 13,
+
+    /// <summary>UC-11: Project được cập nhật.</summary>
+    ProjectUpdated = 14,
+
+    /// <summary>UC-11: Lời mời workspace được chấp nhận.</summary>
+    InviteAccepted = 15
 }

@@ -1,0 +1,183 @@
+@page "/Reports/Dashboard"
+@model WorkFlowPro.Pages.Reports.DashboardModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Báo cáo & KPI";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="mb-3">Báo cáo &amp; Dashboard KPI</h1>
+<p class="text-muted small">UC-13 — Chỉ PM. Dữ liệu theo workspace hiện tại. Cohort task: <strong>CreatedAtUtc</strong> trong khoảng ngày chọn. CompletionRate / AvgScore / Level từ <strong>MemberProfile</strong> (UC-08). Điểm đánh giá trong kỳ/project từ <strong>TaskEvaluation</strong> (theo <strong>EvaluatedAtUtc</strong>).</p>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.Dashboard is not null)
+{
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-md-4">
+            <label class="form-label">Project</label>
+            <select name="projectId" class="form-select" asp-for="ProjectId">
+                @foreach (var p in Model.Projects)
+                {
+                    <option value="@p.Id">@p.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Từ ngày (UTC)</label>
+            <input type="date" name="from" class="form-control" value="@Model.FromDefault" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Đến ngày (UTC)</label>
+            <input type="date" name="to" class="form-control" value="@Model.ToDefault" />
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Áp dụng</button>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <div class="text-muted small">Tổng task (trong kỳ)</div>
+                    <div class="fs-3 fw-bold">@Model.Dashboard.TotalTasks</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <div class="text-muted small">Hoàn thành</div>
+                    <div class="fs-3 fw-bold">@Model.Dashboard.CompletedTasks</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-danger">
+                <div class="card-body">
+                    <div class="text-muted small">Quá hạn (trong kỳ, chưa Done/Cancel)</div>
+                    <div class="fs-3 fw-bold">@Model.Dashboard.OverdueTasks</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <div class="text-muted small">Tỉ lệ hoàn thành</div>
+                    <div class="fs-3 fw-bold">@Model.Dashboard.CompletionRatePercent.ToString("0.##") %</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <h5 class="mb-2">Tỉ lệ task theo trạng thái</h5>
+            <div style="max-height: 360px;">
+                <canvas id="wfPieStatus"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h5 class="mb-2">Số task theo member (đã nhận, trong kỳ)</h5>
+            <div style="max-height: 360px;">
+                <canvas id="wfBarMember"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-2">Hiệu suất thành viên</h5>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Tên</th>
+                    <th>Level</th>
+                    <th>Completion rate (UC-08)</th>
+                    <th>Avg score (UC-08)</th>
+                    <th>Điểm TB đánh giá (kỳ / project)</th>
+                    <th>Task giao (kỳ / project)</th>
+                    <th>Hoàn thành (kỳ / project)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Dashboard.MemberPerformance)
+                {
+                    <tr>
+                        <td>@m.DisplayName</td>
+                        <td>@m.Level</td>
+                        <td>@((m.CompletionRate * 100).ToString("0.##")) %</td>
+                        <td>@m.AvgScore.ToString("0.##")</td>
+                        <td>@(m.AvgEvaluationScoreInProject.HasValue ? m.AvgEvaluationScoreInProject.Value.ToString("0.##") : "—")</td>
+                        <td>@m.AssignedInProjectInPeriod</td>
+                        <td>@m.CompletedInProjectInPeriod</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Dashboard is not null)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            (function () {
+                const pieRaw = @Html.Raw(Model.PieJson);
+                const barLabels = @Html.Raw(Model.BarLabelsJson);
+                const barData = @Html.Raw(Model.BarDataJson);
+
+                const pieLabels = pieRaw.map(x => x.label);
+                const pieValues = pieRaw.map(x => x.value);
+                const pieColors = [
+                    "#6c757d", "#fd7e14", "#0d6efd", "#198754", "#ffc107", "#20c997", "#dc3545"
+                ];
+
+                if (pieLabels.length) {
+                    new Chart(document.getElementById("wfPieStatus"), {
+                        type: "pie",
+                        data: {
+                            labels: pieLabels,
+                            datasets: [{
+                                data: pieValues,
+                                backgroundColor: pieLabels.map((_, i) => pieColors[i % pieColors.length])
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: "bottom" } }
+                        }
+                    });
+                }
+
+                if (barLabels.length) {
+                    new Chart(document.getElementById("wfBarMember"), {
+                        type: "bar",
+                        data: {
+                            labels: barLabels,
+                            datasets: [{
+                                label: "Số task",
+                                data: barData,
+                                backgroundColor: "rgba(13, 110, 253, 0.6)",
+                                borderColor: "rgba(13, 110, 253, 1)",
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            })();
+        </script>
+    }
+}

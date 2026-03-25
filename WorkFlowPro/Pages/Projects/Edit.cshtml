@@ -1,0 +1,83 @@
+@page "/Projects/Settings/{projectId:guid}"
+@model WorkFlowPro.Pages.Projects.EditModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Project settings";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Project Settings</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+
+@if (Model.Project is null)
+{
+    <div class="alert alert-info">Project not found.</div>
+}
+else
+{
+    <form method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="ProjectId" />
+
+        <div class="mb-3">
+            <label asp-for="Input.Name" class="form-label"></label>
+            <input asp-for="Input.Name" class="form-control" disabled="@Model.IsArchived" />
+            <span asp-validation-for="Input.Name" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Input.Description" class="form-label"></label>
+            <textarea asp-for="Input.Description" class="form-control" rows="3" disabled="@Model.IsArchived"></textarea>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label asp-for="Input.StartDateUtc" class="form-label"></label>
+                <input asp-for="Input.StartDateUtc" class="form-control" type="date" disabled="@Model.IsArchived" />
+            </div>
+            <div class="col-md-6">
+                <label asp-for="Input.EndDateUtc" class="form-label"></label>
+                <input asp-for="Input.EndDateUtc" class="form-control" type="date" disabled="@Model.IsArchived" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Input.Color" class="form-label"></label>
+            <input asp-for="Input.Color" class="form-control" placeholder="#RRGGBB" disabled="@Model.IsArchived" />
+            <span asp-validation-for="Input.Color" class="text-danger"></span>
+        </div>
+
+        @if (!Model.IsArchived)
+        {
+            <button type="submit" class="btn btn-primary">Save</button>
+        }
+        else
+        {
+            <div class="alert alert-secondary">
+                Archived projects are read-only.
+            </div>
+        }
+    </form>
+
+    <div class="mt-3 d-flex gap-2">
+        @if (!Model.IsArchived)
+        {
+            <form method="post" asp-page-handler="Archive">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ProjectId" />
+                <button type="submit" class="btn btn-warning">Archive</button>
+            </form>
+        }
+        <a class="btn btn-outline-secondary" href="/Projects/Details/@Model.Project.Id">Back to details</a>
+        <a class="btn btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

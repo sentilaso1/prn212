@@ -1,0 +1,308 @@
+@page "/board"
+@model WorkFlowPro.Pages.Tasks.KanbanModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Kanban Board";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Kanban Board</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <div class="text-muted">Project</div>
+            <div><strong>@Model.ProjectName</strong></div>
+            <div class="small mt-1">
+                <a href="/tasks/list?projectId=@Model.ProjectId">Task List</a>
+            </div>
+        </div>
+        <div class="text-muted small">
+            PM xem mọi task; Member chỉ task được giao (Pending/Accepted). Kéo thả trên cột workflow.
+        </div>
+    </div>
+
+    <partial name="_TaskFilters" model="Model.Filters" />
+
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <input id="wfSearch" class="form-control form-control-sm" type="text" placeholder="Tìm nhanh theo tiêu đề (client)..." />
+        </div>
+    </div>
+
+    <div class="kanban-board d-flex flex-wrap gap-3" id="kanbanBoard">
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Unassigned">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Unassigned</strong></div>
+                <span class="text-muted" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
+            </div>
+            <div class="kanban-stack wf-kanban-stack" id="wf-stack-unassigned">
+                @foreach (var t in Model.Board.Unassigned)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Pending">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Pending</strong></div>
+                <span class="text-muted" id="wf-count-pending">@Model.Board.Pending.Count</span>
+            </div>
+            <div class="kanban-stack wf-kanban-stack" id="wf-stack-pending">
+                @foreach (var t in Model.Board.Pending)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="ToDo" id="col-ToDo">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>To Do</strong></div>
+                <span class="text-muted" id="wf-count-todo">@Model.Board.ToDo.Count</span>
+            </div>
+            <div class="kanban-dropzone" data-target-status="ToDo" id="wf-drop-todo">
+                @foreach (var t in Model.Board.ToDo)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="InProgress" id="col-InProgress">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>In Progress</strong></div>
+                <span class="text-muted" id="wf-count-inprogress">@Model.Board.InProgress.Count</span>
+            </div>
+            <div class="kanban-dropzone" data-target-status="InProgress" id="wf-drop-inprogress">
+                @foreach (var t in Model.Board.InProgress)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Review" id="col-Review">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Review / Testing</strong></div>
+                <span class="text-muted" id="wf-count-review">@Model.Board.Review.Count</span>
+            </div>
+            <div class="kanban-dropzone" data-target-status="Review" id="wf-drop-review">
+                @foreach (var t in Model.Board.Review)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Done" id="col-Done">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Done</strong></div>
+                <span class="text-muted" id="wf-count-done">@Model.Board.Done.Count</span>
+            </div>
+            <div class="kanban-dropzone" data-target-status="Done" id="wf-drop-done">
+                @foreach (var t in Model.Board.Done)
+                {
+                    <partial name="_TaskCard" model="t" />
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+@if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
+{
+    <script src="~/js/task-filters.js" asp-append-version="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        (function () {
+            const projectId = "@Model.ProjectId.ToString("D")";
+            const myUserId = "@Model.CurrentUserId";
+            const isPm = @(Model.IsPm ? "true" : "false");
+            let wfSearchQuery = "";
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/task")
+                .build();
+
+            function applySearchToCard(cardEl) {
+                if (!cardEl) return;
+                if (!wfSearchQuery) {
+                    cardEl.style.display = "";
+                    return;
+                }
+                const t = (cardEl.getAttribute("data-title") || "").toLowerCase();
+                cardEl.style.display = t.includes(wfSearchQuery) ? "" : "none";
+            }
+
+            function applySearchAll() {
+                document.querySelectorAll(".wf-task-card").forEach(applySearchToCard);
+            }
+
+            function escapeHtml(s) {
+                if (s === null || s === undefined) return "";
+                return String(s)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function renderCardHtml(card) {
+                return window.wfTaskFilters.wfTaskCardHtml(card, myUserId, isPm);
+            }
+
+            let draggedTaskId = null;
+            document.addEventListener("dragstart", function (e) {
+                const card = e.target.closest(".wf-task-card");
+                if (!card) return;
+                const canDrag = card.getAttribute("data-can-drag") === "1";
+                if (!canDrag) {
+                    e.preventDefault();
+                    return;
+                }
+                draggedTaskId = card.getAttribute("data-task-id");
+                e.dataTransfer.setData("text/plain", draggedTaskId);
+                e.dataTransfer.effectAllowed = "move";
+            });
+            document.addEventListener("dragend", function () { draggedTaskId = null; });
+
+            function findDropHost(newStatus) {
+                const map = {
+                    Unassigned: "wf-stack-unassigned",
+                    Pending: "wf-stack-pending",
+                    ToDo: "wf-drop-todo",
+                    InProgress: "wf-drop-inprogress",
+                    Review: "wf-drop-review",
+                    Done: "wf-drop-done"
+                };
+                const id = map[newStatus];
+                return id ? document.getElementById(id) : null;
+            }
+
+            document.querySelectorAll(".kanban-dropzone").forEach(function (dz) {
+                dz.addEventListener("dragover", function (e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                });
+                dz.addEventListener("drop", async function (e) {
+                    e.preventDefault();
+                    if (!draggedTaskId) return;
+                    const targetStatus = dz.getAttribute("data-target-status");
+                    if (!targetStatus) return;
+                    try {
+                        await connection.invoke("MoveTask", draggedTaskId, targetStatus);
+                    } catch (err) {
+                        console.error(err);
+                        alert("Không thể chuyển task. Vui lòng thử lại.");
+                    }
+                });
+            });
+
+            function showToast(message, type) {
+                try {
+                    const containerId = "wfToastContainer";
+                    let container = document.getElementById(containerId);
+                    if (!container) {
+                        container = document.createElement("div");
+                        container.id = containerId;
+                        container.className = "toast-container position-fixed bottom-0 end-0 p-3";
+                        document.body.appendChild(container);
+                    }
+                    const toastEl = document.createElement("div");
+                    const bg = type === "danger" ? "text-bg-danger" : type === "success" ? "text-bg-success" : "text-bg-primary";
+                    toastEl.className = `toast align-items-center ${bg} border-0`;
+                    toastEl.setAttribute("role", "alert");
+                    toastEl.innerHTML = `
+                        <div class="d-flex">
+                            <div class="toast-body">${escapeHtml(message)}</div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>`;
+                    container.appendChild(toastEl);
+                    const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+                    toast.show();
+                    toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
+                } catch (e) { console.warn(e); }
+            }
+
+            connection.on("taskMoved", function (payload) {
+                if (!payload || !payload.taskId) return;
+                const newStatus = payload.newStatus;
+                const card = payload.card || null;
+                const display = ["Unassigned", "Pending", "ToDo", "InProgress", "Review", "Done"];
+                const shouldDisplay = display.includes(newStatus);
+                if (!shouldDisplay) {
+                    const existing = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
+                    if (existing) existing.remove();
+                    return;
+                }
+                const dropzone = findDropHost(newStatus);
+                const existing = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
+                if (existing) {
+                    if (card) {
+                        const html = renderCardHtml(card);
+                        if (!html) return;
+                        existing.outerHTML = html;
+                        applySearchToCard(document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`));
+                    } else if (dropzone) {
+                        dropzone.appendChild(existing);
+                    }
+                } else if (card && dropzone) {
+                    const wrapper = document.createElement("div");
+                    wrapper.innerHTML = renderCardHtml(card);
+                    const el = wrapper.firstElementChild;
+                    if (el) {
+                        dropzone.appendChild(el);
+                        applySearchToCard(el);
+                    }
+                }
+            });
+
+            async function start() {
+                await connection.start();
+                await connection.invoke("JoinProject", projectId);
+            }
+            start().catch(function (err) { console.error(err.toString()); });
+
+            connection.on("CommentAdded", function () { showToast("Có comment mới trong một task.", "primary"); });
+            connection.on("CommentUpdated", function () { showToast("Một comment vừa được chỉnh sửa.", "primary"); });
+            connection.on("CommentDeleted", function () { showToast("Một comment vừa được xoá.", "primary"); });
+            connection.on("TaskEvaluated", function () { showToast("Một task vừa được đánh giá.", "success"); });
+
+            const style = document.createElement("style");
+            style.innerHTML = `
+                .wf-avatar { width: 26px; height: 26px; border-radius: 50%; overflow:hidden; object-fit: cover; }
+                .wf-avatar--text { display:flex; align-items:center; justify-content:center; background:#eee; color:#333; font-weight:600; }
+                .kanban-column { background:#f8f9fa; border:1px solid #eee; border-radius:8px; padding:12px; min-height: 420px; }
+                .kanban-dropzone, .wf-kanban-stack { min-height: 320px; }
+            `;
+            document.head.appendChild(style);
+
+            const searchEl = document.getElementById("wfSearch");
+            if (searchEl) {
+                searchEl.addEventListener("input", function () {
+                    wfSearchQuery = (searchEl.value || "").toLowerCase();
+                    applySearchAll();
+                });
+            }
+
+            const filterRoot = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"kanban\"]");
+            if (filterRoot && window.wfTaskFilters) {
+                window.wfTaskFilters.bindFilterCard(filterRoot, {
+                    myUserId: myUserId,
+                    isPm: isPm,
+                    onKanbanUpdated: applySearchAll
+                });
+            }
+        })();
+    </script>
+}
+}

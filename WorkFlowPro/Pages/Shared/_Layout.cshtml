@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -18,7 +18,7 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                    <ul class="navbar-nav flex-grow-1 align-items-sm-center">
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
@@ -26,10 +26,21 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
                     </ul>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <ul class="navbar-nav align-items-sm-center">
+                            <partial name="_NotificationBell" />
+                        </ul>
+                    }
+                    @await Component.InvokeAsync("WorkspaceSwitcher")
                 </div>
             </div>
         </nav>
     </header>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <partial name="_NotificationToast" />
+    }
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()
@@ -45,6 +56,11 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+        <script src="~/js/notifications.js" asp-append-version="true"></script>
+    }
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

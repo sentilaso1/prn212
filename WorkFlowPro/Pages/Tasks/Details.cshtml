@@ -1,0 +1,425 @@
+@page "/Tasks/Details/{taskId:guid}"
+@model WorkFlowPro.Pages.Tasks.DetailsModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Task details";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Task details</h1>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="/board?projectId=@Model.ProjectId">Kanban</a>
+        <a class="btn btn-outline-secondary" href="/tasks/list?projectId=@Model.ProjectId">Danh sách task (lọc)</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.OverviewVm is not null)
+{
+    <ul class="nav nav-tabs mb-3" id="wfTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-overview" data-bs-toggle="tab" data-bs-target="#pane-overview" type="button" role="tab">
+                Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-attachments" data-bs-toggle="tab" data-bs-target="#pane-attachments" type="button" role="tab">
+                Attachments
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-comments" data-bs-toggle="tab" data-bs-target="#pane-comments" type="button" role="tab">
+                Comments
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history" type="button" role="tab">
+                Lịch sử
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(Model.IsPm ? "" : "disabled")" id="tab-eval" data-bs-toggle="tab" data-bs-target="#pane-eval" type="button" role="tab" @(Model.IsPm ? null : "aria-disabled=\"true\"")>
+                Evaluation
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+            <div id="wfOverviewSection">
+                <partial name="_TaskOverview" model="Model.OverviewVm" />
+            </div>
+        </div>
+        <div class="tab-pane fade" id="pane-attachments" role="tabpanel" aria-labelledby="tab-attachments">
+            <div id="wfAttachmentsSection">
+                <partial name="_Attachments" model="Model.AttachmentsVm" />
+            </div>
+        </div>
+        <div class="tab-pane fade" id="pane-comments" role="tabpanel" aria-labelledby="tab-comments">
+            <div id="wfCommentsSection">
+                <partial name="_Comments" model="Model.CommentsVm" />
+            </div>
+        </div>
+        <div class="tab-pane fade" id="pane-history" role="tabpanel" aria-labelledby="tab-history">
+            <div id="wfHistorySection">
+                <partial name="_ActivityLog" model="Model.ActivityLogVm" />
+            </div>
+        </div>
+        <div class="tab-pane fade" id="pane-eval" role="tabpanel" aria-labelledby="tab-eval">
+            <div id="wfEvaluationContainer">
+                <partial name="_TaskEvaluation" model="new WorkFlowPro.Pages.Tasks.EvaluationSectionVm(isPm:Model.IsPm, taskId:Model.TaskId, status:Model.OverviewVm!.detail.Status, evaluations:Model.EvaluationHistoryVm)" />
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts{
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        (function () {
+            const taskId = "@Model.TaskId.ToString("D")";
+            const projectId = "@Model.ProjectId.ToString("D")";
+            const actorUserId = "@Model.ActorUserId";
+            const isPm = @Model.IsPm.ToString().ToLowerInvariant();
+
+            // Global ajax submit interceptor for forms in this page.
+            document.addEventListener("submit", async function (e) {
+                const form = e.target.closest('form[data-wf-ajax="true"]');
+                if (!form) return;
+                e.preventDefault();
+
+                try {
+                    const formData = new FormData(form);
+                    const res = await fetch(form.action, {
+                        method: "POST",
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        body: formData
+                    });
+
+                    if (!res.ok) {
+                        const text = await res.text();
+                        console.error(text);
+                        alert("Có lỗi khi gửi yêu cầu. Vui lòng thử lại.");
+                        return;
+                    }
+                    // UI will be refreshed by SignalR.
+                } catch (err) {
+                    console.error(err);
+                    alert("Có lỗi khi gửi yêu cầu. Vui lòng thử lại.");
+                }
+            });
+
+            async function fetchPartial(handlerName) {
+                const url = `/Tasks/Details/${taskId}?handler=${handlerName}`;
+                const res = await fetch(url, { credentials: "include" });
+                if (!res.ok) return null;
+                return await res.text();
+            }
+
+            async function refreshOverview() {
+                const html = await fetchPartial("OverviewPartial");
+                if (html !== null) document.getElementById("wfOverviewSection").innerHTML = html;
+            }
+
+            async function refreshAttachments() {
+                const html = await fetchPartial("AttachmentsPartial");
+                if (html !== null) document.getElementById("wfAttachmentsSection").innerHTML = html;
+            }
+
+            async function refreshComments() {
+                const html = await fetchPartial("CommentsPartial");
+                if (html !== null) document.getElementById("wfCommentsSection").innerHTML = html;
+            }
+
+            async function refreshHistory() {
+                const html = await fetchPartial("ActivityLogPartial");
+                if (html !== null) document.getElementById("wfHistorySection").innerHTML = html;
+            }
+
+            async function refreshEvaluation() {
+                const html = await fetchPartial("EvaluationPartial");
+                if (html !== null) document.getElementById("wfEvaluationContainer").innerHTML = html;
+            }
+
+            // SignalR realtime
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/task")
+                .build();
+
+            function escapeHtml(s) {
+                if (s === null || s === undefined) return "";
+                return String(s)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function formatTimeLocal(isoOrDate) {
+                if (!isoOrDate) return "";
+                const d = (isoOrDate instanceof Date) ? isoOrDate : new Date(isoOrDate);
+                if (isNaN(d.getTime())) return "";
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                const hh = String(d.getHours()).padStart(2, "0");
+                const mi = String(d.getMinutes()).padStart(2, "0");
+                return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+            }
+
+            function getCommentsRoot() {
+                return document.getElementById("wfCommentsRoot");
+            }
+
+            function getCanManageComments() {
+                const root = getCommentsRoot();
+                if (!root) return false;
+                return root.getAttribute("data-can-manage") === "1";
+            }
+
+            function findCommentEl(commentId) {
+                return document.querySelector(`[data-wf-comment-id="${commentId}"]`);
+            }
+
+            function ensureRepliesContainer(commentId) {
+                let el = document.getElementById(`wfReplies-${commentId}`);
+                if (!el) {
+                    const host = findCommentEl(commentId);
+                    if (!host) return null;
+                    el = document.createElement("div");
+                    el.id = `wfReplies-${commentId}`;
+                    el.className = "ms-3";
+                    host.appendChild(el);
+                }
+                return el;
+            }
+
+            function getRootList() {
+                return document.getElementById("wfCommentsTree");
+            }
+
+            function buildCommentHtml(c) {
+                const canReply = getCanManageComments();
+                const canEdit = (isPm || (actorUserId && actorUserId === c.userId)) && !c.isDeleted;
+                const canDelete = (isPm || (actorUserId && actorUserId === c.userId));
+                const createdStr = formatTimeLocal(c.createdAtUtc);
+                const updatedStr = c.updatedAtUtc ? formatTimeLocal(c.updatedAtUtc) : "";
+                const editedBadge = c.updatedAtUtc ? `<span class="text-muted small ms-2">(đã chỉnh sửa)</span>` : "";
+
+                const contentHtml = c.isDeleted
+                    ? `<em class="text-muted">[Bình luận đã bị xoá]</em>`
+                    : `${escapeHtml(c.content || "")}`;
+
+                const replyForm = canReply ? `
+                    <details class="mt-2">
+                        <summary class="small text-primary" style="cursor:pointer;">Reply</summary>
+                        <form method="post" action="/Tasks/Details/${taskId}?handler=AddComment" data-wf-ajax="true" class="mt-2">
+                            <input name="__RequestVerificationToken" type="hidden" value="${escapeHtml(getCsrfToken())}" />
+                            <input type="hidden" name="parentCommentId" value="${escapeHtml(c.id)}" />
+                            <textarea class="form-control" name="content" rows="2"></textarea>
+                            <button class="btn btn-sm btn-primary mt-2" type="submit">Send</button>
+                        </form>
+                    </details>
+                ` : "";
+
+                const editForm = canEdit ? `
+                    <details class="mt-2">
+                        <summary class="small text-primary" style="cursor:pointer;">Edit</summary>
+                        <form method="post" action="/Tasks/Details/${taskId}?handler=EditComment" data-wf-ajax="true" class="mt-2">
+                            <input name="__RequestVerificationToken" type="hidden" value="${escapeHtml(getCsrfToken())}" />
+                            <input type="hidden" name="commentId" value="${escapeHtml(c.id)}" />
+                            <textarea class="form-control" name="content" rows="2">${escapeHtml(c.content || "")}</textarea>
+                            <button class="btn btn-sm btn-success mt-2" type="submit">Save</button>
+                        </form>
+                    </details>
+                ` : "";
+
+                const deleteForm = canDelete ? `
+                    <form method="post" action="/Tasks/Details/${taskId}?handler=DeleteComment" data-wf-ajax="true" class="mt-2">
+                        <input name="__RequestVerificationToken" type="hidden" value="${escapeHtml(getCsrfToken())}" />
+                        <input type="hidden" name="commentId" value="${escapeHtml(c.id)}" />
+                        <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete comment?');">Delete</button>
+                    </form>
+                ` : "";
+
+                return `
+                    <div class="mb-3 ${c.parentCommentId ? "ms-3" : ""}" data-wf-comment-id="${escapeHtml(c.id)}" data-wf-parent-id="${escapeHtml(c.parentCommentId || "")}" data-wf-created-at="${escapeHtml(c.createdAtUtc || "")}">
+                        <div class="p-2 border rounded bg-light">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div>
+                                    <div class="fw-semibold small">${escapeHtml(c.userDisplayName || c.userId || "-")}${editedBadge}</div>
+                                    <div class="text-muted small">${escapeHtml(createdStr)}</div>
+                                </div>
+                                <div class="text-end small text-muted">
+                                    ${updatedStr ? `<div>Updated: ${escapeHtml(updatedStr)}</div>` : ""}
+                                </div>
+                            </div>
+                            <div class="mt-2" style="white-space: pre-wrap;" data-wf-comment-content="1">
+                                ${contentHtml}
+                            </div>
+                            ${replyForm}
+                            ${editForm}
+                            ${deleteForm}
+                        </div>
+                        <div id="wfReplies-${escapeHtml(c.id)}" class="ms-3"></div>
+                    </div>
+                `;
+            }
+
+            function getCsrfToken() {
+                const root = getCommentsRoot();
+                if (!root) return "";
+                return root.getAttribute("data-csrf") || "";
+            }
+
+            function insertCommentIntoDom(comment) {
+                const listRoot = getRootList();
+                if (!listRoot) return false;
+
+                const html = buildCommentHtml(comment);
+                const wrapper = document.createElement("div");
+                wrapper.innerHTML = html;
+                const el = wrapper.firstElementChild;
+                if (!el) return false;
+
+                const parentId = comment.parentCommentId;
+                const container = parentId ? ensureRepliesContainer(parentId) : listRoot;
+                if (!container) return false;
+
+                // Insert sorted by createdAtUtc ascending among siblings.
+                const created = new Date(comment.createdAtUtc);
+                const siblings = Array.from(container.children).filter(x => x && x.getAttribute && x.getAttribute("data-wf-comment-id"));
+                for (const sib of siblings) {
+                    const sibCreatedRaw = sib.getAttribute("data-wf-created-at");
+                    const sibCreated = sibCreatedRaw ? new Date(sibCreatedRaw) : null;
+                    if (sibCreated && !isNaN(sibCreated.getTime()) && !isNaN(created.getTime())) {
+                        if (sibCreated.getTime() > created.getTime()) {
+                            container.insertBefore(el, sib);
+                            return true;
+                        }
+                    }
+                }
+                container.appendChild(el);
+                return true;
+            }
+
+            function applyCommentUpdate(comment) {
+                const el = findCommentEl(comment.id);
+                if (!el) return false;
+                const contentEl = el.querySelector('[data-wf-comment-content="1"]');
+                if (!contentEl) return false;
+                contentEl.textContent = comment.content || "";
+
+                // Mark as edited
+                const headerName = el.querySelector(".fw-semibold.small");
+                if (headerName && !headerName.textContent.includes("(đã chỉnh sửa)")) {
+                    headerName.insertAdjacentHTML("beforeend", ' <span class="text-muted small ms-2">(đã chỉnh sửa)</span>');
+                }
+
+                const updatedAt = comment.updatedAtUtc ? formatTimeLocal(comment.updatedAtUtc) : "";
+                const rightBox = el.querySelector(".text-end.small.text-muted");
+                if (rightBox) {
+                    rightBox.innerHTML = updatedAt ? `<div>Updated: ${escapeHtml(updatedAt)}</div>` : "";
+                }
+                return true;
+            }
+
+            function applyCommentDelete(payload) {
+                const id = payload.id;
+                const el = findCommentEl(id);
+                if (!el) return false;
+                const soft = payload.isSoftDelete === true;
+                if (!soft) {
+                    el.remove();
+                    return true;
+                }
+                const contentEl = el.querySelector('[data-wf-comment-content="1"]');
+                if (contentEl) contentEl.innerHTML = '<em class="text-muted">[Bình luận đã bị xoá]</em>';
+                return true;
+            }
+
+            connection.on("TaskUpdated", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshOverview();
+                await refreshHistory();
+                // If evaluation changed, TaskUpdated might be enough to refresh it.
+                await refreshEvaluation();
+            });
+
+            connection.on("CommentAdded", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                if (payload.comment && payload.comment.id) {
+                    const exists = findCommentEl(payload.comment.id);
+                    if (!exists) {
+                        const ok = insertCommentIntoDom(payload.comment);
+                        if (!ok) await refreshComments();
+                    }
+                } else {
+                    await refreshComments();
+                }
+                await refreshHistory();
+            });
+
+            connection.on("CommentUpdated", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                if (payload.comment && payload.comment.id) {
+                    const ok = applyCommentUpdate(payload.comment);
+                    if (!ok) await refreshComments();
+                } else {
+                    await refreshComments();
+                }
+                await refreshHistory();
+            });
+
+            connection.on("CommentDeleted", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                if (payload.comment && payload.comment.id) {
+                    const ok = applyCommentDelete(payload.comment);
+                    if (!ok) await refreshComments();
+                } else {
+                    await refreshComments();
+                }
+                await refreshHistory();
+            });
+
+            connection.on("AttachmentAdded", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshAttachments();
+                await refreshHistory();
+            });
+
+            connection.on("AttachmentDeleted", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshAttachments();
+                await refreshHistory();
+            });
+
+            connection.on("TaskEvaluated", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshEvaluation();
+                await refreshHistory();
+            });
+
+            connection.on("HistoryAdded", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshHistory();
+                await refreshEvaluation();
+            });
+
+            async function start() {
+                await connection.start();
+                await connection.invoke("JoinProject", projectId);
+            }
+
+            start().catch(function (err) {
+                console.error(err.toString());
+            });
+        })();
+    </script>
+}
+

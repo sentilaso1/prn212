@@ -1,0 +1,82 @@
+@page "/Roles"
+@model WorkFlowPro.Pages.RolesModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Manage workspace roles";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="h3 mb-3">Quản lý Role (UC-09)</h1>
+
+<p class="text-muted small">
+    Chỉ <strong>PM</strong> hoặc <strong>Platform Admin</strong>. Dữ liệu theo workspace hiện tại (<code>CurrentWorkspaceId</code>).
+</p>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.WorkspaceId is null)
+{
+    <div class="alert alert-warning">Workspace không hợp lệ.</div>
+}
+else
+{
+    <p class="small text-muted mb-3">WorkspaceId: <strong>@Model.WorkspaceId</strong></p>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+
+    <datalist id="role-subrole-suggestions">
+        <option value="BA"></option>
+        <option value="DEV"></option>
+        <option value="Designer"></option>
+        <option value="QA"></option>
+    </datalist>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+            <tr>
+                <th style="width:72px;">Avatar</th>
+                <th>Tên</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>SubRole</th>
+                <th style="min-width:220px;">Thao tác</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Model.Members)
+            {
+                <partial name="_MemberRoleRow" model="row" />
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (Model.ShowToast)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+        <div id="rolesSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">@Model.ToastMessage</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (Model.ShowToast)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const el = document.getElementById('rolesSuccessToast');
+                if (!el || typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
+                new bootstrap.Toast(el, { delay: 4000 }).show();
+            });
+        </script>
+    }
+}

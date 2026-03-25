@@ -1,0 +1,56 @@
+@model WorkFlowPro.ViewModels.WorkspaceMemberRoleRowVm
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<tr>
+    <td>
+        @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
+        {
+            <img src="@Model.AvatarUrl" alt="" class="rounded-circle" width="40" height="40" style="object-fit:cover;" />
+        }
+        else
+        {
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-secondary-subtle text-muted" style="width:40px;height:40px;">@(Model.DisplayName.Length > 0 ? Model.DisplayName[0] : '?')</span>
+        }
+    </td>
+    <td class="fw-medium">@Model.DisplayName</td>
+    <td class="small text-muted">@Model.Email</td>
+    <td>
+        <span class="badge @(Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM ? "bg-primary" : "bg-secondary")">@Model.Role</span>
+    </td>
+    <td>@(string.IsNullOrWhiteSpace(Model.SubRole) ? "—" : Model.SubRole)</td>
+    <td>
+        <div class="d-flex flex-column gap-2">
+            @if (Model.CanChangeWorkspaceRole)
+            {
+                <form method="post" asp-page="/Roles" asp-page-handler="ChangeRole" class="d-flex flex-wrap gap-1 align-items-center"
+                      onsubmit="return confirm('Xác nhận đổi workspace role (PM ↔ Member)? Hệ thống không cho phép workspace không còn PM nào.');">
+                    <input type="hidden" name="ChangeRoleInput.TargetUserId" value="@Model.UserId" />
+                    <select name="ChangeRoleInput.NewRole" class="form-select form-select-sm" style="width:auto;min-width:120px;">
+                        @if (Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
+                        {
+                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM" selected>PM</option>
+                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member">Member</option>
+                        }
+                        else
+                        {
+                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM">PM</option>
+                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member" selected>Member</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Đổi role</button>
+                </form>
+            }
+            else
+            {
+                <span class="text-muted small">Không đổi role của chính bạn</span>
+            }
+
+            <form method="post" asp-page="/Roles" asp-page-handler="ChangeSubRole" class="d-flex flex-wrap gap-1 align-items-center"
+                  onsubmit="return confirm('Xác nhận lưu SubRole? Thay đổi được đồng bộ với gợi ý phân công (UC-04).');">
+                <input type="hidden" name="ChangeSubRoleInput.TargetUserId" value="@Model.UserId" />
+                <input name="ChangeSubRoleInput.SubRole" class="form-control form-control-sm" style="min-width:140px;max-width:200px;" value="@Model.SubRole" placeholder="BA, DEV, QA..." maxlength="100" list="role-subrole-suggestions" />
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Lưu SubRole</button>
+            </form>
+        </div>
+    </td>
+</tr>

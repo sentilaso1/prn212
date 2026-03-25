@@ -1,0 +1,110 @@
+@using WorkFlowPro.Data
+@using WorkFlowPro.Services
+@using TaskItemStatus = WorkFlowPro.Data.TaskStatus
+@model WorkFlowPro.ViewModels.TaskFiltersVm
+@{
+    var c = Model.Criteria;
+    var selAssignees = new HashSet<string>(c.AssigneeUserIds ?? new List<string>(), StringComparer.Ordinal);
+    var selStatuses = new HashSet<TaskItemStatus>(c.Statuses ?? new List<TaskItemStatus>());
+    var selPri = new HashSet<TaskPriority>(c.Priorities ?? new List<TaskPriority>());
+    var formId = $"wfTaskFilters_{Model.ViewContext}_{Model.ProjectId:N}";
+    bool St(TaskItemStatus s) => selStatuses.Count == 0 || selStatuses.Contains(s);
+    bool Pr(TaskPriority p) => selPri.Count == 0 || selPri.Contains(p);
+}
+
+<div class="card mb-3" id="@formId" data-project-id="@Model.ProjectId" data-view="@Model.ViewContext">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label small text-muted mb-1">Assignee (multi)</label>
+                <select class="form-select form-select-sm wf-filter-assignees" multiple size="4" aria-label="Assignee">
+                    @foreach (var m in Model.WorkspaceMembers)
+                    {
+                        <option value="@m.UserId" selected="@selAssignees.Contains(m.UserId)">
+                            @m.DisplayName @(m.Level is null ? "" : $"({m.Level})")
+                        </option>
+                    }
+                </select>
+                <div class="form-text">Không chọn = tất cả assignee.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label small text-muted mb-1">Trạng thái</label>
+                <div class="border rounded px-2 py-1 wf-filter-status" style="max-height: 120px; overflow-y: auto;">
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.Unassigned" id="@(formId)_st_u" checked="@St(TaskItemStatus.Unassigned)" />
+                        <label class="form-check-label small" for="@(formId)_st_u">Unassigned</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.Pending" id="@(formId)_st_p" checked="@St(TaskItemStatus.Pending)" />
+                        <label class="form-check-label small" for="@(formId)_st_p">Pending</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.ToDo" id="@(formId)_st_td" checked="@St(TaskItemStatus.ToDo)" />
+                        <label class="form-check-label small" for="@(formId)_st_td">To Do</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.InProgress" id="@(formId)_st_ip" checked="@St(TaskItemStatus.InProgress)" />
+                        <label class="form-check-label small" for="@(formId)_st_ip">In Progress</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.Review" id="@(formId)_st_r" checked="@St(TaskItemStatus.Review)" />
+                        <label class="form-check-label small" for="@(formId)_st_r">Review</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.Done" id="@(formId)_st_d" checked="@St(TaskItemStatus.Done)" />
+                        <label class="form-check-label small" for="@(formId)_st_d">Done</label>
+                    </div>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input wf-filter-status-cb" type="checkbox" value="@TaskItemStatus.Cancelled" id="@(formId)_st_c" checked="@St(TaskItemStatus.Cancelled)" />
+                        <label class="form-check-label small" for="@(formId)_st_c">Cancelled</label>
+                    </div>
+                </div>
+                <div class="form-text">Không chọn ô nào = mọi trạng thái (server loại Cancelled khi không lọc).</div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label small text-muted mb-1">Ưu tiên</label>
+                <div class="wf-filter-priority">
+                    @foreach (TaskPriority p in Enum.GetValues<TaskPriority>())
+                    {
+                        <div class="form-check form-check-sm">
+                            <input class="form-check-input wf-filter-pri-cb" type="checkbox" value="@p" id="@(formId)_pri_@(p)" checked="@Pr(p)" />
+                            <label class="form-check-label small" for="@(formId)_pri_@(p)">@p</label>
+                        </div>
+                    }
+                </div>
+                <div class="form-text">Không chọn = mọi mức.</div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label small text-muted mb-1">Hạn chót</label>
+                <select class="form-select form-select-sm wf-filter-due">
+                    <option value="None" selected="@(c.DueDateBucket == TaskDueDateBucket.None)">—</option>
+                    <option value="Today" selected="@(c.DueDateBucket == TaskDueDateBucket.Today)">Hôm nay</option>
+                    <option value="ThisWeek" selected="@(c.DueDateBucket == TaskDueDateBucket.ThisWeek)">Tuần này</option>
+                    <option value="ThisMonth" selected="@(c.DueDateBucket == TaskDueDateBucket.ThisMonth)">Tháng này</option>
+                    <option value="Overdue" selected="@(c.DueDateBucket == TaskDueDateBucket.Overdue)">Quá hạn</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label small text-muted mb-1">Sắp xếp</label>
+                <select class="form-select form-select-sm wf-filter-sort">
+                    <option value="DueDateAsc" selected="@(c.Sort == TaskSortOption.DueDateAsc)">Hạn ↑</option>
+                    <option value="DueDateDesc" selected="@(c.Sort == TaskSortOption.DueDateDesc)">Hạn ↓</option>
+                    <option value="PriorityAsc" selected="@(c.Sort == TaskSortOption.PriorityAsc)">Ưu tiên ↑</option>
+                    <option value="PriorityDesc" selected="@(c.Sort == TaskSortOption.PriorityDesc)">Ưu tiên ↓</option>
+                    <option value="CreatedAtAsc" selected="@(c.Sort == TaskSortOption.CreatedAtAsc)">Tạo ↑</option>
+                    <option value="CreatedAtDesc" selected="@(c.Sort == TaskSortOption.CreatedAtDesc)">Tạo ↓</option>
+                    <option value="TitleAsc" selected="@(c.Sort == TaskSortOption.TitleAsc)">Tiêu đề A→Z</option>
+                    <option value="TitleDesc" selected="@(c.Sort == TaskSortOption.TitleDesc)">Tiêu đề Z→A</option>
+                </select>
+            </div>
+            <div class="col-lg-6 col-md-8">
+                <label class="form-label small text-muted mb-1">Tìm tiêu đề (server)</label>
+                <input type="search" class="form-control form-control-sm wf-filter-search" placeholder="Lọc theo tiêu đề..."
+                       value="@c.SearchTitle" autocomplete="off" />
+            </div>
+            <div class="col-lg-6 col-md-4 text-md-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary wf-filter-clear">Xóa bộ lọc</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
 using WorkFlowPro.Extensions;
+using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Controllers;
 
@@ -19,17 +20,20 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtTokenService _jwt;
     private readonly IConfiguration _config;
+    private readonly IWorkspaceOnboardingService _workspaceOnboarding;
 
     public AuthController(
         WorkFlowProDbContext db,
         UserManager<ApplicationUser> userManager,
         IJwtTokenService jwt,
-        IConfiguration config)
+        IConfiguration config,
+        IWorkspaceOnboardingService workspaceOnboarding)
     {
         _db = db;
         _userManager = userManager;
         _jwt = jwt;
         _config = config;
+        _workspaceOnboarding = workspaceOnboarding;
     }
 
     public sealed record RegisterRequest(
@@ -75,30 +79,10 @@ public sealed class AuthController : ControllerBase
             return BadRequest(createResult.Errors.Select(e => e.Description));
         }
 
-        var workspace = new Workspace
-        {
-            Name = request.CompanyName,
-            Description = null
-        };
-
-        var profile = new MemberProfile
-        {
-            UserId = user.Id,
-            Level = MemberLevel.Junior
-        };
-
-        var membership = new WorkspaceMember
-        {
-            WorkspaceId = workspace.Id,
-            UserId = user.Id,
-            Role = WorkspaceMemberRole.PM,
-            SubRole = "PM"
-        };
-
-        _db.Workspaces.Add(workspace);
-        _db.MemberProfiles.Add(profile);
-        _db.WorkspaceMembers.Add(membership);
-        await _db.SaveChangesAsync();
+        var workspace = await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
+            userId: user.Id,
+            workspaceName: request.CompanyName,
+            cancellationToken: HttpContext.RequestAborted);
 
         var token = _jwt.GenerateAccessToken(user, workspace.Id);
         var workspaces = new[]

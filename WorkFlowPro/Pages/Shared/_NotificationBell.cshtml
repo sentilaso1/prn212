@@ -1,0 +1,28 @@
+@* UC-11: Chuông + dropdown + badge *@
+<li class="nav-item dropdown me-2" id="wfNotificationBellWrapper">
+    <a class="nav-link dropdown-toggle py-2 position-relative"
+       href="#"
+       id="wfNotificationDropdown"
+       role="button"
+       data-bs-toggle="dropdown"
+       data-bs-auto-close="outside"
+       aria-expanded="false">
+        <span class="text-dark" aria-hidden="true">🔔</span>
+        <span id="wfNotifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 320px; max-height: 420px; overflow-y: auto;" aria-labelledby="wfNotificationDropdown">
+        <li class="px-3 py-2 d-flex justify-content-between align-items-center border-bottom">
+            <span class="fw-semibold">Thông báo</span>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" id="wfNotifMarkAllRead" title="Đánh dấu đã đọc tất cả">Đã đọc hết</button>
+            </div>
+        </li>
+        <li>
+            <partial name="_NotificationList" />
+        </li>
+        <li><hr class="dropdown-divider" /></li>
+        <li>
+            <a class="dropdown-item text-center" asp-page="/Notifications/Index">Xem tất cả</a>
+        </li>
+    </ul>
+</li>

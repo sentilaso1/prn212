@@ -1,0 +1,50 @@
+@model WorkFlowPro.Pages.Tasks.CommentsVm
+@{
+    var d = Model.detail;
+}
+
+<div class="card card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Comments</h5>
+        <span class="text-muted small">@Model.items.Count comment(s)</span>
+    </div>
+
+    @if (d.CanManageComments)
+    {
+        <form method="post" asp-page-handler="AddComment" data-wf-ajax="true" class="mb-3">
+            @Html.AntiForgeryToken()
+            <div class="mb-2">
+                <label class="form-label">Add a comment</label>
+                <textarea class="form-control" name="content" rows="3"></textarea>
+            </div>
+            <input type="hidden" name="parentCommentId" value="" />
+            <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+    }
+
+    @{
+        // Grab anti-forgery token value so JS-created forms can reuse it.
+        var anti = Context.RequestServices.GetService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>();
+        var tokens = anti?.GetAndStoreTokens(Context);
+        var csrf = tokens?.RequestToken ?? "";
+    }
+
+    <div id="wfCommentsRoot" data-actor-user-id="@Model.actorUserId" data-can-manage="@(d.CanManageComments ? "1" : "0")" data-csrf="@csrf">
+        <div id="wfCommentsList">
+        @if (Model.items.Count == 0)
+        {
+            <div class="alert alert-info small">Chưa có comment.</div>
+        }
+        else
+        {
+            <div class="list-unstyled" id="wfCommentsTree">
+                @foreach (var c in Model.items)
+                {
+                    <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(c, Model.actorUserId, d.CanManageComments)" />
+                }
+            </div>
+        }
+        </div>
+    </div>
+</div>
+

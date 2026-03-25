@@ -1,0 +1,77 @@
+@using WorkFlowPro.Services
+@model WorkFlowPro.Pages.Tasks.ActivityLogVm
+
+<div class="card card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Lịch sử</h5>
+        <span class="text-muted small">@Model.items.Count entry(s)</span>
+    </div>
+
+    <style>
+        .wf-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; object-fit: cover; }
+        .wf-avatar--text { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #eee; color: #333; font-weight: 700; }
+        .wf-history-scroll { max-height: 420px; overflow-y: auto; }
+        .wf-history-entry-action { white-space: pre-wrap; }
+    </style>
+
+    <div id="wfHistoryList" class="wf-history-scroll">
+        @if (Model.items.Count == 0)
+        {
+            <div class="alert alert-info small">Chưa có lịch sử cho task này.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var h in Model.items)
+                {
+                    <div class="list-group-item">
+                        <div class="d-flex gap-3">
+                            <div>
+                                @if (!string.IsNullOrWhiteSpace(h.ActorAvatarUrl))
+                                {
+                                    <img src="@h.ActorAvatarUrl" class="wf-avatar" alt="avatar" />
+                                }
+                                else
+                                {
+                                    <div class="wf-avatar wf-avatar--text">
+                                        @(string.IsNullOrWhiteSpace(h.ActorDisplayName)
+                                            ? "?"
+                                            : h.ActorDisplayName[0].ToString().ToUpperInvariant())
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <div>
+                                        <div class="fw-semibold">@h.ActorDisplayName</div>
+                                    </div>
+                                    <div class="text-muted small">@TaskHistoryHelper.FormatRelativeTime(h.TimestampUtc)</div>
+                                </div>
+
+                                <div class="wf-history-entry-action small mt-1">
+                                    @TaskHistoryHelper.GetHumanReadableAction(h)
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(h.OldValue) || !string.IsNullOrWhiteSpace(h.NewValue))
+                                {
+                                    <div class="text-muted small mt-1">
+                                        @if (!string.IsNullOrWhiteSpace(h.OldValue))
+                                        {
+                                            <div>Old: @h.OldValue</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(h.NewValue))
+                                        {
+                                            <div>New: @h.NewValue</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+

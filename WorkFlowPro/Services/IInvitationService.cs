@@ -1,0 +1,32 @@
+using WorkFlowPro.Data;
+
+namespace WorkFlowPro.Services;
+
+public interface IInvitationService
+{
+    Task<InviteMembersResult> InviteMembersAsync(
+        Guid workspaceId,
+        string emailsRaw,
+        WorkspaceMemberRole role,
+        string? subRole,
+        CancellationToken cancellationToken = default);
+
+    Task<AcceptInviteResult> AcceptInviteAsync(
+        string token,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class InviteMembersResult
+{
+    public required IReadOnlyList<string> Errors { get; init; }
+
+    public bool Success => Errors.Count == 0;
+}
+
+public sealed class AcceptInviteResult
+{
+    public bool Success { get; init; }
+    public Guid? WorkspaceId { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+

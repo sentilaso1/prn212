@@ -1,0 +1,82 @@
+@page "/Tasks/AcceptReject/{taskId:guid}"
+@model WorkFlowPro.Pages.Tasks.AcceptRejectModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Accept / Reject task";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Accept / Reject task</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @Model.ErrorMessage
+    </div>
+}
+
+@if (Model.Task is not null)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4 class="card-title">@Model.Task.Title</h4>
+            <p class="text-muted mb-1">
+                Project: <strong>@Model.Task.ProjectName</strong>
+            </p>
+            <p class="mb-1">
+                Priority: <strong>@Model.Task.Priority</strong>
+            </p>
+            <p class="mb-1">
+                Due: <strong>@(Model.Task.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-")</strong>
+            </p>
+        </div>
+    </div>
+
+    <form method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Input.TaskId" />
+
+        <div class="mb-3">
+            <label asp-for="Input.RejectReason" class="form-label">Reject reason (required if you Reject)</label>
+            <textarea asp-for="Input.RejectReason" class="form-control" rows="4"></textarea>
+            <span asp-validation-for="Input.RejectReason" class="text-danger"></span>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success" asp-page-handler="Accept">Accept</button>
+            <button type="submit" class="btn btn-danger" asp-page-handler="Reject">Reject</button>
+            <a class="btn btn-outline-secondary" href="/Projects">Back</a>
+        </div>
+    </form>
+}
+
+@if (Model.ShowSuccessToast)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="taskActionToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    @Model.SuccessToastMessage
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    @if (Model.ShowSuccessToast)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const el = document.getElementById('taskActionToast');
+                if (!el) return;
+                const toast = new bootstrap.Toast(el, { delay: 4000 });
+                toast.show();
+            });
+        </script>
+    }
+}
+

@@ -6,6 +6,7 @@ using WorkFlowPro.Data;
 using WorkFlowPro.Extensions;
 using WorkFlowPro.Hubs;
 using WorkFlowPro.Services;
+using WorkFlowPro.ViewModels;
 using TaskStatus = WorkFlowPro.Data.TaskStatus;
 
 namespace WorkFlowPro.Controllers;
@@ -15,20 +16,23 @@ namespace WorkFlowPro.Controllers;
 public sealed class TasksController : ControllerBase
 {
     private readonly WorkFlowProDbContext _db;
-    private readonly IHubContext<KanbanHub> _hub;
+    private readonly IHubContext<TaskHub> _hub;
     private readonly ITaskHistoryService _history;
     private readonly INotificationService _notifications;
+    private readonly ITaskService _taskService;
 
     public TasksController(
         WorkFlowProDbContext db,
-        IHubContext<KanbanHub> hub,
+        IHubContext<TaskHub> hub,
         ITaskHistoryService history,
-        INotificationService notifications)
+        INotificationService notifications,
+        ITaskService taskService)
     {
         _db = db;
         _hub = hub;
         _history = history;
         _notifications = notifications;
+        _taskService = taskService;
     }
 
     public sealed record CreateTaskRequest(
@@ -70,7 +74,7 @@ public sealed class TasksController : ControllerBase
                 _db.TaskAssignments.Any(a =>
                     a.TaskId == t.Id &&
                     a.AssigneeUserId == userId &&
-                    a.Status == TaskAssignmentStatus.Accepted));
+                    (a.Status == TaskAssignmentStatus.Accepted || a.Status == TaskAssignmentStatus.Pending)));
         }
 
         var tasks = await visibleTasksQuery
@@ -183,7 +187,8 @@ public sealed class TasksController : ControllerBase
                 workspaceId: workspaceId,
                 projectId: projectId,
                 taskId: task.Id,
-                redirectUrl: $"/board?projectId={projectId}",
+                // UC-05: Member nhận task qua notification -> mở trang accept/reject.
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}",
                 cancellationToken: HttpContext.RequestAborted);
         }
 
@@ -246,9 +251,10 @@ public sealed class TasksController : ControllerBase
             redirectUrl: $"/board?projectId={project.Id}",
             cancellationToken: HttpContext.RequestAborted);
 
+        var card = await BuildTaskCardAsync(task.Id, HttpContext.RequestAborted);
         await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
             "taskMoved",
-            new { taskId = task.Id, newStatus = task.Status.ToString() },
+            new { taskId = task.Id, newStatus = task.Status.ToString(), card },
             cancellationToken: HttpContext.RequestAborted);
 
         return Ok();
@@ -310,9 +316,10 @@ public sealed class TasksController : ControllerBase
             redirectUrl: $"/board?projectId={project.Id}",
             cancellationToken: HttpContext.RequestAborted);
 
+        var card = await BuildTaskCardAsync(task.Id, HttpContext.RequestAborted);
         await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
             "taskMoved",
-            new { taskId = task.Id, newStatus = task.Status.ToString() },
+            new { taskId = task.Id, newStatus = task.Status.ToString(), card },
             cancellationToken: HttpContext.RequestAborted);
 
         return Ok();
@@ -364,9 +371,10 @@ public sealed class TasksController : ControllerBase
             newValue: task.Status.ToString(),
             cancellationToken: HttpContext.RequestAborted);
 
+        var card = await BuildTaskCardAsync(task.Id, HttpContext.RequestAborted);
         await _hub.Clients.Group(projectId.ToString("D")).SendAsync(
             "taskMoved",
-            new { taskId = task.Id, newStatus = task.Status.ToString() },
+            new { taskId = task.Id, newStatus = task.Status.ToString(), card },
             cancellationToken: HttpContext.RequestAborted);
 
         if (task.Status == TaskStatus.Done)
@@ -385,6 +393,156 @@ public sealed class TasksController : ControllerBase
         return Ok();
     }
 
+    /// <summary>UC-16: Lọc/sắp xếp Kanban — JSON + lưu Session.</summary>
+    [Authorize]
+    [HttpPost("projects/{projectId:guid}/tasks/filter-kanban")]
+    public async Task<ActionResult<object>> FilterKanban(Guid projectId, [FromBody] TaskFilterCriteria? criteria)
+    {
+        var userId = User.GetUserId();
+        var workspaceId = User.GetWorkspaceId();
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
+        if (project is null)
+            return NotFound();
+
+        var c = criteria ?? TaskFilterCriteria.Default();
+        HttpContext.Session.SetString(TaskFilterSession.KeyForProject(projectId), TaskFilterSession.Serialize(c));
+
+        try
+        {
+            var result = await _taskService.GetFilteredKanbanTasksAsync(
+                projectId,
+                workspaceId,
+                userId,
+                c,
+                HttpContext.RequestAborted);
+
+            return Ok(ToKanbanFilterResponse(result));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>UC-16: Danh sách task (list view) — JSON + Session.</summary>
+    [Authorize]
+    [HttpPost("projects/{projectId:guid}/tasks/filter-list")]
+    public async Task<ActionResult<object>> FilterTaskList(Guid projectId, [FromBody] TaskFilterCriteria? criteria)
+    {
+        var userId = User.GetUserId();
+        var workspaceId = User.GetWorkspaceId();
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
+        if (project is null)
+            return NotFound();
+
+        var c = criteria ?? TaskFilterCriteria.Default();
+        HttpContext.Session.SetString(TaskFilterSession.KeyForProject(projectId), TaskFilterSession.Serialize(c));
+
+        try
+        {
+            var result = await _taskService.GetFilteredTaskListAsync(
+                projectId,
+                workspaceId,
+                userId,
+                c,
+                HttpContext.RequestAborted);
+
+            return Ok(new { tasks = result.Tasks.Select(TaskCardJson).ToList() });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>UC-16: Đọc bộ lọc đã lưu trong Session (khởi tạo UI).</summary>
+    [Authorize]
+    [HttpGet("projects/{projectId:guid}/tasks/filter-state")]
+    public async Task<ActionResult<TaskFilterCriteria>> GetFilterState(Guid projectId)
+    {
+        var workspaceId = User.GetWorkspaceId();
+        var ok = await _db.Projects.AnyAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
+        if (!ok)
+            return NotFound();
+
+        var json = HttpContext.Session.GetString(TaskFilterSession.KeyForProject(projectId));
+        return Ok(TaskFilterSession.Deserialize(json));
+    }
+
+    /// <summary>UC-16: Xóa bộ lọc trong Session (mặc định).</summary>
+    [Authorize]
+    [HttpPost("projects/{projectId:guid}/tasks/filter-reset")]
+    public async Task<ActionResult<TaskFilterCriteria>> ResetFilterState(Guid projectId)
+    {
+        var workspaceId = User.GetWorkspaceId();
+        var ok = await _db.Projects.AnyAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
+        if (!ok)
+            return NotFound();
+
+        HttpContext.Session.Remove(TaskFilterSession.KeyForProject(projectId));
+        return Ok(TaskFilterCriteria.Default());
+    }
+
+    private static object ToKanbanFilterResponse(FilteredKanbanTasksResult r) => new
+    {
+        unassigned = r.Unassigned.Select(TaskCardJson).ToList(),
+        pending = r.Pending.Select(TaskCardJson).ToList(),
+        toDo = r.ToDo.Select(TaskCardJson).ToList(),
+        inProgress = r.InProgress.Select(TaskCardJson).ToList(),
+        review = r.Review.Select(TaskCardJson).ToList(),
+        done = r.Done.Select(TaskCardJson).ToList()
+    };
+
+    private static object TaskCardJson(TaskCardVm vm) => new
+    {
+        taskId = vm.TaskId,
+        title = vm.Title,
+        projectId = vm.ProjectId,
+        priority = vm.Priority.ToString(),
+        dueDateUtc = vm.DueDateUtc,
+        status = vm.Status.ToString(),
+        assigneeUserId = vm.AssigneeUserId,
+        assigneeDisplayName = vm.AssigneeDisplayName,
+        assigneeAvatarUrl = vm.AssigneeAvatarUrl,
+        isOverdue = vm.IsOverdue,
+        canDrag = vm.CanDrag,
+        createdAtUtc = vm.CreatedAtUtc
+    };
+
+    private async Task<object?> BuildTaskCardAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        if (task is null)
+            return null;
+
+        var display = task.Status is TaskStatus.ToDo or TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Done;
+        if (!display)
+            return null;
+
+        var assignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
+            a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted, cancellationToken);
+
+        var assigneeUserId = assignment?.AssigneeUserId ?? string.Empty;
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == assigneeUserId, cancellationToken);
+        var assigneeDisplayName = user?.DisplayName ?? user?.Email ?? user?.UserName ?? "-";
+
+        return new
+        {
+            taskId = task.Id,
+            title = task.Title,
+            projectId = task.ProjectId,
+            priority = task.Priority.ToString(),
+            dueDateUtc = task.DueDateUtc,
+            status = task.Status.ToString(),
+            assigneeUserId = assigneeUserId,
+            assigneeDisplayName = assigneeDisplayName,
+            assigneeAvatarUrl = user?.AvatarUrl
+        };
+    }
+
     [Authorize]
     [HttpPost("tasks/{taskId:guid}/evaluate")]
     public async Task<ActionResult<object>> Evaluate(Guid taskId, [FromBody] EvaluateTaskRequest request)
@@ -392,123 +550,18 @@ public sealed class TasksController : ControllerBase
         var userId = User.GetUserId();
         var workspaceId = User.GetWorkspaceId();
 
-        var pmRole = await _db.WorkspaceMembers.AnyAsync(m =>
-            m.UserId == userId && m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM);
-        if (!pmRole) return Forbid();
-
-        if (request.Score is < 1 or > 10) return BadRequest("Score must be 1..10.");
-
-        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId);
-        if (task is null) return NotFound();
-
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId);
-        if (project is null) return Forbid();
-
-        if (task.Status != TaskStatus.Done)
-            return BadRequest("Task must be in Done state.");
-
-        var acceptedAssignment = await _db.TaskAssignments
-            .Where(a => a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted)
-            .OrderByDescending(a => a.CreatedAtUtc)
-            .FirstOrDefaultAsync();
-        if (acceptedAssignment is null) return BadRequest("Missing assignee.");
-
-        var memberUserId = acceptedAssignment.AssigneeUserId;
-
-        // Upsert evaluation within 24h window
-        var existingEval = await _db.TaskEvaluations.FirstOrDefaultAsync(e => e.TaskId == taskId);
-        if (existingEval is not null && existingEval.EvaluatedAtUtc < DateTime.UtcNow.AddHours(-24))
-            return Conflict("Evaluation can be edited only within 24 hours.");
-
-        if (existingEval is null)
-        {
-            existingEval = new TaskEvaluation
-            {
-                TaskId = taskId,
-                PmUserId = userId,
-            };
-            _db.TaskEvaluations.Add(existingEval);
-        }
-
-        existingEval.PmUserId = userId;
-        existingEval.Score = request.Score;
-        existingEval.Comment = request.Comment;
-        existingEval.EvaluatedAtUtc = DateTime.UtcNow;
-
-        // Update member profile KPI (UC-08 + UC-13 source)
-        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, HttpContext.RequestAborted);
-
-        await _db.SaveChangesAsync(HttpContext.RequestAborted);
-
-        await _history.LogAsync(
+        var result = await _taskService.EvaluateTaskAsync(
             taskId,
-            User,
-            "Đánh giá task",
-            oldValue: null,
-            newValue: $"Score={request.Score}",
+            actorUserId: userId,
+            workspaceId: workspaceId,
+            score: request.Score,
+            comment: request.Comment,
             cancellationToken: HttpContext.RequestAborted);
 
-        await _notifications.CreateAndPushAsync(
-            userId: memberUserId,
-            type: NotificationType.TaskEvaluated,
-            message: $"Bạn đã được đánh giá task \"{task.Title}\". Điểm: {request.Score}/10.",
-            workspaceId: workspaceId,
-            projectId: project.Id,
-            taskId: task.Id,
-            redirectUrl: $"/board?projectId={project.Id}",
-            cancellationToken: HttpContext.RequestAborted);
+        if (!result.Success)
+            return BadRequest(result.ErrorMessage ?? "Không thể đánh giá task.");
 
         return Ok(new { taskId, score = request.Score });
-    }
-
-    private async Task UpdateMemberProfileFromEvaluationsAsync(Guid workspaceId, string memberUserId, CancellationToken cancellationToken)
-    {
-        // Average score (only tasks in this workspace that are assigned & accepted to this member).
-        var scores = await _db.TaskEvaluations
-            .Join(_db.Tasks, e => e.TaskId, t => t.Id, (e, t) => new { e, t })
-            .Join(_db.Projects.Where(p => p.WorkspaceId == workspaceId), x => x.t.ProjectId, p => p.Id, (x, _) => x)
-            .Where(x => _db.TaskAssignments.Any(a =>
-                a.TaskId == x.t.Id &&
-                a.AssigneeUserId == memberUserId &&
-                a.Status == TaskAssignmentStatus.Accepted))
-            .Select(x => x.e.Score)
-            .ToListAsync(cancellationToken);
-
-        var avgScore = scores.Count == 0 ? 0m : (decimal)scores.Average();
-
-        // Assigned tasks in this workspace.
-        var memberTasksQuery = _db.TaskAssignments
-            .Where(a => a.AssigneeUserId == memberUserId && a.Status == TaskAssignmentStatus.Accepted)
-            .Join(_db.Tasks, a => a.TaskId, t => t.Id, (a, t) => t)
-            .Join(_db.Projects.Where(p => p.WorkspaceId == workspaceId), t => t.ProjectId, p => p.Id, (t, _) => t);
-
-        var totalAssigned = await memberTasksQuery.CountAsync(cancellationToken);
-
-        var onTime = await memberTasksQuery.CountAsync(t =>
-            t.Status == TaskStatus.Done &&
-            t.DueDateUtc.HasValue &&
-            t.UpdatedAtUtc <= t.DueDateUtc.Value,
-            cancellationToken);
-
-        var completionRate = totalAssigned == 0 ? 0m : (decimal)onTime / totalAssigned;
-
-        var workload = await memberTasksQuery.CountAsync(t => t.Status == TaskStatus.InProgress, cancellationToken);
-
-        var profile = await _db.MemberProfiles.FirstOrDefaultAsync(m => m.UserId == memberUserId, cancellationToken);
-        if (profile is null)
-        {
-            profile = new MemberProfile { UserId = memberUserId };
-            _db.MemberProfiles.Add(profile);
-        }
-
-        profile.AvgScore = avgScore;
-        profile.CompletionRate = completionRate;
-        profile.CurrentWorkload = workload;
-        profile.Level = avgScore >= 8m
-            ? MemberLevel.Senior
-            : avgScore >= 6m
-                ? MemberLevel.Mid
-                : MemberLevel.Junior;
     }
 
     private async Task<IReadOnlyList<object>> GetTaskSuggestionsAsync(
@@ -558,6 +611,18 @@ public sealed class TasksController : ControllerBase
             .ToList();
 
         return suggestions;
+    }
+
+    /// <summary>UC-14: Làm mới danh sách gợi ý phân công (UC-04) khi MemberProfile thay đổi — dùng từ SignalR + fetch.</summary>
+    [Authorize(Policy = "IsPM")]
+    [HttpGet("tasks/suggested-assignees")]
+    public async Task<ActionResult<IReadOnlyList<SuggestedAssigneeVm>>> GetSuggestedAssignees(
+        [FromQuery] TaskPriority priority,
+        CancellationToken cancellationToken)
+    {
+        var workspaceId = User.GetWorkspaceId();
+        var list = await _taskService.GetSuggestedAssigneesAsync(workspaceId, priority, 5, cancellationToken);
+        return Ok(list);
     }
 }
 

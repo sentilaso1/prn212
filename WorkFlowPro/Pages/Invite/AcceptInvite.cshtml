@@ -1,0 +1,28 @@
+@page "/Invite/Accept"
+@model WorkFlowPro.Pages.Invite.AcceptInviteModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Accept invitation";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Accept invitation</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @Model.ErrorMessage
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/Identity/Account/Login">Login</a>
+        <a class="btn btn-outline-primary" href="/Projects">Back</a>
+    </div>
+}
+else
+{
+    <div class="alert alert-info" role="alert">
+        Invitation accepted. Redirecting to workspace...
+    </div>
+}
+

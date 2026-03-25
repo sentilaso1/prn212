@@ -1,0 +1,60 @@
+@page "/Projects/Details/{projectId:guid}"
+@model WorkFlowPro.Pages.Projects.DetailsModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Project details";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Project Details</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+
+@if (Model.Project is not null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h4 class="card-title">@Model.Project.Name</h4>
+                    @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                    {
+                        <span class="badge text-bg-secondary">Archived</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-success">Active</span>
+                    }
+                </div>
+                <div>
+                    <span class="badge text-bg-light border" style="background:@(Model.Project.Color ?? "#FFFFFF"); border-color:#ddd;">
+                        Color: @Model.Project.Color
+                    </span>
+                </div>
+            </div>
+
+            <dl class="row mt-3">
+                <dt class="col-sm-3">Description</dt>
+                <dd class="col-sm-9">@Model.Project.Description</dd>
+
+                <dt class="col-sm-3">Start</dt>
+                <dd class="col-sm-9">@Model.Project.StartDateUtc?.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">End</dt>
+                <dd class="col-sm-9">@Model.Project.EndDateUtc?.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">Created</dt>
+                <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("yyyy-MM-dd")</dd>
+            </dl>
+
+            <div class="d-flex gap-2 mt-3">
+                <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
+                <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+            </div>
+        </div>
+    </div>
+}
+

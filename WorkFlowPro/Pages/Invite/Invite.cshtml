@@ -1,0 +1,70 @@
+@page "/Invite"
+@model WorkFlowPro.Pages.Invite.InviteModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Invite members";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Invite members</h1>
+
+<form method="post">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+
+    <div class="mb-3">
+        <label asp-for="Input.EmailsRaw" class="form-label"></label>
+        <textarea asp-for="Input.EmailsRaw" class="form-control" rows="3" placeholder="name1@domain.com, name2@domain.com"></textarea>
+        <span asp-validation-for="Input.EmailsRaw" class="text-danger"></span>
+        <div class="form-text">Bạn có thể nhập nhiều email cách nhau dấu phẩy (,).</div>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Role" class="form-label"></label>
+        <select asp-for="Input.Role" class="form-select">
+            <option value="Member">Member</option>
+            <option value="PM">PM</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.SubRole" class="form-label"></label>
+        <input asp-for="Input.SubRole" class="form-control" placeholder="BA/DEV/Designer/QA (optional)" />
+        <span asp-validation-for="Input.SubRole" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Send invites</button>
+    <a class="btn btn-outline-secondary" href="/Projects">Cancel</a>
+</form>
+
+@if (Model.ShowSuccessToast)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="inviteSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    @Model.InviteSuccessMessage
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    @if (Model.ShowSuccessToast)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const el = document.getElementById('inviteSuccessToast');
+                if (!el) return;
+                const toast = new bootstrap.Toast(el, { delay: 4000 });
+                toast.show();
+            });
+        </script>
+    }
+}
+

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
 
@@ -6,8 +6,18 @@ namespace WorkFlowPro.Data;
 
 public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
 {
-    public WorkFlowProDbContext(DbContextOptions<WorkFlowProDbContext> options)
-        : base(options) { }
+    private readonly ICurrentWorkspaceService _currentWorkspaceService;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
+
+    public WorkFlowProDbContext(
+        DbContextOptions<WorkFlowProDbContext> options,
+        ICurrentWorkspaceService currentWorkspaceService,
+        ICurrentUserAccessor currentUserAccessor)
+        : base(options)
+    {
+        _currentWorkspaceService = currentWorkspaceService;
+        _currentUserAccessor = currentUserAccessor;
+    }
 
     public DbSet<MemberProfile> MemberProfiles => Set<MemberProfile>();
     public DbSet<Workspace> Workspaces => Set<Workspace>();
@@ -28,6 +38,44 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        // UC-15 (v1.3+): Data isolation theo workspace active.
+        // - Controllers vẫn có thể lọc thủ công, nhưng global filter giúp chặn rò rỉ dữ liệu.
+        // UC-15 (v1.3+): Data isolation theo workspace active.
+        // Lưu ý: dùng CurrentWorkspaceService để giá trị refresh theo Session/Claims mỗi request.
+        b.Entity<Project>().HasQueryFilter(p =>
+            p.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId);
+
+        b.Entity<TaskItem>().HasQueryFilter(t =>
+            Projects.Any(p =>
+                p.Id == t.ProjectId &&
+                p.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId));
+
+        b.Entity<TaskAssignment>().HasQueryFilter(a =>
+            Tasks.Any(t => t.Id == a.TaskId));
+
+        b.Entity<TaskEvaluation>().HasQueryFilter(e =>
+            Tasks.Any(t => t.Id == e.TaskId));
+
+        b.Entity<TaskHistoryEntry>().HasQueryFilter(h =>
+            Tasks.Any(t => t.Id == h.TaskId));
+
+        b.Entity<TaskComment>().HasQueryFilter(c =>
+            Tasks.Any(t => t.Id == c.TaskId));
+
+        b.Entity<Attachment>().HasQueryFilter(att =>
+            Tasks.Any(t => t.Id == att.TaskId));
+
+        b.Entity<RoleChangeLog>().HasQueryFilter(r =>
+            r.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId);
+
+        // UC-11: thông báo của user hiện tại + (nếu có workspace active) lọc theo workspace hoặc thông báo chung (WorkspaceId null).
+        b.Entity<UserNotification>().HasQueryFilter(n =>
+            _currentUserAccessor.UserId != null &&
+            n.UserId == _currentUserAccessor.UserId &&
+            (_currentWorkspaceService.CurrentWorkspaceId == null ||
+             n.WorkspaceId == null ||
+             n.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId));
 
         // ── MemberProfile ────────────────────────────────────────────────
         b.Entity<MemberProfile>(e =>

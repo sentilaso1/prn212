@@ -1,0 +1,53 @@
+@page "/Projects/Create"
+@model WorkFlowPro.Pages.Projects.CreateModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Create project";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Create Project</h1>
+
+<form method="post">
+    @Html.AntiForgeryToken()
+    <div class="mb-3">
+        <label asp-for="Input.Name" class="form-label"></label>
+        <input asp-for="Input.Name" class="form-control" />
+        <span asp-validation-for="Input.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Description" class="form-label"></label>
+        <textarea asp-for="Input.Description" class="form-control" rows="3"></textarea>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label asp-for="Input.StartDateUtc" class="form-label"></label>
+            <input asp-for="Input.StartDateUtc" class="form-control" type="date" />
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Input.EndDateUtc" class="form-label"></label>
+            <input asp-for="Input.EndDateUtc" class="form-control" type="date" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Color" class="form-label"></label>
+        <input asp-for="Input.Color" class="form-control" placeholder="#RRGGBB" />
+        <span asp-validation-for="Input.Color" class="text-danger"></span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-warning">@Model.ErrorMessage</div>
+    }
+
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a class="btn btn-outline-secondary" href="/Projects">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

@@ -1,0 +1,49 @@
+@page "/Tasks/MyTasks/Pending"
+@model WorkFlowPro.Pages.Tasks.MyTasksPendingModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "My tasks - Pending";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>My tasks - Pending</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.PendingTasks.Count == 0)
+{
+    <div class="alert alert-info">Bạn không có task đang Pending để Accept/Reject.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Project</th>
+                <th>Priority</th>
+                <th>Due</th>
+                <th style="width: 220px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in Model.PendingTasks)
+            {
+                <tr>
+                    <td>@t.Title</td>
+                    <td>@t.ProjectName</td>
+                    <td><span class="badge bg-secondary">@t.Priority</span></td>
+                    <td>@(t.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-primary" href="/Tasks/AcceptReject/@t.TaskId">
+                            Accept / Reject
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+

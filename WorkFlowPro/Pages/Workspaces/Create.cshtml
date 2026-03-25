@@ -1,0 +1,31 @@
+@page "/Workspaces/Create"
+@model WorkFlowPro.Pages.Workspaces.CreateModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Create workspace";
+}
+
+<h1>Create workspace</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+
+            <div class="mb-3">
+                <label asp-for="Input.Name" class="form-label"></label>
+                <input asp-for="Input.Name" class="form-control" />
+                <span asp-validation-for="Input.Name" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Create</button>
+            <a class="btn btn-outline-secondary" href="/Workspaces">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

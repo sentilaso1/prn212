@@ -1,0 +1,92 @@
+@model WorkFlowPro.Pages.Tasks.CommentNodeRenderVm
+
+@{
+    var node = Model.Node;
+    var canEdit = (Model.CanManageComments || Model.ActorUserId == node.UserId) && !node.IsDeleted;
+    var canReply = Model.CanManageComments;
+    var canDelete = Model.CanManageComments || Model.ActorUserId == node.UserId;
+}
+
+<div class="mb-3 @(node.ParentCommentId is null ? "" : "ms-3")"
+     data-wf-comment-id="@node.Id"
+     data-wf-parent-id="@(node.ParentCommentId?.ToString("D") ?? "")"
+     data-wf-created-at="@node.CreatedAtUtc.ToString("O")">
+    <div class="p-2 border rounded bg-light">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+                <div class="fw-semibold small">
+                    @node.UserDisplayName
+                    @if (node.UpdatedAtUtc is not null)
+                    {
+                        <span class="text-muted small ms-2">(đã chỉnh sửa)</span>
+                    }
+                </div>
+                <div class="text-muted small">@node.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</div>
+            </div>
+            <div class="text-end small text-muted">
+                @if (node.UpdatedAtUtc is not null)
+                {
+                    <div>Updated: @node.UpdatedAtUtc.Value.ToString("yyyy-MM-dd HH:mm")</div>
+                }
+            </div>
+        </div>
+
+        <div class="mt-2" style="white-space: pre-wrap;" data-wf-comment-content="1">
+            @if (node.IsDeleted)
+            {
+                <em class="text-muted">@node.Content</em>
+            }
+            else
+            {
+                @node.Content
+            }
+        </div>
+
+        @if (canReply)
+        {
+            <details class="mt-2">
+                <summary class="small text-primary" style="cursor:pointer;">Reply</summary>
+                <form method="post" asp-page-handler="AddComment" data-wf-ajax="true" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="parentCommentId" value="@node.Id" />
+                    <textarea class="form-control" name="content" rows="2"></textarea>
+                    <button class="btn btn-sm btn-primary mt-2" type="submit">Send</button>
+                </form>
+            </details>
+        }
+
+        @if (canEdit)
+        {
+            <details class="mt-2">
+                <summary class="small text-primary" style="cursor:pointer;">Edit</summary>
+                <form method="post" asp-page-handler="EditComment" data-wf-ajax="true" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="commentId" value="@node.Id" />
+                    <textarea class="form-control" name="content" rows="2">@node.Content</textarea>
+                    <button class="btn btn-sm btn-success mt-2" type="submit">Save</button>
+                </form>
+            </details>
+        }
+
+        @if (canDelete)
+        {
+            <form method="post" asp-page-handler="DeleteComment" data-wf-ajax="true" class="mt-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="commentId" value="@node.Id" />
+                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete comment?');">Delete</button>
+            </form>
+        }
+    </div>
+    <div id="wfReplies-@node.Id" class="ms-3">
+        @if (node.Replies is not null && node.Replies.Count > 0)
+        {
+            @foreach (var r in node.Replies)
+            {
+                <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(r, Model.ActorUserId, Model.CanManageComments)" />
+            }
+        }
+    </div>
+</div>
+
+
+

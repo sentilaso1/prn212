@@ -1,0 +1,143 @@
+@page "/Profile"
+@model WorkFlowPro.Pages.ProfileModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Member profile";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="h3 mb-3">Member profile</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.Profile is null)
+{
+    <div class="alert alert-danger">Không tải được profile.</div>
+}
+else
+{
+    <p class="text-muted small mb-4">
+        UC-14 — Workspace hiện tại: <strong>@Model.WorkspaceId</strong>.
+        @if (Model.Profile.IsSelf)
+        {
+            <span>Đang xem profile của bạn.</span>
+        }
+        else
+        {
+            <span>PM xem profile member (query <code>?userId=...</code>).</span>
+        }
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    @if (!string.IsNullOrWhiteSpace(Model.Profile.AvatarUrl))
+                    {
+                        <img src="@Model.Profile.AvatarUrl" alt="avatar" class="rounded-circle mb-3" style="width:120px;height:120px;object-fit:cover;" />
+                    }
+                    else
+                    {
+                        <div class="rounded-circle bg-secondary-subtle d-inline-flex align-items-center justify-content-center mb-3" style="width:120px;height:120px;">
+                            <span class="fs-2 text-muted">@(Model.Profile.FullName.Length > 0 ? Model.Profile.FullName[0] : '?')</span>
+                        </div>
+                    }
+                    <h2 class="h5 mb-1">@Model.Profile.FullName</h2>
+                    <p class="text-muted small mb-0">@Model.Profile.Email</p>
+                    @if (!string.IsNullOrWhiteSpace(Model.Profile.SubRole))
+                    {
+                        <p class="mt-2 mb-0"><span class="badge bg-light text-dark border">@Model.Profile.SubRole</span></p>
+                    }
+                    <p class="small text-muted mt-2 mb-0">Vai trò workspace: @Model.Profile.WorkspaceRole</p>
+                </div>
+            </div>
+
+            @if (Model.Profile.CanEditProfile)
+            {
+                <div class="card shadow-sm mt-3">
+                    <div class="card-header">Chỉnh sửa thông tin cá nhân</div>
+                    <div class="card-body">
+                        <form method="post" asp-page-handler="UpdateProfile" enctype="multipart/form-data" class="needs-validation">
+                            <input type="hidden" asp-for="Input.TargetUserId" />
+                            <div asp-validation-summary="ModelOnly" class="text-danger small" role="alert"></div>
+                            <div class="mb-3">
+                                <label asp-for="Input.FullName" class="form-label">Họ tên</label>
+                                <input asp-for="Input.FullName" class="form-control" />
+                                <span asp-validation-for="Input.FullName" class="text-danger small"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="Input.AvatarFile" class="form-label">Avatar (JPG/PNG, tối đa 2MB)</label>
+                                <input asp-for="Input.AvatarFile" class="form-control" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
+                                <span asp-validation-for="Input.AvatarFile" class="text-danger small"></span>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Lưu</button>
+                        </form>
+                    </div>
+                </div>
+            }
+
+            @if (Model.Profile.CanEditLevelOrSubRole)
+            {
+                <div class="card shadow-sm mt-3 border-primary">
+                    <div class="card-header bg-primary text-white">PM — Level &amp; SubRole</div>
+                    <div class="card-body">
+                        <form method="post" asp-page-handler="UpdatePm"
+                              onsubmit="return confirm('Xác nhận cập nhật Level / SubRole cho member này? Thay đổi sẽ áp dụng ngay cho gợi ý phân công (UC-04).');">
+                            <input type="hidden" asp-for="PmInput.TargetUserId" />
+                            <div asp-validation-summary="ModelOnly" class="text-danger small" role="alert"></div>
+                            <div class="mb-3">
+                                <label asp-for="PmInput.Level" class="form-label">Level</label>
+                                <select asp-for="PmInput.Level" class="form-select" asp-items="Html.GetEnumSelectList<WorkFlowPro.Data.MemberLevel>()"></select>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="PmInput.SubRole" class="form-label">SubRole</label>
+                                <input asp-for="PmInput.SubRole" class="form-control" list="subrole-list" placeholder="BA, DEV, Designer, QA..." maxlength="100" />
+                                <datalist id="subrole-list">
+                                    <option value="BA"></option>
+                                    <option value="DEV"></option>
+                                    <option value="Designer"></option>
+                                    <option value="QA"></option>
+                                    <option value="Tester"></option>
+                                </datalist>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Lưu Level / SubRole</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="col-lg-8">
+            <partial name="_MemberStats" model="Model.Profile" />
+            <partial name="_TaskHistory30Days" model="Model.Profile.TaskHistory" />
+        </div>
+    </div>
+}
+
+@if (Model.ShowToast)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+        <div id="profileSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">@Model.ToastMessage</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (Model.ShowToast)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const el = document.getElementById('profileSuccessToast');
+                if (!el || typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
+                const toast = new bootstrap.Toast(el, { delay: 4000 });
+                toast.show();
+            });
+        </script>
+    }
+}

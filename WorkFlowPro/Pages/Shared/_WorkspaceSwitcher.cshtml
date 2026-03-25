@@ -1,0 +1,28 @@
+@model WorkFlowPro.ViewModels.WorkspaceSwitcherVm
+
+<div class="ms-auto d-flex align-items-center gap-2">
+    <span class="navbar-text text-muted">
+        Workspace: <strong>@Model.ActiveWorkspaceName</strong>
+    </span>
+
+    <form method="get" action="/Workspaces/Switch" class="d-inline">
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+
+        <select name="workspaceId"
+                class="form-select form-select-sm"
+                style="width:auto; display:inline-block;"
+                onchange="this.form.submit()">
+            @foreach (var w in Model.Workspaces)
+            {
+                <option value="@w.Id" selected="@(w.Id == Model.ActiveWorkspaceId)">
+                    @w.Name (@w.Role)
+                </option>
+            }
+        </select>
+    </form>
+
+    <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create">
+        + Tạo Workspace mới
+    </a>
+</div>
+

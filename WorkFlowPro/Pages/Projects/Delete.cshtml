@@ -1,0 +1,45 @@
+@page "/Projects/Delete/{projectId:guid}"
+@model WorkFlowPro.Pages.Projects.DeleteModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Delete project";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Delete Project</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+
+@if (Model.Project is null)
+{
+    <div class="alert alert-info">Project not found.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <h4>@Model.Project.Name</h4>
+            <p class="text-muted">
+                Status: @Model.Project.Status
+            </p>
+
+            @if (Model.HasInProgressTasks)
+            {
+                <div class="alert alert-warning mt-3">
+                    Project này đang có Task ở trạng thái <strong>In Progress</strong>. Hệ thống sẽ chặn xóa.
+                </div>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ProjectId" />
+                <button type="submit" class="btn btn-danger">Confirm delete</button>
+                <a class="btn btn-outline-secondary" href="/Projects/Details/@Model.Project.Id">Cancel</a>
+            </form>
+        </div>
+    </div>
+}
+

@@ -1,0 +1,92 @@
+@page "/Notifications"
+@model WorkFlowPro.Pages.Notifications.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "My notifications";
+}
+
+<h1>My notifications</h1>
+
+<div class="mb-3">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="wfPageMarkAllRead">Đánh dấu đã đọc tất cả</button>
+</div>
+
+<div class="list-group">
+    @foreach (var n in Model.Items)
+    {
+        var href = string.IsNullOrEmpty(n.RedirectUrl) ? "#" : n.RedirectUrl;
+        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2">
+            <div class="flex-grow-1">
+                @if (!n.IsRead)
+                {
+                    <span class="badge bg-danger me-1">Mới</span>
+                }
+                <span class="small text-muted">@n.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                <span class="badge bg-secondary ms-1">@n.TypeLabel</span>
+                <div class="mt-1">
+                    @if (href != "#")
+                    {
+                        <a href="@href" class="text-decoration-none wf-notif-page-link" data-id="@n.Id.ToString("D")">@n.Message</a>
+                    }
+                    else
+                    {
+                        <span>@n.Message</span>
+                    }
+                </div>
+            </div>
+            <div class="btn-group btn-group-sm">
+                @if (!n.IsRead)
+                {
+                    <button type="button" class="btn btn-outline-secondary wf-mark-read" data-id="@n.Id.ToString("D")">Đã đọc</button>
+                }
+                <button type="button" class="btn btn-outline-danger wf-delete" data-id="@n.Id.ToString("D")">Xóa</button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <p class="text-muted mt-3">Không có thông báo.</p>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            async function postRead(id) {
+                await fetch("/api/notifications/" + id + "/read", { method: "POST", credentials: "include" });
+            }
+            async function del(id) {
+                await fetch("/api/notifications/" + id, { method: "DELETE", credentials: "include" });
+            }
+            document.querySelectorAll(".wf-mark-read").forEach(function (b) {
+                b.addEventListener("click", async function () {
+                    var id = b.getAttribute("data-id");
+                    await postRead(id);
+                    location.reload();
+                });
+            });
+            document.querySelectorAll(".wf-delete").forEach(function (b) {
+                b.addEventListener("click", async function () {
+                    if (!confirm("Xóa thông báo này?")) return;
+                    var id = b.getAttribute("data-id");
+                    await del(id);
+                    location.reload();
+                });
+            });
+            document.querySelectorAll(".wf-notif-page-link").forEach(function (a) {
+                a.addEventListener("click", async function () {
+                    var id = a.getAttribute("data-id");
+                    if (id) await postRead(id);
+                });
+            });
+            var all = document.getElementById("wfPageMarkAllRead");
+            if (all) {
+                all.addEventListener("click", async function () {
+                    await fetch("/api/notifications/read-all", { method: "POST", credentials: "include" });
+                    location.reload();
+                });
+            }
+        })();
+    </script>
+}
