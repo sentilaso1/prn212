@@ -24,6 +24,3 @@ appsettings.Local.json
 secrets.json
 .env
 
-# Avoid committing DB credentials
-WorkFlowPro/appsettings.json
-
