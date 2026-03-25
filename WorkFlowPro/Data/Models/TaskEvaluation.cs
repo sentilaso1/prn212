@@ -14,5 +14,6 @@ public sealed class TaskEvaluation
     [MaxLength(2000)]
     public string? Comment { get; set; }
     public DateTime EvaluatedAtUtc { get; set; } = DateTime.UtcNow;
+    public bool IsLocked { get; set; } = false;
 }
 

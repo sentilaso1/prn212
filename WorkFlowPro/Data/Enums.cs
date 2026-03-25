@@ -1,4 +1,4 @@
-namespace WorkFlowPro.Data;
+﻿namespace WorkFlowPro.Data;
 
 public enum WorkspaceMemberRole
 {
@@ -53,6 +53,9 @@ public enum NotificationType
     TaskDoneNeedsEvaluation = 4,
     TaskEvaluated = 5,
     RoleChanged = 6,
-    WorkspaceInvite = 7
+    WorkspaceInvite = 7,  
+    DeadlineReminder = 8,
+    ProjectCreated = 9,
+    ProjectDeleted = 10,
+    LevelChanged = 11
 }
-
