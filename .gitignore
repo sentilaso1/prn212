@@ -1,0 +1,29 @@
+### .NET
+[Bb]in/
+[Oo]bj/
+TestResults/
+
+### Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+### Rider / JetBrains
+.idea/
+
+### Database
+*.mdf
+*.ndf
+
+### Secrets / config overrides
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+.env
+
+# Avoid committing DB credentials
+WorkFlowPro/appsettings.json
+

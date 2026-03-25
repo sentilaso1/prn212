@@ -1,0 +1,465 @@
+<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>WorkFlow Pro SRS v1.4</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom></w:WordDocument></xml><![endif]--><style>body{font-family:Arial,sans-serif;font-size:13pt;margin:2cm}h1{font-size:20pt;font-weight:bold;color:#1a56db}h2{font-size:14pt;font-weight:bold;border-bottom:2px solid #e5e7eb;padding-bottom:4px;margin-top:24pt}h3{font-size:10pt;color:#9ca3af;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8pt 0 14pt;font-size:11pt}th{background:#f3f4f6;font-weight:bold;padding:6pt 9pt;text-align:left;border:1pt solid #e5e7eb}td{padding:6pt 9pt;border:1pt solid #e5e7eb;vertical-align:top}p{margin-bottom:7pt;font-size:12pt}.btn,.note{display:none}.scope-note{background:#f0fdf4;border:1pt solid #86efac;padding:8pt 12pt;margin-bottom:12pt;font-size:11pt}.uc{border:1pt solid #e5e7eb;margin-bottom:14pt;padding:10pt}.uc.new{border-color:#0d7377}.uc.sub{border-color:#b45309}.uch{background:#f9fafb;padding:8pt;margin:-10pt -10pt 10pt -10pt}.uc.new .uch{background:#e6f7f7}.uc.sub .uch{background:#fef3c7}.ucbg{background:#1a56db;color:#fff;font-size:10pt;font-weight:bold;padding:2pt 7pt}.uc.new .ucbg{background:#0d7377}.uc.sub .ucbg{background:#b45309}.uct{font-size:13pt;font-weight:bold}.uca{float:right;font-size:10pt;color:#6b7280}.ucm{display:grid;grid-template-columns:1fr 1fr;background:#f9fafb;border:1pt solid #e5e7eb;padding:9pt;margin-bottom:9pt}.ucmi label{font-size:9pt;font-weight:bold;text-transform:uppercase;color:#9ca3af;display:block}.ucmi span{font-size:12pt}.sec{border-left:3pt solid #1a56db;padding:7pt 11pt;margin:6pt 0;background:#f9fafb}.sec.alt{border-left-color:#dc2626}.sec.post{border-left-color:#059669}.sec.teal{border-left-color:#0d7377}.sl{font-size:9pt;font-weight:bold;text-transform:uppercase;color:#9ca3af;display:block;margin-bottom:4pt}.matrix th{background:#1a56db;color:#fff;text-align:center}.matrix td:first-child{font-weight:bold;background:#f3f4f6}.matrix td{text-align:center}.ck{color:#059669;font-weight:bold}.cx{color:#d1d5db}.dep{font-family:Courier New,monospace;font-size:10pt;background:#f3f4f6;border:1pt solid #e5e7eb;padding:12pt 16pt;line-height:2}.cover{border-bottom:3pt solid #1a56db;padding-bottom:18pt;margin-bottom:18pt}.tag{background:#e8f0fe;color:#1a56db;font-size:10pt;font-weight:bold;padding:2pt 8pt}.toc{background:#e8f0fe;padding:14pt 18pt;margin-bottom:22pt}.toc-grid{column-count:3}.tr{font-size:11pt;margin-bottom:2pt}.ti{color:#1a56db;font-weight:bold;min-width:40pt;display:inline-block}.nb{background:#0d7377;color:#fff;font-size:8pt;font-weight:bold;padding:1pt 3pt}.nsb{background:#b45309;color:#fff;font-size:8pt;font-weight:bold;padding:1pt 3pt}.pg{page-break-before:always}.footer{margin-top:28pt;padding-top:10pt;border-top:1pt solid #e5e7eb;font-size:10pt;color:#9ca3af;text-align:center}</style></head><body>
+
+<div style="display:flex;gap:10px;margin-bottom:12px">
+  <button class="btn" style="flex:1" onclick="downloadDoc()">Tải về file Word (.doc)</button>
+  <button class="btn" style="flex:1;background:#374151" onclick="window.print()">Xuất PDF (Ctrl+P)</button>
+</div>
+<div class="note">Nhấn "Tải về file Word" → mở bằng Microsoft Word hoặc Google Docs. Nhấn "Xuất PDF" → chọn Save as PDF trong hộp thoại in.</div>
+<script>
+function downloadDoc(){
+  var html = '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>WorkFlow Pro SRS v1.4</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom></w:WordDocument></xml><![endif]--><style>body{font-family:Arial,sans-serif;font-size:13pt;margin:2cm}h1{font-size:20pt;font-weight:bold;color:#1a56db}h2{font-size:14pt;font-weight:bold;border-bottom:2px solid #e5e7eb;padding-bottom:4px;margin-top:24pt}h3{font-size:10pt;color:#9ca3af;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8pt 0 14pt;font-size:11pt}th{background:#f3f4f6;font-weight:bold;padding:6pt 9pt;text-align:left;border:1pt solid #e5e7eb}td{padding:6pt 9pt;border:1pt solid #e5e7eb;vertical-align:top}p{margin-bottom:7pt;font-size:12pt}.btn,.note{display:none}.scope-note{background:#f0fdf4;border:1pt solid #86efac;padding:8pt 12pt;margin-bottom:12pt;font-size:11pt}.uc{border:1pt solid #e5e7eb;margin-bottom:14pt;padding:10pt}.uc.new{border-color:#0d7377}.uc.sub{border-color:#b45309}.uch{background:#f9fafb;padding:8pt;margin:-10pt -10pt 10pt -10pt}.uc.new .uch{background:#e6f7f7}.uc.sub .uch{background:#fef3c7}.ucbg{background:#1a56db;color:#fff;font-size:10pt;font-weight:bold;padding:2pt 7pt}.uc.new .ucbg{background:#0d7377}.uc.sub .ucbg{background:#b45309}.uct{font-size:13pt;font-weight:bold}.uca{float:right;font-size:10pt;color:#6b7280}.ucm{display:grid;grid-template-columns:1fr 1fr;background:#f9fafb;border:1pt solid #e5e7eb;padding:9pt;margin-bottom:9pt}.ucmi label{font-size:9pt;font-weight:bold;text-transform:uppercase;color:#9ca3af;display:block}.ucmi span{font-size:12pt}.sec{border-left:3pt solid #1a56db;padding:7pt 11pt;margin:6pt 0;background:#f9fafb}.sec.alt{border-left-color:#dc2626}.sec.post{border-left-color:#059669}.sec.teal{border-left-color:#0d7377}.sl{font-size:9pt;font-weight:bold;text-transform:uppercase;color:#9ca3af;display:block;margin-bottom:4pt}.matrix th{background:#1a56db;color:#fff;text-align:center}.matrix td:first-child{font-weight:bold;background:#f3f4f6}.matrix td{text-align:center}.ck{color:#059669;font-weight:bold}.cx{color:#d1d5db}.dep{font-family:Courier New,monospace;font-size:10pt;background:#f3f4f6;border:1pt solid #e5e7eb;padding:12pt 16pt;line-height:2}.cover{border-bottom:3pt solid #1a56db;padding-bottom:18pt;margin-bottom:18pt}.tag{background:#e8f0fe;color:#1a56db;font-size:10pt;font-weight:bold;padding:2pt 8pt}.toc{background:#e8f0fe;padding:14pt 18pt;margin-bottom:22pt}.toc-grid{column-count:3}.tr{font-size:11pt;margin-bottom:2pt}.ti{color:#1a56db;font-weight:bold;min-width:40pt;display:inline-block}.nb{background:#0d7377;color:#fff;font-size:8pt;font-weight:bold;padding:1pt 3pt}.nsb{background:#b45309;color:#fff;font-size:8pt;font-weight:bold;padding:1pt 3pt}.pg{page-break-before:always}.footer{margin-top:28pt;padding-top:10pt;border-top:1pt solid #e5e7eb;font-size:10pt;color:#9ca3af;text-align:center}</style></head><body>' + document.body.innerHTML + '</body></html>';
+  var blob = new Blob([html],{type:'application/msword'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'WorkFlowPro_SRS_v1.4.doc';
+  a.click();
+}
+</script>
+
+<div class="cover">
+  <div class="tag">Software Requirements Specification</div>
+  <h1>WorkFlow Pro</h1>
+  <div class="cover-sub">Nền tảng Quản lý Công việc Nhóm — Phiên bản Project Cuối Môn</div>
+  <div class="meta">
+    <div class="mi"><label>Phiên bản</label><span>v1.4 — Student Scope (17 UC)</span></div>
+    <div class="mi"><label>Ngày soạn</label><span>25/03/2026</span></div>
+    <div class="mi"><label>Công nghệ</label><span>ASP.NET Core 8 + Razor Pages + SignalR + MSSQL</span></div>
+  </div>
+</div>
+
+<table>
+  <tbody><tr><th colspan="3" style="background:#1a56db;color:#fff">Lịch sử thay đổi</th></tr>
+  <tr><th style="width:70px">Phiên bản</th><th style="width:100px">Ngày</th><th>Nội dung</th></tr>
+  <tr><td>v1.0</td><td>—</td><td>11 UC cơ bản</td></tr>
+  <tr><td>v1.1</td><td>25/03/2026</td><td>Bổ sung Alternative Flow và phân quyền chi tiết</td></tr>
+  <tr><td>v1.2</td><td>25/03/2026</td><td>Thêm SF-01, UC-12–14; kiến trúc, ERD, State Machine, ma trận quyền</td></tr>
+  <tr><td>v1.3</td><td>25/03/2026</td><td>Thêm UC-15–21; RBAC fine-grained; deadline automation; smart assign v2</td></tr>
+  <tr><td><strong>v1.4</strong></td><td>25/03/2026</td><td>Điều chỉnh scope cho project cuối môn: bỏ UC-10/19/20/21; đơn giản hóa SF-01, UC-03/05/07/09/11/12/13/15/16/17/18; giữ nguyên các UC cốt lõi</td></tr>
+</tbody></table>
+
+<div class="scope-note">
+  <strong>Ghi chú phạm vi v1.4:</strong> Phiên bản này được tối ưu cho nhóm 4–5 sinh viên làm trong 8–10 tuần.
+  Đã loại bỏ: UC-10 (Billing/VNPay), UC-19 (Notification Settings), UC-20 (Import CSV), UC-21 (Platform Admin Dashboard).
+  Đã đơn giản hóa: SF-01, UC-03, UC-05, UC-07, UC-09, UC-11, UC-12, UC-13, UC-15, UC-16, UC-17, UC-18.
+  Các UC cốt lõi giữ nguyên đầy đủ: UC-01, UC-02, UC-04, UC-06, UC-08, UC-14.
+</div>
+
+<div class="toc">
+  <h3 style="color:#1a56db;margin-bottom:8px">MỤC LỤC — 17 USE CASE</h3>
+  <div class="toc-grid">
+    <div class="tr"><span class="ti">UC-01</span><span>Đăng ký &amp; Tạo Workspace</span></div>
+    <div class="tr"><span class="ti">UC-02</span><span>Đăng nhập</span></div>
+    <div class="tr"><span class="ti">SF-01</span><span>Reset Password <span class="nsb">SUB</span></span></div>
+    <div class="tr"><span class="ti">UC-03</span><span>Invite thành viên</span></div>
+    <div class="tr"><span class="ti">UC-04</span><span>Tạo Task + Gợi ý phân công</span></div>
+    <div class="tr"><span class="ti">UC-05</span><span>Accept / Reject Task</span></div>
+    <div class="tr"><span class="ti">UC-06</span><span>Kanban Board Realtime</span></div>
+    <div class="tr"><span class="ti">UC-07</span><span>Chi tiết Task</span></div>
+    <div class="tr"><span class="ti">UC-08</span><span>Đánh giá Task &amp; Level</span></div>
+    <div class="tr"><span class="ti">UC-09</span><span>Quản lý Role</span></div>
+    <div class="tr"><span class="ti">UC-11</span><span>Thông báo Realtime</span></div>
+    <div class="tr"><span class="ti">UC-12</span><span>Quản lý Dự án</span></div>
+    <div class="tr"><span class="ti">UC-13</span><span>Báo cáo &amp; KPI</span></div>
+    <div class="tr"><span class="ti">UC-14</span><span>Member Profile</span></div>
+    <div class="tr"><span class="ti">UC-15</span><span>Workspace Switching <span class="nb">v1.3</span></span></div>
+    <div class="tr"><span class="ti">UC-16</span><span>Filter &amp; Sort Tasks <span class="nb">v1.3</span></span></div>
+    <div class="tr"><span class="ti">UC-17</span><span>Comment <span class="nb">v1.3</span></span></div>
+    <div class="tr"><span class="ti">UC-18</span><span>Activity Log <span class="nb">v1.3</span></span></div>
+  </div>
+</div>
+
+<h2>CHƯƠNG 1. GIỚI THIỆU</h2>
+<h3>1.1. Mục đích &amp; Bối cảnh</h3>
+<p>WorkFlow Pro là nền tảng web quản lý công việc nhóm, thay thế Zalo + Google Sheets cho team 5–50 người. Cung cấp Kanban realtime, phân công có gợi ý, cơ chế Accept/Reject task và đánh giá thành viên theo level.</p>
+<h3>1.2. Phạm vi hệ thống</h3>
+<p><strong>Trong phạm vi:</strong> Đăng ký/đăng nhập/reset password; Multi-workspace; Quản lý dự án; Tạo task + gợi ý phân công; Accept/Reject; Kanban realtime (SignalR); Comment; Activity log; Filter task; Đánh giá + Level; Dashboard KPI cơ bản; Member profile; Thông báo realtime.</p>
+<p><strong>Ngoài phạm vi:</strong> Thanh toán/Billing; Notification settings; Import CSV/Excel; Platform Admin Dashboard; Chấm công/lương; Chat video.</p>
+<h3>1.3. Định nghĩa &amp; Từ viết tắt</h3>
+<table><tbody><tr><th>Thuật ngữ</th><th>Định nghĩa</th></tr>
+<tr><td>Workspace</td><td>Không gian làm việc riêng của một nhóm/tổ chức</td></tr>
+<tr><td>Task</td><td>Đơn vị công việc nhỏ nhất trong một dự án</td></tr>
+<tr><td>PM</td><td>Project Manager — quản lý dự án, phân việc, đánh giá</td></tr>
+<tr><td>Level</td><td>Mức kinh nghiệm: Junior / Mid / Senior</td></tr>
+<tr><td>Completion Rate</td><td>Tỉ lệ task hoàn thành đúng hạn / tổng task đã giao</td></tr>
+<tr><td>Average Score</td><td>Điểm trung bình từ đánh giá task của PM (thang 1–10)</td></tr>
+<tr><td>SignalR</td><td>Thư viện ASP.NET Core cho giao tiếp realtime qua WebSocket</td></tr>
+</tbody></table>
+
+<div class="pg"></div>
+<h2>CHƯƠNG 2. MÔ TẢ TỔNG QUAN</h2>
+<h3>2.1. Kiến trúc hệ thống</h3>
+<table><tbody><tr><th>Tầng</th><th>Công nghệ</th><th>Vai trò</th></tr>
+<tr><td>Frontend</td><td>ASP.NET Core 8 Razor Pages + JS</td><td>Render UI, kéo thả Kanban, realtime notification</td></tr>
+<tr><td>Backend</td><td>ASP.NET Core 8 Web API + SignalR Hub</td><td>Xử lý nghiệp vụ, broadcast realtime, JWT auth</td></tr>
+<tr><td>Database</td><td>Microsoft SQL Server (MSSQL)</td><td>Lưu toàn bộ dữ liệu</td></tr>
+<tr><td>Cloud Storage</td><td>Azure Blob / AWS S3</td><td>File đính kèm qua Presigned URL</td></tr>
+<tr><td>Mail Service</td><td>SendGrid / SMTP</td><td>Email xác thực, invite, reset password</td></tr>
+</tbody></table>
+
+<h3>2.2. Phân quyền 3 tầng</h3>
+<p><strong>Platform Admin:</strong> Thay đổi role thành viên trong bất kỳ Workspace nào trên toàn hệ thống.</p>
+<p><strong>Team PM:</strong> Tạo dự án, invite thành viên, tạo và phân công task, đánh giá, xem KPI.</p>
+<p><strong>Team Member:</strong> Accept/Reject task, cập nhật tiến độ Kanban, comment, xem profile cá nhân.</p>
+
+<h3>2.3. Mô hình dữ liệu (ERD tóm tắt)</h3>
+<table><tbody><tr><th>Bảng</th><th>Mô tả chính</th><th>Quan hệ</th></tr>
+<tr><td>Users</td><td>Tài khoản, email, password hash, avatar</td><td>1–N WorkspaceMembers</td></tr>
+<tr><td>Workspaces</td><td>Tên, mô tả, created_at</td><td>1–N Projects, 1–N WorkspaceMembers</td></tr>
+<tr><td>WorkspaceMembers</td><td>user_id, workspace_id, role (PM/Member), sub_role</td><td>N–N Users ↔ Workspaces</td></tr>
+<tr><td>MemberProfiles</td><td>level, completion_rate, avg_score, current_workload</td><td>1–1 Users</td></tr>
+<tr><td>Projects</td><td>Tên, mô tả, màu, ngày bắt đầu/kết thúc, status</td><td>1–N Tasks</td></tr>
+<tr><td>Tasks</td><td>Tiêu đề, mô tả, priority, due_date, status, assignment_status</td><td>N–1 Projects</td></tr>
+<tr><td>TaskAssignments</td><td>task_id, user_id, status (Pending/Accepted/Rejected), reject_reason</td><td>N–1 Tasks</td></tr>
+<tr><td>TaskEvaluations</td><td>task_id, pm_id, score (1–10), comment, evaluated_at</td><td>N–1 Tasks</td></tr>
+<tr><td>TaskHistory</td><td>task_id, user_id, action, old_value, new_value, timestamp</td><td>Activity log</td></tr>
+<tr><td>Comments</td><td>task_id, user_id, content, created_at, updated_at</td><td>N–1 Tasks</td></tr>
+<tr><td>Notifications</td><td>user_id, type, message, is_read, redirect_url</td><td>N–1 Users</td></tr>
+<tr><td>Attachments</td><td>task_id, file_name, file_url, file_size, uploaded_by</td><td>N–1 Tasks</td></tr>
+<tr><td>RoleChangeLogs</td><td>changed_by, target_user, old_role, new_role, timestamp</td><td>Audit log</td></tr>
+</tbody></table>
+
+<h3>2.4. Vòng đời Task (State Machine)</h3>
+<table><tbody><tr><th>Trạng thái</th><th>Mô tả</th></tr>
+<tr><td><strong style="color:#1a56db">Unassigned</strong></td><td>Task vừa tạo chưa gán, hoặc đã bị reject — chờ PM tái phân công.</td></tr>
+<tr><td><strong style="color:#1a56db">Pending</strong></td><td>PM đã gán. Badge cam "Chờ xác nhận". Chưa hiển thị trên Kanban. Member cần phản hồi trong 72h.</td></tr>
+<tr><td><strong style="color:#1a56db">To Do</strong></td><td>Member Accept. Hiển thị trên Kanban. Có thể kéo thả.</td></tr>
+<tr><td><strong style="color:#1a56db">In Progress</strong></td><td>Member kéo sang "In Progress".</td></tr>
+<tr><td><strong style="color:#1a56db">Review</strong></td><td>Member kéo sang "Review" — chờ PM kiểm tra.</td></tr>
+<tr><td><strong style="color:#1a56db">Done</strong></td><td>Hoàn thành. Completion Rate cập nhật. PM nhận thông báo đánh giá.</td></tr>
+<tr><td><strong style="color:#dc2626">Overdue (label)</strong></td><td>Deadline qua mà chưa Done. Label đỏ trên card — không phải cột riêng.</td></tr>
+<tr><td><strong style="color:#1a56db">Cancelled</strong></td><td>Chỉ PM cancel được. Ghi log.</td></tr>
+</tbody></table>
+
+<h3>2.5. Ràng buộc hệ thống</h3>
+<table><tbody><tr><th style="width:70px">Mã</th><th>Nội dung</th></tr>
+<tr><td>RB-01</td><td>Một Task thuộc về một Dự án duy nhất.</td></tr>
+<tr><td>RB-02</td><td>File đính kèm tối đa 10MB/file.</td></tr>
+<tr><td>RB-03</td><td>Kéo thả Kanban phản hồi dưới 500ms.</td></tr>
+<tr><td>RB-04</td><td>Chỉ PM mới invite/xoá thành viên khỏi Workspace của mình.</td></tr>
+<tr><td>RB-05</td><td>Chỉ Platform Admin nâng/hạ role (PM ↔ Member).</td></tr>
+<tr><td>RB-06</td><td>Workspace phải có ít nhất 1 PM. Không thể hạ role PM duy nhất.</td></tr>
+<tr><td>RB-07</td><td>Task Pending phải được phản hồi trong 72h; sau đó hệ thống nhắc PM.</td></tr>
+<tr><td>RB-08</td><td>Khi Reject task, Member bắt buộc nhập lý do.</td></tr>
+<tr><td>RB-09</td><td>Dự án phải tồn tại trước khi PM tạo task.</td></tr>
+<tr><td>RB-10</td><td>Token reset password hiệu lực 1 giờ, dùng được 1 lần.</td></tr>
+<tr><td>RB-11</td><td>Comment không được xoá nếu đã có reply; chỉ được edit nội dung.</td></tr>
+</tbody></table>
+
+<h2>CHƯƠNG 3. YÊU CẦU PHI CHỨC NĂNG</h2>
+<table><tbody><tr><th style="width:70px">Mã</th><th style="width:90px">Loại</th><th>Nội dung</th></tr>
+<tr><td>PER-01</td><td>Hiệu năng</td><td>API danh sách task phản hồi &lt;200ms cho dự án dưới 500 task.</td></tr>
+<tr><td>PER-02</td><td>Hiệu năng</td><td>API gợi ý phân công hoàn thành &lt;300ms.</td></tr>
+<tr><td>PER-03</td><td>Hiệu năng</td><td>API filter task phản hồi &lt;300ms.</td></tr>
+<tr><td>SEC-01</td><td>Bảo mật</td><td>Toàn bộ API bảo vệ bằng JWT. User không thuộc Workspace A không gọi được API của Workspace A.</td></tr>
+<tr><td>SEC-02</td><td>Bảo mật</td><td>Lý do reject task mã hóa khi lưu DB.</td></tr>
+<tr><td>SEC-03</td><td>Bảo mật</td><td>Sau 5 lần đăng nhập sai, tài khoản tạm khóa 15 phút.</td></tr>
+<tr><td>REL-01</td><td>Độ tin cậy</td><td>Accept/reject idempotent — gửi 2 lần không tạo 2 bản ghi.</td></tr>
+<tr><td>REL-02</td><td>Độ tin cậy</td><td>SignalR tự reconnect; thông báo offline đồng bộ khi kết nối lại.</td></tr>
+<tr><td>USA-01</td><td>UX</td><td>Màu nhất quán: Xanh lá = Hoàn thành, Đỏ = Quá hạn, Cam = Chờ Accept.</td></tr>
+<tr><td>USA-02</td><td>UX</td><td>Kéo thả Kanban dùng Optimistic UI — cập nhật ngay, rollback nếu lỗi.</td></tr>
+</tbody></table>
+
+<div class="pg"></div>
+<h2>CHƯƠNG 4. CHI TIẾT USE CASE</h2>
+
+<!-- UC-01 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-01</span><span class="uct">Đăng ký &amp; Tạo Workspace tự động</span><span class="uca">Guest</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Người dùng mới đăng ký, xác thực email → hệ thống tự động tạo Workspace và gán vai trò Team PM.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Chưa có tài khoản hợp lệ.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User truy cập trang chủ → nhấn "Đăng ký".</td></tr>
+<tr><td>2</td><td>Điền email, mật khẩu (≥8 ký tự, có chữ hoa + số), tên công ty.</td></tr>
+<tr><td>3</td><td>Hệ thống gửi email xác thực; user click link trong vòng 24h.</td></tr>
+<tr><td>4</td><td>Tạo Workspace, tạo User với role PM, tạo MemberProfile (level = Junior).</td></tr>
+<tr><td>5</td><td>Tự động đăng nhập → redirect Dashboard Workspace.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Email đã tồn tại → lỗi, yêu cầu nhập email khác hoặc đăng nhập.</td></tr>
+<tr><td><b>A2</b></td><td>Link xác thực hết hạn (24h) → trang gửi lại email xác thực.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User là Team PM của Workspace mới, sử dụng được hệ thống ngay.</div></div></div>
+
+<!-- UC-02 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-02</span><span class="uct">Đăng nhập bình thường</span><span class="uca">Tất cả user</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User đã có tài khoản đăng nhập vào hệ thống.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Có tài khoản hợp lệ, đã xác thực email.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User truy cập /login, nhập email + mật khẩu.</td></tr>
+<tr><td>2</td><td>Hệ thống xác thực qua ASP.NET Identity, tạo JWT token.</td></tr>
+<tr><td>3</td><td>1 Workspace → redirect Dashboard ngay. Nhiều Workspace → trang chọn Workspace (UC-15).</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Sai mật khẩu → đếm số lần; sau 5 lần tạm khóa 15 phút (SEC-03).</td></tr>
+<tr><td><b>A2</b></td><td>Tài khoản vô hiệu hóa → thông báo liên hệ quản trị viên.</td></tr>
+<tr><td><b>A3</b></td><td>Quên mật khẩu → chuyển sang SF-01.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User đã đăng nhập, có JWT hợp lệ, đang ở trong một Workspace.</div></div></div>
+
+<!-- SF-01 -->
+<div class="uc sub"><div class="uch"><span class="ucbg">SF-01</span><span class="uct">Reset Password qua email <span class="nsb">SUB-FLOW UC-02</span></span><span class="uca">Tất cả user</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User quên mật khẩu, yêu cầu đặt lại qua email.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Có tài khoản với email đã xác thực.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User nhấn "Quên mật khẩu?" → nhập email → hệ thống tạo token (hash, expiry = now+1h, RB-10) → gửi link qua email.</td></tr>
+<tr><td>2</td><td>User click link → xác thực token → nhập mật khẩu mới (≥8 ký tự, có chữ hoa + số) + xác nhận.</td></tr>
+<tr><td>3</td><td>Hash mật khẩu mới → lưu DB → đánh dấu token đã dùng → redirect /login.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Email không tồn tại → thông báo chung "Nếu email hợp lệ, bạn sẽ nhận được hướng dẫn".</td></tr>
+<tr><td><b>A2</b></td><td>Token hết hạn hoặc đã dùng → "Link không hợp lệ", gợi ý gửi lại.</td></tr>
+<tr><td><b>A3</b></td><td>Mật khẩu mới trùng cũ → "Không được trùng mật khẩu hiện tại".</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Mật khẩu được cập nhật; user cần đăng nhập lại.</div></div></div>
+
+<!-- UC-03 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-03</span><span class="uct">Invite thành viên vào Workspace</span><span class="uca">Team PM</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>PM mời thành viên mới vào Workspace qua email.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>PM đã đăng nhập vào Workspace.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>PM vào Members → "Mời thành viên" → nhập email + chọn sub-role (BA / DEV / Designer…).</td></tr>
+<tr><td>2</td><td>Hệ thống gửi email invite chứa link có hiệu lực 48h.</td></tr>
+<tr><td>3</td><td>Người nhận click link → đăng ký nhanh nếu chưa có tài khoản → tự động join Workspace với role Member.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Link hết hạn (48h) → trang thông báo hết hạn; PM gửi lại lời mời.</td></tr>
+<tr><td><b>A2</b></td><td>Email chưa có tài khoản → kèm link đăng ký nhanh trong email invite.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Member xuất hiện trong danh sách Workspace.</div></div></div>
+
+<!-- UC-04 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-04</span><span class="uct">Tạo Task + Gợi ý phân công</span><span class="uca">Team PM</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>PM tạo task và hệ thống gợi ý top 3 member phù hợp dựa trên số task đang làm và level.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>PM đang ở trong một dự án đã tạo theo UC-12.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>PM vào dự án → "+ Tạo task" → nhập tiêu đề (bắt buộc), mô tả, due date (tùy chọn), priority (Low/Medium/High/Critical).</td></tr>
+<tr><td>2</td><td>Hệ thống truy vấn MemberProfile → sắp xếp theo: (1) số task In Progress ít nhất, (2) Level cao hơn ưu tiên hơn → hiển thị top 3 kèm tên, level, số task đang làm.</td></tr>
+<tr><td>3</td><td>PM chọn từ top 3 gợi ý hoặc chọn thủ công từ dropdown danh sách đầy đủ.</td></tr>
+<tr><td>4</td><td>Tạo TaskAssignment Pending → Member nhận thông báo realtime.</td></tr>
+<tr><td>5</td><td>Task vẫn Pending → PM có thể đổi người hoặc thu hồi.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Chưa có member → cảnh báo "Chưa có thành viên", gợi ý mời (UC-03); PM vẫn có thể tự nhận task.</td></tr>
+<tr><td><b>A2</b></td><td>Tất cả member có ≥5 task In Progress → cảnh báo "Tất cả đang bận" kèm workload từng người.</td></tr>
+<tr><td><b>A3</b></td><td>PM không chọn due date → task hiển thị nhãn "Không có hạn".</td></tr>
+<tr><td><b>A4</b></td><td>PM đổi người khi Pending → hủy assignment cũ, tạo mới; member cũ nhận thông báo thu hồi.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Task Pending trên Kanban, chờ Member Accept (UC-05).</div></div></div>
+
+<!-- UC-05 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-05</span><span class="uct">Accept / Reject Task</span><span class="uca">Team Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Member nhận task và quyết định chấp nhận hoặc từ chối.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Member đã được PM giao task (Pending).</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Member nhận thông báo realtime "Bạn được giao task X".</td></tr>
+<tr><td>2</td><td><strong>Accept</strong> → task chuyển sang To Do, hiển thị Kanban; PM nhận thông báo xác nhận.</td></tr>
+<tr><td>3</td><td><strong>Reject</strong> → bắt buộc nhập lý do (RB-08) → task về Unassigned; PM nhận thông báo kèm lý do.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Không phản hồi 24h → nhắc lần 1; 48h → nhắc lần 2 + cảnh báo PM; 72h → PM nhận thông báo chủ động xử lý (RB-07).</td></tr>
+<tr><td><b>A2</b></td><td>PM thu hồi trước khi phản hồi → task Unassigned; Member nhận thông báo thu hồi.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Task chỉ kéo thả Kanban được khi đã ở trạng thái To Do (đã Accept).</div></div></div>
+
+<!-- UC-06 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-06</span><span class="uct">Kanban Board Realtime</span><span class="uca">PM (read-only) &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Xem và cập nhật trạng thái task bằng kéo thả (4 cột) với đồng bộ realtime qua SignalR.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>User đang trong một dự án cụ thể.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User mở Kanban Board → 4 cột: To Do / In Progress / Review / Done.</td></tr>
+<tr><td>2</td><td>Member kéo thả task của mình (đã Accept). Optimistic UI cập nhật ngay (USA-02).</td></tr>
+<tr><td>3</td><td>SignalR broadcast TASK_MOVED đến tất cả thành viên đang mở Board.</td></tr>
+<tr><td>4</td><td>Task kéo vào Done → PM nhận thông báo tiến hành đánh giá (UC-08).</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Mất kết nối SignalR → banner cảnh báo, tự reconnect 5 giây; kéo thả tạm khóa.</td></tr>
+<tr><td><b>A2</b></td><td>Member kéo task chưa Accept / của người khác → chặn, tooltip "Không có quyền".</td></tr>
+<tr><td><b>A3</b></td><td>Server lỗi → rollback về cột cũ, "Cập nhật thất bại".</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Trạng thái task lưu vào DB; tất cả user thấy thay đổi ngay.</div></div></div>
+
+<!-- UC-07 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-07</span><span class="uct">Xem &amp; Chỉnh sửa Chi tiết Task</span><span class="uca">PM &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Mở modal chi tiết task để xem và cập nhật thông tin. Quyền phân theo vai trò.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Task tồn tại và user có quyền truy cập dự án.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Click thẻ task trên Kanban → modal chi tiết hiện ra.</td></tr>
+<tr><td>2</td><td><strong>PM:</strong> chỉnh sửa tất cả trường — tiêu đề, mô tả, due date, priority, assignee, checklist, file.<br><strong>Member (task mình, đã Accept):</strong> chỉnh sửa mô tả, checklist, file. Không đổi được due date, priority, assignee.<br><strong>Member (task người khác):</strong> chỉ xem (read-only).</td></tr>
+<tr><td>3</td><td>File đính kèm tối đa 10MB/file (RB-02).</td></tr>
+<tr><td>4</td><td>Mọi thay đổi ghi vào activity log (UC-18).</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Hai người cùng chỉnh sửa → last-write-wins.</td></tr>
+<tr><td><b>A2</b></td><td>File vượt 10MB → từ chối, hiển thị lỗi.</td></tr>
+<tr><td><b>A3</b></td><td>Member cố chỉnh trường không được phép → trường hiển thị read-only (disabled).</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Thay đổi lưu vào DB và activity log; thành viên liên quan nhận thông báo.</div></div></div>
+
+<!-- UC-08 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-08</span><span class="uct">Đánh giá Task &amp; Cập nhật Level thành viên</span><span class="uca">Team PM</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>PM đánh giá chất lượng khi task Done; dữ liệu phản ánh vào gợi ý phân công (UC-04).</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Task đã kéo sang cột Done.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Task Done → PM nhận thông báo realtime "Cần đánh giá task [Tên]".</td></tr>
+<tr><td>2</td><td>PM mở modal đánh giá: nhập Điểm (1–10), Nhận xét, cập nhật Level (Junior/Mid/Senior) nếu phù hợp.</td></tr>
+<tr><td>3</td><td>Hệ thống tính lại: Completion Rate = Task Done đúng hạn / Tổng task giao. Average Score = Trung bình điểm tất cả task đã đánh giá.</td></tr>
+<tr><td>4</td><td>Lưu vào TaskEvaluations + cập nhật MemberProfile ngay. Member nhận thông báo kết quả.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>PM chưa đánh giá sau 3 ngày → nhắc nhở tự động mỗi ngày.</td></tr>
+<tr><td><b>A2</b></td><td>Chỉnh sửa đánh giá → chỉ được trong 24h; sau đó khóa.</td></tr>
+<tr><td><b>A3</b></td><td>Task trễ deadline → hệ thống tự ghi vào Completion Rate trước khi PM cho điểm.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Average Score và Completion Rate cập nhật ngay; ảnh hưởng gợi ý phân công lần sau.</div></div></div>
+
+<!-- UC-09 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-09</span><span class="uct">Quản lý Role trong Workspace</span><span class="uca">Platform Admin</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Platform Admin thay đổi role thành viên (PM ↔ Member) trong bất kỳ Workspace nào.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Đăng nhập với tài khoản Platform Admin.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Admin truy cập /admin/workspaces → chọn Workspace.</td></tr>
+<tr><td>2</td><td>Xem danh sách thành viên → chọn user → nâng/hạ role.</td></tr>
+<tr><td>3</td><td>Ghi log vào RoleChangeLogs; user nhận thông báo realtime.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Hạ role PM duy nhất → cảnh báo "Workspace sẽ không có PM", yêu cầu xác nhận (RB-06).</td></tr>
+<tr><td><b>A2</b></td><td>Xem lịch sử role → tab "Role Logs" với toàn bộ audit trail.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Role thay đổi ngay lập tức; ghi vào RoleChangeLogs.</div></div></div>
+
+<!-- UC-11 -->
+<div class="uc"><div class="uch"><span class="ucbg">UC-11</span><span class="uct">Thông báo Realtime</span><span class="uca">Tất cả user</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Hệ thống gửi thông báo tức thời qua SignalR khi có sự kiện quan trọng; lưu lại để xem sau.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>User đăng nhập; SignalR kết nối.</span></div></div>
+<div class="sec"><div class="sl">Sự kiện kích hoạt</div>
+<table style="margin:0"><tbody><tr><th>Sự kiện</th><th>Người nhận</th></tr>
+<tr><td>Được giao task mới (Pending)</td><td>Member được gán</td></tr>
+<tr><td>Task bị Reject kèm lý do</td><td>Team PM</td></tr>
+<tr><td>Task được Accept</td><td>Team PM</td></tr>
+<tr><td>Task Done — cần đánh giá</td><td>Team PM</td></tr>
+<tr><td>Kết quả đánh giá task</td><td>Member được đánh giá</td></tr>
+<tr><td>Role bị thay đổi</td><td>User liên quan</td></tr>
+<tr><td>Workspace invite</td><td>Người được mời</td></tr>
+<tr><td>Task sắp đến deadline (còn 24h)</td><td>Member phụ trách</td></tr>
+<tr><td>Dự án mới được tạo/xoá</td><td>Tất cả thành viên Workspace</td></tr></tbody></table></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Thông báo hiện pop-up góc phải màn hình, tự ẩn sau 5 giây.</td></tr>
+<tr><td>2</td><td>Đồng thời lưu vào "My Notifications" (chấm đỏ chưa đọc).</td></tr>
+<tr><td>3</td><td>User click thông báo → điều hướng màn hình liên quan.</td></tr>
+<tr><td>4</td><td>User đánh dấu đã đọc (từng cái hoặc tất cả) hoặc xóa.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>User offline → lưu hàng đợi; đồng bộ khi đăng nhập lại (REL-02).</td></tr>
+<tr><td><b>A2</b></td><td>Danh sách vượt 200 mục → xóa tự động thông báo cũ nhất đã đọc.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User nhận thông báo ngay khi online; đồng bộ đầy đủ khi offline.</div></div></div>
+
+<!-- UC-12 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-12</span><span class="uct">Quản lý Dự án — CRUD Project</span><span class="uca">Team PM</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>PM tạo, chỉnh sửa, archive và xoá dự án. Entry point bắt buộc trước UC-04 và UC-06.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>PM đã đăng nhập vào Workspace.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>PM → "+ Tạo dự án" → nhập tên (bắt buộc), mô tả, ngày bắt đầu/kết thúc, màu nhận diện.</td></tr>
+<tr><td>2</td><td>Validate tên không rỗng và không trùng trong Workspace.</td></tr>
+<tr><td>3</td><td>Tạo dự án + Kanban Board 4 cột mặc định + gán PM là Owner. SignalR broadcast PROJECT_CREATED.</td></tr>
+<tr><td>4</td><td>PM chỉnh sửa qua Project Settings bất kỳ lúc nào.</td></tr>
+<tr><td>5</td><td>PM archive dự án → chuyển sang read-only. PM xoá dự án → xác nhận → xoá khỏi DB.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Tên trùng trong Workspace → "Tên dự án đã tồn tại".</td></tr>
+<tr><td><b>A2</b></td><td>Xoá dự án có task In Progress → cảnh báo "Dự án đang có task chưa hoàn thành", yêu cầu xác nhận.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Dự án hiển thị trong Workspace; PM và thành viên có thể bắt đầu tạo task.</div></div></div>
+
+<!-- UC-13 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-13</span><span class="uct">Báo cáo &amp; Dashboard KPI</span><span class="uca">Team PM</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>PM xem dashboard tổng quan tiến độ dự án và hiệu suất thành viên.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>PM đăng nhập; có ít nhất 1 dự án đang hoạt động.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>PM chọn "Báo cáo" → chọn dự án + khoảng thời gian.</td></tr>
+<tr><td>2</td><td>Hệ thống hiển thị: tổng task, task hoàn thành, task quá hạn, tỉ lệ hoàn thành (%).</td></tr>
+<tr><td>3</td><td>Bảng hiệu suất member: tên, level, completion rate, average score, số task giao/hoàn thành.</td></tr>
+<tr><td>4</td><td>Biểu đồ Pie Chart tỉ lệ task theo trạng thái; Bar Chart số task theo member.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Chưa có task → "Chưa có dữ liệu để thống kê".</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>PM có cái nhìn tổng quan về tiến độ và hiệu suất team.</div></div></div>
+
+<!-- UC-14 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-14</span><span class="uct">Xem &amp; Chỉnh sửa Member Profile</span><span class="uca">PM &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>Member xem profile cá nhân và cập nhật thông tin cơ bản. PM xem đầy đủ và cập nhật Level/sub-role.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>User đã đăng nhập vào Workspace.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>Member click avatar → "Profile của tôi" → xem: tên, email, sub-role, Level, Completion Rate, Average Score, lịch sử task 30 ngày.</td></tr>
+<tr><td>2</td><td>Member chỉnh sửa tên hiển thị, avatar (≤2MB, JPG/PNG). Không tự đổi email, level, điểm.</td></tr>
+<tr><td>3</td><td>PM xem full profile member; cập nhật Level (Junior/Mid/Senior) và sub-role → ghi LevelChangeLog.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Chưa có task → chỉ số hiển thị "Chưa có dữ liệu".</td></tr>
+<tr><td><b>A2</b></td><td>Avatar vượt 2MB / sai định dạng → lỗi tương ứng.</td></tr>
+<tr><td><b>A3</b></td><td>PM xem profile member không thuộc Workspace → 403 Forbidden.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Profile cập nhật trong DB; chỉ số phản ánh tức thì vào gợi ý phân công (UC-04).</div></div></div>
+
+<!-- UC-15 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-15</span><span class="uct">Workspace Switching</span><span class="uca">Tất cả user</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User thuộc nhiều Workspace có thể chuyển đổi nhanh giữa các Workspace.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>User đăng nhập và thuộc ít nhất 2 Workspace.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User nhấn vào tên Workspace trên header → mở dropdown danh sách Workspace đang active.</td></tr>
+<tr><td>2</td><td>User chọn Workspace khác → hệ thống đổi context JWT sang Workspace được chọn.</td></tr>
+<tr><td>3</td><td>Reload toàn bộ UI (projects, notifications, Kanban) theo context Workspace mới.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>User bị xoá khỏi Workspace trong khi đang switch → "Bạn không còn là thành viên của Workspace này".</td></tr>
+<tr><td><b>A2</b></td><td>User muốn tạo Workspace mới → nút "+ Tạo Workspace" trong dropdown → luồng UC-01.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User đang hoạt động trong Workspace mới; dữ liệu isolated với Workspace cũ.</div></div></div>
+
+<!-- UC-16 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-16</span><span class="uct">Filter &amp; Sort Tasks</span><span class="uca">PM &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User lọc và sắp xếp task trong dự án theo các tiêu chí cơ bản.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>User đang ở trong một dự án.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User mở bộ lọc trên Kanban Board hoặc List View → chọn các tiêu chí: Assignee (multi-select), Status, Priority, Due date (hôm nay / tuần này / tháng này / quá hạn).</td></tr>
+<tr><td>2</td><td>Hệ thống lọc task theo WHERE clause tương ứng → cập nhật giao diện ngay.</td></tr>
+<tr><td>3</td><td>User chọn Sort: theo Due date, Priority hoặc Created date (tăng/giảm).</td></tr>
+<tr><td>4</td><td>User xóa bộ lọc → hiển thị lại tất cả task.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Không có task nào phù hợp → "Không có task nào phù hợp với bộ lọc này".</td></tr>
+<tr><td><b>A2</b></td><td>Member filter → chỉ thấy task trong dự án mình tham gia. PM thấy tất cả task trong Workspace.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User thấy danh sách task đã lọc/sắp xếp theo yêu cầu.</div></div></div>
+
+<!-- UC-17 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-17</span><span class="uct">Comment trên Task</span><span class="uca">PM &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User thêm, chỉnh sửa và xoá bình luận trên task. Thay thế việc trao đổi qua Zalo.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Task tồn tại và user có quyền xem task đó.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User mở task detail (UC-07) → tab "Bình luận" → nhập nội dung → nhấn "Gửi".</td></tr>
+<tr><td>2</td><td>Comment lưu DB, hiển thị ngay trong danh sách (thứ tự thời gian tăng dần).</td></tr>
+<tr><td>3</td><td>User edit comment của mình → cập nhật nội dung, hiển thị nhãn "(đã chỉnh sửa)".</td></tr>
+<tr><td>4</td><td>User xoá comment của mình: nếu chưa có reply → xoá hẳn; nếu đã có reply → hiển thị "[Bình luận đã bị xoá]" (RB-11).</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Comment rỗng → không cho phép gửi.</td></tr>
+<tr><td><b>A2</b></td><td>PM xoá comment của Member → được phép; ghi log.</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>Comment được lưu và hiển thị trong task detail. Mọi thay đổi ghi vào activity log (UC-18).</div></div></div>
+
+<!-- UC-18 -->
+<div class="uc new"><div class="uch"><span class="ucbg">UC-18</span><span class="uct">Activity Log của Task</span><span class="uca">PM &amp; Member</span></div>
+<div class="ucb"><div class="ucm"><div class="ucmi"><label>Mô tả</label><span>User xem lịch sử thay đổi trên task: ai sửa gì, lúc nào.</span></div><div class="ucmi"><label>Điều kiện tiên quyết</label><span>Task tồn tại và user có quyền xem task đó.</span></div></div>
+<div class="sec"><div class="sl">Main Flow</div><table style="margin:0"><tbody><tr><th style="width:26px">#</th><th>Bước</th></tr>
+<tr><td>1</td><td>User mở task detail → tab "Lịch sử" → danh sách sự kiện theo thứ tự thời gian giảm dần.</td></tr>
+<tr><td>2</td><td>Mỗi entry: avatar + tên người thực hiện, mô tả hành động ("đổi Priority từ Medium → High"), timestamp.</td></tr>
+<tr><td>3</td><td>Các hành động tự động ghi log: tạo task, đổi status, đổi assignee, đổi due date/priority, accept/reject, upload/xoá file, thêm/sửa/xoá comment, đổi checklist, đánh giá.</td></tr></tbody></table></div>
+<div class="sec alt"><div class="sl">Alternative Flow</div><table style="margin:0">
+<tbody><tr><td style="width:26px"><b>A1</b></td><td>Task mới tạo → chỉ hiển thị entry "Tạo task".</td></tr></tbody></table></div>
+<div class="sec post"><div class="sl">Post-condition</div>User có đầy đủ lịch sử thay đổi để tra cứu.</div></div></div>
+
+<div class="pg"></div>
+<h2>CHƯƠNG 5. MA TRẬN PHÂN QUYỀN</h2>
+<table class="matrix">
+  <tbody><tr><th style="text-align:left">Chức năng</th><th>Platform Admin</th><th>Team PM</th><th>Team Member</th></tr>
+  <tr><td>Đăng ký / Đăng nhập / Reset Password</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Workspace Switching (UC-15)</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Xem profile của chính mình (UC-14)</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Cập nhật thông tin cá nhân</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Comment trên task (UC-17)</td><td class="cx">—</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Xem Activity Log task (UC-18)</td><td class="cx">—</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+  <tr><td>Filter &amp; Sort Tasks (UC-16)</td><td class="cx">—</td><td class="ck">✓ (all)</td><td class="ck">✓ (scope)</td></tr>
+  <tr><td>Invite / Xoá thành viên Workspace</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Tạo / Chỉnh sửa / Archive / Xoá Dự án (UC-12)</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Tạo Task + Gợi ý phân công (UC-04)</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Accept / Reject Task (UC-05)</td><td class="cx">—</td><td class="cx">—</td><td class="ck">✓</td></tr>
+  <tr><td>Kéo thả Kanban (UC-06)</td><td class="cx">—</td><td>Xem</td><td class="ck">✓ (own)</td></tr>
+  <tr><td>Chỉnh sửa chi tiết Task (UC-07)</td><td class="cx">—</td><td class="ck">✓ (toàn bộ)</td><td class="ck">✓ (giới hạn)</td></tr>
+  <tr><td>Đánh giá Task + Cập nhật Level (UC-08)</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Xem Dashboard KPI (UC-13)</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Xem profile member (UC-14)</td><td class="ck">✓</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Cập nhật Level / Sub-role member</td><td class="cx">—</td><td class="ck">✓</td><td class="cx">—</td></tr>
+  <tr><td>Quản lý Role Workspace (UC-09)</td><td class="ck">✓</td><td class="cx">—</td><td class="cx">—</td></tr>
+</tbody></table>
+
+<h2>CHƯƠNG 6. SƠ ĐỒ LIÊN KẾT USE CASE</h2>
+<div class="dep">
+UC-01 (Đăng ký) ──► UC-15 (Workspace Switching) — nhiều Workspace
+
+UC-02 (Đăng nhập)
+  ├──► SF-01 (Reset Password) — A3
+  └──► UC-15 (Workspace Switching) — nhiều Workspace
+
+<b>UC-12 (Quản lý Dự án) ← ENTRY POINT BẮT BUỘC</b>
+  └──► UC-04 (Tạo Task) — dự án phải tồn tại trước
+
+UC-04 (Tạo Task + Gợi ý)
+  └──► UC-05 (Accept / Reject)
+         └──► UC-06 (Kanban Board)
+                ├──► UC-07 (Chi tiết Task)
+                │      ├──► UC-17 (Comment)
+                │      └──► UC-18 (Activity Log)
+                └──► UC-08 (Đánh giá Task)
+                       └──► UC-14 (Member Profile — cập nhật level)
+
+UC-13 (KPI Dashboard) ──► UC-08 (nguồn dữ liệu đánh giá)
+UC-16 (Filter/Sort) ──► UC-07 (mở task từ kết quả filter)
+UC-03 (Invite) ──► UC-04 (thêm member → có thể phân công)
+UC-09 (Quản lý Role) ──► UC-11 (Thông báo role changed)
+
+UC-11 (Thông báo)
+  ← Kích hoạt bởi: UC-04, UC-05, UC-06, UC-08, UC-09, UC-12
+</div>
+
+<div class="footer">WorkFlow Pro — SRS v1.4 (Student Scope) &nbsp;|&nbsp; 25/03/2026 &nbsp;|&nbsp; 17 use case (UC-01→UC-09, UC-11→UC-18 + SF-01) — Phiên bản tối ưu cho project cuối môn</div>
+</body></html>
