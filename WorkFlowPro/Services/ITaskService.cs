@@ -129,6 +129,7 @@ public interface ITaskService
         Guid workspaceId,
         int score,
         string? comment,
+        MemberLevel? newLevel = null,
         CancellationToken cancellationToken = default);
 }
 

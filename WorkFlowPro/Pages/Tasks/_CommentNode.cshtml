@@ -4,7 +4,7 @@
     var node = Model.Node;
     var canEdit = (Model.CanManageComments || Model.ActorUserId == node.UserId) && !node.IsDeleted;
     var canReply = Model.CanManageComments;
-    var canDelete = Model.CanManageComments || Model.ActorUserId == node.UserId;
+    var canDelete = Model.IsPm || Model.ActorUserId == node.UserId;
 }
 
 <div class="mb-3 @(node.ParentCommentId is null ? "" : "ms-3")"
@@ -82,7 +82,7 @@
         {
             @foreach (var r in node.Replies)
             {
-                <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(r, Model.ActorUserId, Model.CanManageComments)" />
+                <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(r, Model.ActorUserId, Model.CanManageComments, Model.IsPm)" />
             }
         }
     </div>

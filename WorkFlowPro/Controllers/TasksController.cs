@@ -48,7 +48,7 @@ public sealed class TasksController : ControllerBase
 
     public sealed record RejectTaskRequest(string Reason);
 
-    public sealed record EvaluateTaskRequest(int Score, string? Comment);
+    public sealed record EvaluateTaskRequest(int Score, string? Comment, string? NewLevel = null);
 
     [Authorize]
     [HttpGet("projects/{projectId:guid}/kanban")]
@@ -550,12 +550,17 @@ public sealed class TasksController : ControllerBase
         var userId = User.GetUserId();
         var workspaceId = User.GetWorkspaceId();
 
+        MemberLevel? level = null;
+        if (!string.IsNullOrWhiteSpace(request.NewLevel) && Enum.TryParse<MemberLevel>(request.NewLevel, true, out var parsed))
+            level = parsed;
+
         var result = await _taskService.EvaluateTaskAsync(
             taskId,
             actorUserId: userId,
             workspaceId: workspaceId,
             score: request.Score,
             comment: request.Comment,
+            newLevel: level,
             cancellationToken: HttpContext.RequestAborted);
 
         if (!result.Success)

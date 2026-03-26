@@ -20,9 +20,16 @@ public sealed class CurrentWorkspaceService : ICurrentWorkspaceService
             if (http is null)
                 return null;
 
-            var sessionVal = http.Session.GetString(WorkspaceSessionKeys.CurrentWorkspaceId);
-            if (!string.IsNullOrWhiteSpace(sessionVal) && Guid.TryParse(sessionVal, out var sessionGuid))
-                return sessionGuid;
+            try
+            {
+                var sessionVal = http.Session.GetString(WorkspaceSessionKeys.CurrentWorkspaceId);
+                if (!string.IsNullOrWhiteSpace(sessionVal) && Guid.TryParse(sessionVal, out var sessionGuid))
+                    return sessionGuid;
+            }
+            catch
+            {
+                // Session not available (e.g. SignalR WebSocket context)
+            }
 
             var claimVal =
                 http.User.FindFirstValue("CurrentWorkspaceId")

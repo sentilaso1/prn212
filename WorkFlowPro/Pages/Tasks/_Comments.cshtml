@@ -40,7 +40,7 @@
             <div class="list-unstyled" id="wfCommentsTree">
                 @foreach (var c in Model.items)
                 {
-                    <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(c, Model.actorUserId, d.CanManageComments)" />
+                    <partial name="_CommentNode" model="new WorkFlowPro.Pages.Tasks.CommentNodeRenderVm(c, Model.actorUserId, d.CanManageComments, d.IsPm)" />
                 }
             </div>
         }

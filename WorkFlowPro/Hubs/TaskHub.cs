@@ -48,36 +48,57 @@ public sealed class TaskHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, projectId.ToString("D"));
     }
 
-    // Called by Kanban board drag & drop.
     public async Task<MoveTaskHubResult> MoveTask(
-        Guid taskId,
+        string taskIdStr,
         string targetStatus,
-        CancellationToken cancellationToken = default)
+        string? wsIdStr = null)
     {
-        var principal = Context.User;
-        if (principal is null)
-            return new MoveTaskHubResult(false, "Not authenticated.");
+        try
+        {
+            var principal = Context.User;
+            if (principal is null)
+                return new MoveTaskHubResult(false, "Not authenticated.");
 
-        var actorUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(actorUserId))
-            return new MoveTaskHubResult(false, "Missing user id.");
+            var actorUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(actorUserId))
+                return new MoveTaskHubResult(false, "Missing user id.");
 
-        // workspace_id is injected by WorkspaceClaimsTransformation (UC-15).
-        var workspaceIdStr = principal.FindFirstValue("workspace_id") ?? principal.FindFirstValue("CurrentWorkspaceId");
-        if (!Guid.TryParse(workspaceIdStr, out var workspaceId))
-            return new MoveTaskHubResult(false, "Missing workspace id.");
+            if (!Guid.TryParse(taskIdStr, out var taskId))
+                return new MoveTaskHubResult(false, "Invalid taskId.");
 
-        if (!Enum.TryParse<TaskStatus>(targetStatus, ignoreCase: true, out var newStatus))
-            return new MoveTaskHubResult(false, "Invalid target status.");
+            Guid workspaceId;
+            if (!string.IsNullOrWhiteSpace(wsIdStr) && Guid.TryParse(wsIdStr, out var parsed))
+            {
+                workspaceId = parsed;
+            }
+            else
+            {
+                var claimVal = principal.FindFirstValue("workspace_id")
+                               ?? principal.FindFirstValue("CurrentWorkspaceId");
+                if (!Guid.TryParse(claimVal, out workspaceId))
+                    return new MoveTaskHubResult(false, "Missing workspace id.");
+            }
 
-        var result = await _kanbanService.UpdateTaskStatusAsync(
-            taskId,
-            newStatus,
-            actorUserId,
-            workspaceId,
-            cancellationToken);
+            if (!Enum.TryParse<TaskStatus>(targetStatus, ignoreCase: true, out var newStatus))
+                return new MoveTaskHubResult(false, "Invalid target status.");
 
-        return new MoveTaskHubResult(result.Success, result.ErrorMessage);
+            var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+                m.WorkspaceId == workspaceId && m.UserId == actorUserId);
+            if (!isMember)
+                return new MoveTaskHubResult(false, "Bạn không thuộc workspace này.");
+
+            var result = await _kanbanService.UpdateTaskStatusAsync(
+                taskId,
+                newStatus,
+                actorUserId,
+                workspaceId);
+
+            return new MoveTaskHubResult(result.Success, result.ErrorMessage);
+        }
+        catch (Exception ex)
+        {
+            return new MoveTaskHubResult(false, $"Server error: {ex.Message}");
+        }
     }
 }
 

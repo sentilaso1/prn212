@@ -64,7 +64,8 @@ public sealed class AcceptRejectModel : PageModel
             return;
         }
 
-        var assignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
+        var assignment = await _db.TaskAssignments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a =>
             a.TaskId == taskId &&
             a.AssigneeUserId == userId &&
             a.Status == TaskAssignmentStatus.Pending, cancellationToken);
@@ -75,14 +76,16 @@ public sealed class AcceptRejectModel : PageModel
             return;
         }
 
-        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        var task = await _db.Tasks.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
         if (task is null)
         {
             ErrorMessage = "Task không tồn tại.";
             return;
         }
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
         if (project is null)
         {
             ErrorMessage = "Project không hợp lệ.";
@@ -92,7 +95,7 @@ public sealed class AcceptRejectModel : PageModel
         var workspaceId = project.WorkspaceId;
         ResolvedWorkspaceId = workspaceId;
 
-        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+        var isPm = await _db.WorkspaceMembers.IgnoreQueryFilters().AnyAsync(m =>
             m.WorkspaceId == workspaceId &&
             m.UserId == userId &&
             m.Role == WorkspaceMemberRole.PM, cancellationToken);
@@ -102,7 +105,7 @@ public sealed class AcceptRejectModel : PageModel
             return;
         }
 
-        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+        var isMember = await _db.WorkspaceMembers.IgnoreQueryFilters().AnyAsync(m =>
             m.WorkspaceId == workspaceId &&
             m.UserId == userId, cancellationToken);
         if (!isMember)
@@ -122,9 +125,9 @@ public sealed class AcceptRejectModel : PageModel
 
     private async Task<Guid?> ResolveWorkspaceFromTask(Guid taskId, CancellationToken ct)
     {
-        var task = await _db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, ct);
+        var task = await _db.Tasks.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, ct);
         if (task is null) return null;
-        var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == task.ProjectId, ct);
+        var project = await _db.Projects.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(p => p.Id == task.ProjectId, ct);
         return project?.WorkspaceId;
     }
 

@@ -43,13 +43,13 @@ public sealed class KanbanService : IKanbanService
         if (!Enum.IsDefined<TaskStatus>(newStatus))
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "newStatus không hợp lệ." };
 
-        // Load task (workspace filter is global, but we still verify workspace via project).
-        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        var task = await _db.Tasks.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
         if (task is null)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "Task không tồn tại." };
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p =>
-            p.Id == task.ProjectId && p.WorkspaceId == workspaceId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId, cancellationToken);
 
         if (project is null)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "Task không thuộc workspace hiện tại." };
@@ -62,8 +62,8 @@ public sealed class KanbanService : IKanbanService
             m.WorkspaceId == workspaceId && m.UserId == actorUserId && m.Role == WorkspaceMemberRole.PM,
             cancellationToken);
 
-        // For Members: require accepted assignment to self.
-        var memberAcceptedAssignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
+        var memberAcceptedAssignment = await _db.TaskAssignments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a =>
             a.TaskId == taskId &&
             a.AssigneeUserId == actorUserId &&
             a.Status == TaskAssignmentStatus.Accepted, cancellationToken);
@@ -73,29 +73,29 @@ public sealed class KanbanService : IKanbanService
 
         var oldStatus = task.Status;
 
-        // Server-side state transitions (match existing TasksController.Move logic).
+        if (oldStatus == newStatus)
+            return new MoveTaskServiceResult { Success = true };
+
         var allowed = oldStatus switch
         {
             TaskStatus.ToDo => newStatus is TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Done,
-            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done,
-            TaskStatus.Review => newStatus is TaskStatus.Done,
+            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done or TaskStatus.ToDo,
+            TaskStatus.Review => newStatus is TaskStatus.Done or TaskStatus.InProgress,
+            TaskStatus.Done => newStatus is TaskStatus.ToDo or TaskStatus.InProgress or TaskStatus.Review,
             _ => newStatus is TaskStatus.Done
         };
 
         if (!allowed)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = $"Không thể chuyển {oldStatus} -> {newStatus}." };
 
-        if (oldStatus == newStatus)
-            return new MoveTaskServiceResult { Success = true };
-
         task.Status = newStatus;
         task.UpdatedAtUtc = now;
         _db.Tasks.Update(task);
 
-        // If moved to Done, decrement workload for the assignee.
         if (newStatus == TaskStatus.Done)
         {
-            var acceptedAssignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
+            var acceptedAssignment = await _db.TaskAssignments.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(a =>
                 a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted, cancellationToken);
 
             if (acceptedAssignment is not null)
@@ -183,6 +183,7 @@ public sealed class KanbanService : IKanbanService
             }
 
             var assigneeId = await _db.TaskAssignments
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(a => a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted)
                 .Select(a => a.AssigneeUserId)
@@ -195,7 +196,7 @@ public sealed class KanbanService : IKanbanService
 
             var msg =
                 $"Task \"{task.Title}\" đã chuyển sang {newStatus} bởi {actorName}.";
-            var redirect = $"/Tasks/Details/{taskId}";
+            var redirect = $"/Tasks/Details/{taskId}?workspaceId={workspaceId:D}";
 
             foreach (var uid in recipientIds)
             {
@@ -233,8 +234,9 @@ public sealed class KanbanService : IKanbanService
         TaskCardPayload? card = null;
         if (displayStatuses.Contains(newStatus))
         {
-            var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
-            var assignee = await _db.TaskAssignments
+            var task = await _db.Tasks.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+            var assignee = await _db.TaskAssignments.IgnoreQueryFilters()
                 .Where(a => a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted)
                 .Select(a => a.AssigneeUserId)
                 .FirstOrDefaultAsync(cancellationToken);

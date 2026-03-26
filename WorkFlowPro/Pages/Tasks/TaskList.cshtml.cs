@@ -113,6 +113,7 @@ public sealed class TaskListModel : PageModel
         Filters = new TaskFiltersVm
         {
             ProjectId = projectId,
+            WorkspaceId = workspaceId,
             ViewContext = "list",
             Criteria = criteria,
             WorkspaceMembers = members,

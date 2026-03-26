@@ -342,8 +342,7 @@ public sealed class TaskService : ITaskService
             var assigneeUserId = assignment?.AssigneeUserId;
             userById.TryGetValue(assigneeUserId ?? string.Empty, out var assigneeUser);
 
-            var canDrag = draggable.Contains(t.Status) &&
-                          (isPm || (!string.IsNullOrEmpty(assigneeUserId) && assigneeUserId == actorUserId));
+            var canDrag = draggable.Contains(t.Status);
 
             var isOverdue = t.DueDateUtc.HasValue
                             && t.DueDateUtc.Value < utcNow
@@ -1514,8 +1513,7 @@ public sealed class TaskService : ITaskService
         string? comment,
         CancellationToken cancellationToken = default)
     {
-        // Backward compatible handler; now uses UC-08 semantics.
-        return await EvaluateTaskAsync(taskId, actorUserId, workspaceId, score, comment, cancellationToken);
+        return await EvaluateTaskAsync(taskId, actorUserId, workspaceId, score, comment, newLevel: null, cancellationToken);
     }
 
     public async Task<EvaluationUpdateResult> EvaluateTaskAsync(
@@ -1524,6 +1522,7 @@ public sealed class TaskService : ITaskService
         Guid workspaceId,
         int score,
         string? comment,
+        MemberLevel? newLevel = null,
         CancellationToken cancellationToken = default)
     {
         var detail = await GetTaskDetailAsync(taskId, actorUserId, workspaceId, cancellationToken);
@@ -1577,15 +1576,9 @@ public sealed class TaskService : ITaskService
             Score = score,
             Comment = normalizedComment,
             EvaluatedAtUtc = now,
-            IsLocked = false
+            IsLocked = true
         };
         _db.TaskEvaluations.Add(eval);
-
-        // Update profile KPIs (AvgScore, CompletionRate, workload computed).
-        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, cancellationToken);
-
-        // Lock evaluation so it cannot be edited.
-        eval.IsLocked = true;
 
         var action = $"Evaluated task with score {score}";
         if (action.Length > 500) action = action[..500];
@@ -1602,6 +1595,10 @@ public sealed class TaskService : ITaskService
         _db.TaskHistoryEntries.Add(entry);
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, newLevel, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+
         await tx.CommitAsync(cancellationToken);
 
         // Realtime: notify assignee.
@@ -1649,6 +1646,7 @@ public sealed class TaskService : ITaskService
     private async Task UpdateMemberProfileFromEvaluationsAsync(
         Guid workspaceId,
         string memberUserId,
+        MemberLevel? overrideLevel,
         CancellationToken cancellationToken)
     {
         var scores = await _db.TaskEvaluations
@@ -1691,7 +1689,8 @@ public sealed class TaskService : ITaskService
         profile.AvgScore = avgScore;
         profile.CompletionRate = completionRate;
         profile.CurrentWorkload = workload;
-        profile.Level = avgScore >= 8m ? MemberLevel.Senior : avgScore >= 6m ? MemberLevel.Mid : MemberLevel.Junior;
+        profile.Level = overrideLevel
+            ?? (avgScore >= 8m ? MemberLevel.Senior : avgScore >= 6m ? MemberLevel.Mid : MemberLevel.Junior);
     }
 
     private async Task<string> GetUserDisplayNameAsync(string userId, CancellationToken cancellationToken)

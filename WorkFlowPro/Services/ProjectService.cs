@@ -15,6 +15,7 @@ public interface IProjectService
     Task<Project> GetForPmAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task UpdateAsync(string userId, Guid projectId, UpdateProjectInput input, CancellationToken cancellationToken = default);
     Task ArchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
+    Task UnarchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task DeleteAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
 }
 
@@ -280,6 +281,25 @@ public sealed class ProjectService : IProjectService
             return;
 
         project.Status = ProjectStatus.Archived;
+        _db.Projects.Update(project);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnarchiveAsync(
+        string userId,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null)
+            throw new KeyNotFoundException("Project not found in current workspace.");
+
+        if (project.Status != ProjectStatus.Archived)
+            return;
+
+        project.Status = ProjectStatus.Active;
         _db.Projects.Update(project);
         await _db.SaveChangesAsync(cancellationToken);
     }

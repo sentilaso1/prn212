@@ -84,6 +84,14 @@ else
                 <button type="submit" class="btn btn-warning">Archive</button>
             </form>
         }
+        else
+        {
+            <form method="post" asp-page-handler="Unarchive">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ProjectId" />
+                <button type="submit" class="btn btn-success">Unarchive</button>
+            </form>
+        }
         <a class="btn btn-outline-secondary" href="/Projects/Details/@Model.Project.Id">Back to details</a>
         <a class="btn btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
     </div>

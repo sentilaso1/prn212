@@ -351,14 +351,18 @@ public sealed class DetailsModel : PageModel
     // ────────────────────────────────────────────────────────────────
     // POST: Evaluation (PM only)
     // ────────────────────────────────────────────────────────────────
-    public async Task<IActionResult> OnPostUpsertEvaluationAsync(Guid taskId, int score, string? comment, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUpsertEvaluationAsync(Guid taskId, int score, string? comment, string? newLevel, CancellationToken cancellationToken)
     {
         var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
         var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (workspaceId is null || string.IsNullOrWhiteSpace(actorUserId))
             return Unauthorized();
 
-        var result = await _taskService.EvaluateTaskAsync(taskId, actorUserId, workspaceId.Value, score, comment, cancellationToken);
+        MemberLevel? level = null;
+        if (!string.IsNullOrWhiteSpace(newLevel) && Enum.TryParse<MemberLevel>(newLevel, true, out var parsed))
+            level = parsed;
+
+        var result = await _taskService.EvaluateTaskAsync(taskId, actorUserId, workspaceId.Value, score, comment, level, cancellationToken);
         if (!result.Success)
         {
             ErrorMessage = result.ErrorMessage ?? "Không thể đánh giá task.";
@@ -590,7 +594,7 @@ public sealed record CommentsVm(
 public sealed record ActivityLogVm(
     IReadOnlyList<HistoryEntryVm> items);
 
-public sealed record CommentNodeRenderVm(CommentNodeVm Node, string ActorUserId, bool CanManageComments);
+public sealed record CommentNodeRenderVm(CommentNodeVm Node, string ActorUserId, bool CanManageComments, bool IsPm);
 
 public sealed record EvaluationSectionVm(
     bool isPm,
