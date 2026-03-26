@@ -67,4 +67,3 @@ public sealed class UserWorkspaceService : IUserWorkspaceService
             m.UserId == userId && m.WorkspaceId == workspaceId, cancellationToken);
     }
 }
-
