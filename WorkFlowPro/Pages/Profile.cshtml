@@ -18,17 +18,6 @@ else if (Model.Profile is null)
 }
 else
 {
-    <p class="text-muted small mb-4">
-        UC-14 — Workspace hiện tại: <strong>@Model.WorkspaceId</strong>.
-        @if (Model.Profile.IsSelf)
-        {
-            <span>Đang xem profile của bạn.</span>
-        }
-        else
-        {
-            <span>PM xem profile member (query <code>?userId=...</code>).</span>
-        }
-    </p>
 
     <div class="row g-4">
         <div class="col-lg-4">

@@ -5,13 +5,70 @@
 }
 
 <div class="text-center py-5">
-    <h1 class="display-5 fw-bold mb-3">WorkFlow Pro</h1>
-    <p class="lead text-muted mb-4">
-        Quản lý công việc nhóm — Kanban, phân công, đánh giá. <br />
-        <span class="small">UC-01: Đăng ký để tạo workspace và trở thành PM.</span>
-    </p>
-    <div class="d-flex flex-wrap justify-content-center gap-2">
-        <a class="btn btn-primary btn-lg px-4" href="/Identity/Account/Register">Đăng ký</a>
-        <a class="btn btn-outline-primary btn-lg px-4" href="/Identity/Account/Login">Đăng nhập</a>
+    <div class="container">
+        <!-- Tiêu đề chính -->
+        <div class="mb-5">
+            <h1 class="display-4 fw-bold">WorkFlow Pro</h1>
+            <p class="lead text-muted mt-3">
+                Quản lý công việc và dự án cho đội nhóm
+            </p>
+        </div>
+
+        <!-- Mô tả ngắn -->
+        <div class="col-lg-7 mx-auto mb-5">
+            <p class="fs-5 text-muted">
+                Giúp bạn phân công nhiệm vụ, theo dõi tiến độ và quản lý công việc hàng ngày một cách đơn giản và hiệu quả.
+            </p>
+        </div>
+
+        <!-- Nút hành động -->
+        <div class="d-flex flex-wrap justify-content-center gap-3 mb-5">
+            <a href="/Identity/Account/Register"
+                   class="btn btn-primary btn-lg px-5 py-3">
+                Đăng ký miễn phí
+            </a>
+            
+            <a href="/Identity/Account/Login"
+                   class="btn btn-outline-primary btn-lg px-5 py-3">
+                Đăng nhập
+            </a>
+        </div>
+
+        <!-- Các tính năng chính -->
+        <div class="row g-4 justify-content-center mt-4">
+            <div class="col-md-4">
+                <div class="p-4 bg-white rounded shadow-sm">
+                    <h5 class="fw-semibold mb-3">Kanban Board</h5>
+                    <p class="text-muted">
+                        Kéo thả công việc giữa các cột để theo dõi tiến độ dễ dàng.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="p-4 bg-white rounded shadow-sm">
+                    <h5 class="fw-semibold mb-3">Phân công công việc</h5>
+                    <p class="text-muted">
+                        Giao nhiệm vụ rõ ràng cho từng thành viên trong đội.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="p-4 bg-white rounded shadow-sm">
+                    <h5 class="fw-semibold mb-3">Theo dõi tiến độ</h5>
+                    <p class="text-muted">
+                        Xem nhanh tình trạng công việc và báo cáo đơn giản.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dòng cuối -->
+        <div class="mt-5 pt-4 border-top">
+            <p class="text-muted small">
+                Dành cho đội nhóm nhỏ đến vừa • Dễ sử dụng • Không phức tạp
+            </p>
+        </div>
     </div>
 </div>

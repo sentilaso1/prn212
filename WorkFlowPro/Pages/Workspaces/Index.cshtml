@@ -27,29 +27,22 @@
     <div class="alert alert-info">
         <p class="mb-2"><strong>Bạn chưa thuộc đơn vị nào.</strong></p>
         <p class="mb-0 small">
-            Hãy chờ PM gửi <strong>lời mời</strong> (UC-03) và chấp nhận qua thông báo hoặc link mời.
+            Hãy chờ PM gửi <strong>lời mời</strong> và chấp nhận qua thông báo hoặc link mời.
             Nếu bạn đăng ký vai trò <strong>PM</strong>, cần chờ Admin nền tảng duyệt trước khi có đơn vị.
         </p>
     </div>
 }
 else
 {
-    <p class="text-muted small">
-        Đơn vị đang chọn: <strong>@(Model.ActiveWorkspaceId?.ToString() ?? "-")</strong>
-    </p>
 
     @if (Model.ActiveWorkspaceId is { } activeWs)
     {
         <div class="card border-primary border-opacity-25 mb-3">
             <div class="card-body py-3">
-                <h2 class="h6 card-title mb-2">Tiếp theo — task &amp; Kanban (UC-07)</h2>
-                <p class="small text-muted mb-2">
-                    UC-07 không nằm trên trang Đơn vị: bảng Kanban và cập nhật task realtime nằm ở màn <strong>theo từng dự án</strong>.
-                </p>
                 <ul class="small mb-0">
                     <li>
                         <a href="/tasks?workspaceId=@activeWs.ToString("D")"><strong>Chọn dự án → danh sách task</strong></a>
-                        — sau đó mở <strong>Kanban Board</strong> trên trang đó (route <code>/board?projectId=…</code>).
+                        — sau đó mở <strong>Kanban Board</strong> trên trang đó.
                     </li>
                     <li>
                         Hoặc dùng menu <strong>Danh sách task</strong> trên thanh trên, rồi chọn dự án.
@@ -57,9 +50,9 @@ else
                     @if (Model.ActiveWorkspaceRole == WorkFlowPro.Data.WorkspaceMemberRole.PM)
                     {
                         <li class="mt-1">
-                            <a href="/Projects?workspaceId=@activeWs.ToString("D")">Quản lý dự án (UC-12)</a>
+                            <a href="/Projects?workspaceId=@activeWs.ToString("D")">Quản lý dự án</a>
                             ·
-                            <a href="/Reports/Dashboard?workspaceId=@activeWs.ToString("D")">Báo cáo KPI (UC-13)</a>
+                            <a href="/Reports/Dashboard?workspaceId=@activeWs.ToString("D")">Báo cáo KPI</a>
                         </li>
                     }
                 </ul>
@@ -72,7 +65,6 @@ else
         <tr>
             <th>Tên đơn vị</th>
             <th>Vai trò</th>
-            <th style="width:1%; white-space:nowrap;">Id</th>
         </tr>
         </thead>
         <tbody>
@@ -81,10 +73,9 @@ else
             <tr>
                 <td>
                     <a href="/Workspaces/Switch?workspaceId=@w.Id&returnUrl=@Uri.EscapeDataString("/Workspaces")">@w.Name</a>
-                    @(w.Id == Model.ActiveWorkspaceId ? " (đang chọn)" : "")
+                    @(w.Id == Model.ActiveWorkspaceId ? " (active)" : "")
                 </td>
                 <td>@w.Role</td>
-                <td class="small">@w.Id</td>
             </tr>
         }
         </tbody>
