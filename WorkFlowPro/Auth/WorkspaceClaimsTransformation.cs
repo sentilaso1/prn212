@@ -71,15 +71,20 @@ public sealed class WorkspaceClaimsTransformation : IClaimsTransformation
         var sessionValid = await ValidateCandidateAsync(_db, userId, workspaceIdFromSession, CancellationToken.None);
         var claimValid = await ValidateCandidateAsync(_db, userId, workspaceIdFromClaim, CancellationToken.None);
 
+        // Chỉ ghi cảnh báo khi nguồn đó thực sự được dùng để chọn workspace.
+        // Nếu URL có ?workspaceId=... hợp lệ (vd. sau AcceptInvite), không báo lỗi chỉ vì
+        // session/claim còn workspace cũ mà user không còn thuộc.
         if (http?.Session is not null)
         {
             if (workspaceIdFromQuery is not null && queryValid is null)
                 http.Session.SetString(WorkspaceSessionKeys.WorkspaceSwitchError,
                     "Workspace vừa chọn không còn tồn tại/không còn quyền. Vui lòng chọn workspace khác.");
-            else if (workspaceIdFromSession is not null && sessionValid is null)
+            else if (workspaceIdFromQuery is null && workspaceIdFromSession is not null && sessionValid is null &&
+                     claimValid is null)
                 http.Session.SetString(WorkspaceSessionKeys.WorkspaceSwitchError,
                     "Workspace hiện tại không còn hợp lệ (bạn đã bị xoá). Hệ thống sẽ chuyển sang workspace khác.");
-            else if (workspaceIdFromClaim is not null && claimValid is null)
+            else if (workspaceIdFromQuery is null && workspaceIdFromSession is null &&
+                     workspaceIdFromClaim is not null && claimValid is null)
                 http.Session.SetString(WorkspaceSessionKeys.WorkspaceSwitchError,
                     "Workspace hiện tại không còn hợp lệ (bạn đã bị xoá). Hệ thống sẽ chuyển sang workspace khác.");
         }
@@ -110,6 +115,9 @@ public sealed class WorkspaceClaimsTransformation : IClaimsTransformation
         if (http?.Session is not null)
         {
             http.Session.SetString(WorkspaceSessionKeys.CurrentWorkspaceId, workspaceIdCandidate.Value.ToString("D"));
+            // URL có workspace hợp lệ → xóa cảnh báo cũ (session/claim lỗi thời trước AcceptInvite).
+            if (queryValid is not null)
+                http.Session.Remove(WorkspaceSessionKeys.WorkspaceSwitchError);
         }
 
         if (principal.Identity is ClaimsIdentity identity)

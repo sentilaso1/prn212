@@ -1,0 +1,24 @@
+@page
+@model WorkFlowPro.Areas.Identity.Pages.Account.RegisterPendingModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Chờ duyệt PM";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<div class="mx-auto" style="max-width: 520px;">
+    <div class="card shadow-sm mt-4">
+        <div class="card-body p-4">
+            <h1 class="h4 mb-3">Đã gửi yêu cầu tạo đơn vị (PM)</h1>
+            <p class="text-muted mb-0">
+                Tài khoản của bạn đang chờ <strong>Admin nền tảng</strong> duyệt. Sau khi duyệt, hệ thống sẽ tự tạo một
+                <strong>đơn vị</strong> và gán bạn làm PM. Bạn sẽ nhận thông báo trong ứng dụng khi được duyệt.
+            </p>
+            <hr />
+            <p class="small text-muted mb-3">
+                Hiện bạn <strong>chưa thể đăng nhập</strong> cho đến khi yêu cầu được chấp nhận.
+            </p>
+            <a class="btn btn-outline-primary" href="/Identity/Account/Login">Về trang đăng nhập</a>
+        </div>
+    </div>
+</div>

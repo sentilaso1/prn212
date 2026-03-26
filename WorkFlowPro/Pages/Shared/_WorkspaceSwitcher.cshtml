@@ -8,7 +8,7 @@
 
 <div class="ms-auto d-flex align-items-center gap-2">
     <span class="navbar-text text-muted">
-        Workspace: <strong>@Model.ActiveWorkspaceName</strong>
+        Đơn vị: <strong>@Model.ActiveWorkspaceName</strong>
     </span>
 
     <select id="wsSwitcherDropdown"
@@ -17,7 +17,8 @@
             onchange="(function(sel){
                 var wsId = sel.value;
                 if(!wsId) return;
-                window.location.href = '/Workspaces/Switch?workspaceId=' + wsId + '&returnUrl=%2FWorkspaces';
+                var ret = encodeURIComponent(window.location.pathname);
+                window.location.href = '/Workspaces/Switch?workspaceId=' + wsId + '&returnUrl=' + ret;
             })(this)">
         @foreach (var w in Model.Workspaces)
         {
@@ -36,21 +37,25 @@
         }
     </select>
 
-    <a class="btn btn-sm btn-outline-secondary" href="/Projects?workspaceId=@Model.ActiveWorkspaceId.ToString("D")">
-        Dự án
-    </a>
-
-    <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create">
-        + Tạo Workspace mới
-    </a>
+    @if (Model.IsPlatformAdmin)
+    {
+        <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create" title="Admin nền tảng">
+            + Tạo đơn vị mới
+        </a>
+    }
 
     @if (isPm)
     {
         <a class="btn btn-sm btn-success" href="/Invite?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-03: Invite members">
             + Mời thành viên
         </a>
-        <a class="btn btn-sm btn-outline-info" href="/Reports/Dashboard?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-13: Báo cáo & KPI">
+        <a class="btn btn-sm btn-outline-info" href="/Reports/Dashboard?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-13">
             Báo cáo
         </a>
+    }
+
+    @if (Model.IsPlatformAdmin)
+    {
+        <a class="btn btn-sm btn-outline-danger" href="/Admin">Admin</a>
     }
 </div>

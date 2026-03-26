@@ -34,10 +34,16 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LevelChangeLog> LevelChangeLogs => Set<LevelChangeLog>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<WorkspaceInviteToken> WorkspaceInviteTokens => Set<WorkspaceInviteToken>();
+    public DbSet<WorkspaceRoleChangeRequest> WorkspaceRoleChangeRequests => Set<WorkspaceRoleChangeRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        b.Entity<ApplicationUser>(e =>
+        {
+            e.Property(x => x.AccountStatus).HasConversion<int>();
+        });
 
         // UC-15 (v1.3+): Data isolation theo workspace active.
         // - Controllers vẫn có thể lọc thủ công, nhưng global filter giúp chặn rò rỉ dữ liệu.
@@ -369,6 +375,24 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
              .WithMany()
              .HasForeignKey(x => x.UserId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── WorkspaceRoleChangeRequest (Admin duyệt nâng/hạ PM) ───────────
+        b.Entity<WorkspaceRoleChangeRequest>(e =>
+        {
+            e.ToTable("WorkspaceRoleChangeRequests");
+            e.Property(x => x.Kind).HasConversion<int>();
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.AdminNote).HasMaxLength(500);
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasIndex(x => new { x.WorkspaceId, x.Status });
+
+            e.HasOne(x => x.Workspace)
+                .WithMany()
+                .HasForeignKey(x => x.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ── WorkspaceInviteToken (UC-03) ─────────────────────────────────

@@ -1,0 +1,12 @@
+@model WorkFlowPro.ViewModels.WorkspaceSwitcherEmptyVm
+
+<div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+    <span class="navbar-text text-muted small">
+        Chưa thuộc <strong>đơn vị</strong> nào — chờ PM mời hoặc kiểm tra thông báo.
+    </span>
+    @if (Model.IsPlatformAdmin)
+    {
+        <a class="btn btn-sm btn-outline-danger" href="/Admin">Admin</a>
+        <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create">+ Tạo đơn vị (Admin)</a>
+    }
+</div>

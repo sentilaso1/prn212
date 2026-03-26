@@ -1,0 +1,169 @@
+@page "/Admin"
+@model WorkFlowPro.Pages.Admin.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Admin — duyệt PM & yêu cầu role";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="h3 mb-4">Quản trị nền tảng</h1>
+
+@if (Model.ShowToast)
+{
+    <div class="alert alert-info">@Model.ToastMessage</div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Đăng ký PM chờ duyệt</div>
+    <div class="card-body p-0">
+        @if (Model.PendingRegistrations.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">Không có yêu cầu nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Tên hiển thị</th>
+                        <th>Đơn vị dự kiến</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var r in Model.PendingRegistrations)
+                    {
+                        <tr>
+                            <td>@r.Email</td>
+                            <td>@(r.DisplayName ?? "—")</td>
+                            <td>@(r.PendingWorkspaceName ?? "—")</td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" asp-page-handler="ApproveRegistration" class="d-inline">
+                                    <input type="hidden" name="targetUserId" value="@r.UserId" />
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt + tạo đơn vị</button>
+                                </form>
+                                <form method="post" asp-page-handler="RejectRegistration" class="d-inline ms-1">
+                                    <input type="hidden" name="targetUserId" value="@r.UserId" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Yêu cầu nâng / hạ PM trong đơn vị</div>
+    <div class="card-body p-0">
+        @if (Model.PendingRoleRequests.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">Không có yêu cầu nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Đơn vị</th>
+                        <th>Loại</th>
+                        <th>Đối tượng</th>
+                        <th>Người gửi</th>
+                        <th>Lý do</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var r in Model.PendingRoleRequests)
+                    {
+                        <tr>
+                            <td>@r.Id</td>
+                            <td>@r.WorkspaceName</td>
+                            <td>@r.Kind</td>
+                            <td>@r.TargetDisplay</td>
+                            <td>@r.RequesterDisplay</td>
+                            <td class="small">@(r.Reason ?? "—")</td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" asp-page-handler="ApproveRoleRequest" class="d-inline">
+                                    <input type="hidden" name="requestId" value="@r.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt</button>
+                                </form>
+                                <form method="post" asp-page-handler="RejectRoleRequest" class="d-inline ms-1">
+                                    <input type="hidden" name="requestId" value="@r.Id" />
+                                    <input type="text" name="adminNote" class="form-control form-control-sm d-inline-block" style="width:120px;" placeholder="Ghi chú" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Hạ PM trực tiếp (tối đa 3 PM / đơn vị; luôn giữ ≥1 PM)</div>
+    <div class="card-body">
+        @if (Model.AllWorkspaces.Count == 0)
+        {
+            <p class="text-muted small">Chưa có đơn vị nào trong hệ thống.</p>
+        }
+        else
+        {
+            <form method="get" class="row g-2 align-items-end mb-3">
+                <div class="col-auto">
+                    <label class="form-label small mb-0">Đơn vị</label>
+                    <select name="DemoteWorkspaceId" class="form-select form-select-sm" onchange="this.form.submit()">
+                        @foreach (var w in Model.AllWorkspaces)
+                        {
+                            if (Model.DemoteWorkspaceId == w.Id)
+                            {
+                                <option value="@w.Id" selected>@w.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@w.Id">@w.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </form>
+        }
+
+        @if (Model.AllWorkspaces.Count > 0)
+        {
+            @if (Model.PmsInSelectedWorkspace.Count == 0)
+            {
+                <p class="text-muted small mb-0">Không có PM trong đơn vị này.</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var p in Model.PmsInSelectedWorkspace)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@p.DisplayName <span class="text-muted small">(@p.Email)</span></span>
+                            <form method="post" asp-page-handler="DemotePmDirect" class="d-inline"
+                                  onsubmit="return confirm('Hạ PM này xuống Member?');">
+                                <input type="hidden" name="workspaceId" value="@Model.DemoteWorkspaceId" />
+                                <input type="hidden" name="targetUserId" value="@p.UserId" />
+                                <button type="submit" class="btn btn-sm btn-outline-warning">Hạ xuống Member</button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </div>
+</div>
+
+<p class="small text-muted mb-0">Giới hạn: <strong>@WorkFlowPro.Data.WorkspacePolicies.MaxPmsPerWorkspace</strong> PM trên mỗi đơn vị.</p>

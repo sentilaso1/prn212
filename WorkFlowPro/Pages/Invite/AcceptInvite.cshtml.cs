@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
 using WorkFlowPro.Services;
 
@@ -67,6 +68,10 @@ public sealed class AcceptInviteModel : PageModel
             InviteInfo = await _invitationService.GetInviteInfoAsync(Token, cancellationToken);
             return Page();
         }
+
+        // Tránh workspaceId trong session/claim cũ làm hiển thị cảnh báo sai sau redirect.
+        HttpContext.Session.Remove(WorkspaceSessionKeys.CurrentWorkspaceId);
+        HttpContext.Session.Remove(WorkspaceSessionKeys.WorkspaceSwitchError);
 
         return LocalRedirect($"/Workspaces?workspaceId={result.WorkspaceId}");
     }

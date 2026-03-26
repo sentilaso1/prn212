@@ -24,10 +24,17 @@ public class IndexModel : PageModel
 
     public Guid? ActiveWorkspaceId { get; private set; }
 
+    /// <summary>Vai trò của user trong đơn vị đang chọn (để hiện shortcut UC).</summary>
+    public WorkspaceMemberRole? ActiveWorkspaceRole { get; private set; }
+
     public string? ErrorMessage { get; private set; }
+
+    public string? InfoMessage { get; private set; }
 
     public async Task OnGetAsync(Guid? workspaceId)
     {
+        InfoMessage = TempData["RegisterBlockedMessage"] as string;
+
         ErrorMessage = TempData["WorkspaceSwitchError"] as string;
         if (ErrorMessage is null)
         {
@@ -66,6 +73,9 @@ public class IndexModel : PageModel
         ActiveWorkspaceId = workspaceId
             ?? claimWorkspaceIdParsed
             ?? (list.Count > 0 ? list[0].Id : (Guid?)null);
+
+        if (ActiveWorkspaceId is { } aid)
+            ActiveWorkspaceRole = list.FirstOrDefault(x => x.Id == aid)?.Role;
     }
 }
 

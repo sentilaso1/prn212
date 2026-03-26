@@ -28,7 +28,16 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" href="/Workspaces">Workspaces</a>
+                                <a class="nav-link text-dark" href="/Workspaces">Đơn vị</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/Tasks/MyTasks/Pending">Việc chờ xử lý</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/tasks">Danh sách task</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/Profile">Hồ sơ</a>
                             </li>
                         }
                     </ul>
@@ -84,5 +93,27 @@
 
     @await RenderSectionAsync("Scripts", required: false)
 
+    <script>
+    // Fix workspace switch: always redirect to /Workspaces after switching
+    // to avoid AccessDenied when leaving PM-only pages as Member.
+    (function(){
+        var form = document.querySelector('form[action="/Workspaces/Switch"]');
+        if (!form) return;
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var sel = form.querySelector('select[name="workspaceId"]');
+            if (!sel || !sel.value) return;
+            window.location.href = '/Workspaces/Switch?workspaceId=' + sel.value + '&returnUrl=%2FWorkspaces';
+        });
+        var sel = form.querySelector('select[name="workspaceId"]');
+        if (sel) {
+            sel.removeAttribute('onchange');
+            sel.addEventListener('change', function() {
+                if (!this.value) return;
+                window.location.href = '/Workspaces/Switch?workspaceId=' + this.value + '&returnUrl=%2FWorkspaces';
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

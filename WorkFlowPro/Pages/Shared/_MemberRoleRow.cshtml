@@ -16,14 +16,22 @@
     <td class="small text-muted">@Model.Email</td>
     <td>
         <span class="badge @(Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM ? "bg-primary" : "bg-secondary")">@Model.Role</span>
+        @if (Model.HasPendingPromoteRequest)
+        {
+            <span class="badge bg-warning text-dark ms-1">Chờ duyệt nâng PM</span>
+        }
+        @if (Model.HasPendingDemoteRequest)
+        {
+            <span class="badge bg-warning text-dark ms-1">Chờ duyệt hạ PM</span>
+        }
     </td>
     <td>@(string.IsNullOrWhiteSpace(Model.SubRole) ? "—" : Model.SubRole)</td>
     <td>
         <div class="d-flex flex-column gap-2">
-            @if (Model.CanChangeWorkspaceRole)
+            @if (Model.ShowAdminRoleChangeForm)
             {
                 <form method="post" asp-page="/Roles" asp-page-handler="ChangeRole" class="d-flex flex-wrap gap-1 align-items-center"
-                      onsubmit="return confirm('Xác nhận đổi workspace role (PM ↔ Member)? Hệ thống không cho phép workspace không còn PM nào.');">
+                      onsubmit="return confirm('Admin: xác nhận đổi workspace role? Tối đa 3 PM / đơn vị.');">
                     <input type="hidden" name="ChangeRoleInput.TargetUserId" value="@Model.UserId" />
                     <select name="ChangeRoleInput.NewRole" class="form-select form-select-sm" style="width:auto;min-width:120px;">
                         @if (Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
@@ -37,20 +45,49 @@
                             <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member" selected>Member</option>
                         }
                     </select>
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Đổi role</button>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Đổi role (Admin)</button>
                 </form>
             }
-            else
+            else if (Model.ShowPmPromoteRequestForm)
+            {
+                <form method="post" asp-page="/Roles" asp-page-handler="RequestPromoteToPm" class="d-flex flex-wrap gap-1 align-items-end">
+                    <input type="hidden" name="TargetUserId" value="@Model.UserId" />
+                    <div>
+                        <label class="form-label small mb-0">Lý do (tùy chọn)</label>
+                        <input name="Reason" class="form-control form-control-sm" maxlength="500" style="min-width:160px;" />
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-success">Yêu cầu nâng PM</button>
+                </form>
+            }
+            else if (Model.ShowPmDemoteRequestForm)
+            {
+                <form method="post" asp-page="/Roles" asp-page-handler="RequestDemotePm" class="d-flex flex-wrap gap-1 align-items-end">
+                    <input type="hidden" name="TargetUserId" value="@Model.UserId" />
+                    <div>
+                        <label class="form-label small mb-0">Lý do (tùy chọn)</label>
+                        <input name="Reason" class="form-control form-control-sm" maxlength="500" style="min-width:160px;" />
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-warning">Yêu cầu hạ PM</button>
+                </form>
+            }
+            else if (Model.CanChangeWorkspaceRole && !Model.IsActorPlatformAdmin && Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
+            {
+                <span class="text-muted small">Hạ PM: dùng yêu cầu hoặc Admin.</span>
+            }
+            else if (!Model.CanChangeWorkspaceRole)
             {
                 <span class="text-muted small">Không đổi role của chính bạn</span>
             }
 
-            <form method="post" asp-page="/Roles" asp-page-handler="ChangeSubRole" class="d-flex flex-wrap gap-1 align-items-center"
-                  onsubmit="return confirm('Xác nhận lưu SubRole? Thay đổi được đồng bộ với gợi ý phân công (UC-04).');">
-                <input type="hidden" name="ChangeSubRoleInput.TargetUserId" value="@Model.UserId" />
-                <input name="ChangeSubRoleInput.SubRole" class="form-control form-control-sm" style="min-width:140px;max-width:200px;" value="@Model.SubRole" placeholder="BA, DEV, QA..." maxlength="100" list="role-subrole-suggestions" />
-                <button type="submit" class="btn btn-sm btn-outline-secondary">Lưu SubRole</button>
-            </form>
+            @if (Model.CanChangeWorkspaceRole || Model.IsActorPlatformAdmin)
+            {
+                <form method="post" asp-page="/Roles" asp-page-handler="ChangeSubRole" class="d-flex flex-wrap gap-1 align-items-center"
+                      onsubmit="return confirm('Xác nhận lưu SubRole?');">
+                    <input type="hidden" name="ChangeSubRoleInput.TargetUserId" value="@Model.UserId" />
+                    <input name="ChangeSubRoleInput.SubRole" class="form-control form-control-sm" style="min-width:140px;max-width:200px;" value="@Model.SubRole" placeholder="BA, DEV, QA..." maxlength="100" list="role-subrole-suggestions" />
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Lưu SubRole</button>
+                </form>
+            }
         </div>
     </td>
 </tr>

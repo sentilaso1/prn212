@@ -31,7 +31,11 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
 
         var items = await _userWorkspaceService.GetUserWorkspacesAsync(userId, HttpContext.RequestAborted);
         if (items.Count == 0)
-            return Content(string.Empty);
+        {
+            var isAdmin = HttpContext.User.HasClaim("platform_role", "admin");
+            var emptyVm = new WorkspaceSwitcherEmptyVm { IsPlatformAdmin = isAdmin };
+            return View("/Pages/Shared/_WorkspaceSwitcherEmpty.cshtml", emptyVm);
+        }
 
         var activeId = _currentWorkspaceService.CurrentWorkspaceId ?? items[0].Id;
         var active = items.FirstOrDefault(x => x.Id == activeId) ?? items[0];
@@ -55,7 +59,8 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
                 Name = i.Name,
                 Role = i.Role
             }).ToList(),
-            ReturnUrl = returnUrl
+            ReturnUrl = returnUrl,
+            IsPlatformAdmin = HttpContext.User.HasClaim("platform_role", "admin")
         };
 
         return View("/Pages/Shared/_WorkspaceSwitcher.cshtml", vm);

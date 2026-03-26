@@ -8,7 +8,7 @@ namespace WorkFlowPro.Auth;
 
 public interface IJwtTokenService
 {
-    string GenerateAccessToken(ApplicationUser user, Guid workspaceId);
+    string GenerateAccessToken(ApplicationUser user, Guid? workspaceId);
 }
 
 public sealed class JwtTokenService : IJwtTokenService
@@ -20,7 +20,7 @@ public sealed class JwtTokenService : IJwtTokenService
         _jwt = jwt.Value;
     }
 
-    public string GenerateAccessToken(ApplicationUser user, Guid workspaceId)
+    public string GenerateAccessToken(ApplicationUser user, Guid? workspaceId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -30,8 +30,10 @@ public sealed class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Sub, user.Id),
             new(ClaimTypes.NameIdentifier, user.Id),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new("workspace_id", workspaceId.ToString("D")),
         };
+
+        if (workspaceId is { } ws)
+            claims.Add(new Claim("workspace_id", ws.ToString("D")));
 
         if (user.IsPlatformAdmin)
         {

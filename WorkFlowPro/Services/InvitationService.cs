@@ -103,6 +103,17 @@ public sealed class InvitationService : IInvitationService
         if (errors.Count > 0)
             return new InviteMembersResult { Errors = errors };
 
+        if (role == WorkspaceMemberRole.PM)
+        {
+            var pmCount = await WorkspacePolicies.CountPmsAsync(_db, workspaceId, cancellationToken);
+            if (pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
+            {
+                errors.Add(
+                    $"Đơn vị đã đủ {WorkspacePolicies.MaxPmsPerWorkspace} PM — không thể mời thêm PM.");
+                return new InviteMembersResult { Errors = errors };
+            }
+        }
+
         var workspace = await _db.Workspaces
             .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
 
@@ -225,6 +236,8 @@ public sealed class InvitationService : IInvitationService
                 Email = normalizedEmail,
                 DisplayName = normalizedEmail,
                 EmailConfirmed = true,
+                AccountStatus = AccountStatus.Approved,
+                AwaitingPmWorkspaceApproval = false
             };
 
             var createRes = await _userManager.CreateAsync(user, password);
@@ -238,6 +251,21 @@ public sealed class InvitationService : IInvitationService
         var member = await _db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == workspaceId && m.UserId == user.Id,
             cancellationToken);
+
+        if (invitation.Role == WorkspaceMemberRole.PM)
+        {
+            var pmCount = await WorkspacePolicies.CountPmsAsync(_db, workspaceId, cancellationToken);
+            var targetAlreadyPm = member?.Role == WorkspaceMemberRole.PM;
+            if (!targetAlreadyPm && pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
+            {
+                return new AcceptInviteResult
+                {
+                    Success = false,
+                    ErrorMessage =
+                        $"Đơn vị đã đủ {WorkspacePolicies.MaxPmsPerWorkspace} PM — không thể chấp nhận lời mời PM."
+                };
+            }
+        }
 
         if (member is null)
         {

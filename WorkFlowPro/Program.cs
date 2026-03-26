@@ -147,6 +147,7 @@ builder.Services.AddScoped<IKanbanService, KanbanService>();
 builder.Services.AddScoped<IKpiDashboardService, KpiDashboardService>();
 builder.Services.AddScoped<IMemberProfileService, MemberProfileService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
+builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -179,5 +180,10 @@ app.MapRazorPages();
 app.MapHub<KanbanHub>("/hubs/kanban");
 app.MapHub<TaskHub>("/hubs/task");
 app.MapHub<NotificationHub>("/hubs/notification");
+
+using (var scope = app.Services.CreateScope())
+{
+    await AdminUserSeed.EnsureSeedAsync(scope.ServiceProvider);
+}
 
 app.Run();

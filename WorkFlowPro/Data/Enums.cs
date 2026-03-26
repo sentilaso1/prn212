@@ -1,5 +1,26 @@
 namespace WorkFlowPro.Data;
 
+/// <summary>Trạng thái tài khoản sau đăng ký (duyệt PM / từ chối).</summary>
+public enum AccountStatus
+{
+    PendingApproval = 0,
+    Approved = 1,
+    Rejected = 2
+}
+
+public enum WorkspaceRoleRequestKind
+{
+    PromoteMemberToPm = 1,
+    DemotePmToMember = 2
+}
+
+public enum WorkspaceRoleRequestStatus
+{
+    Pending = 0,
+    Approved = 1,
+    Rejected = 2
+}
+
 public enum WorkspaceMemberRole
 {
     PM = 1,
@@ -72,7 +93,13 @@ public enum NotificationType
     InviteAccepted = 15,
 
     /// <summary>UC-03: Lời mời workspace bị từ chối.</summary>
-    InviteRejected = 16
+    InviteRejected = 16,
+
+    /// <summary>User đăng ký PM chờ Admin duyệt.</summary>
+    RegistrationPendingPm = 17,
+
+    /// <summary>Yêu cầu nâng/hạ PM trong workspace chờ Admin.</summary>
+    WorkspacePmRoleRequest = 18
 }
 
 public enum InviteStatus
