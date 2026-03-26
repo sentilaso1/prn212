@@ -3,6 +3,8 @@
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     ViewData["Title"] = "Task List";
+    var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
+    var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
@@ -19,7 +21,7 @@ else
             <div class="text-muted">Project</div>
             <div><strong>@Model.ProjectName</strong></div>
             <div class="small mt-1">
-                <a href="/board?projectId=@Model.ProjectId">Kanban Board</a>
+                <a href="/board?projectId=@(Model.ProjectId)@(wsAmp)">Kanban Board</a>
             </div>
         </div>
     </div>
@@ -42,7 +44,7 @@ else
                 {
                     var due = t.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-";
                     <tr>
-                        <td><a href="/Tasks/Details/@t.TaskId">@t.Title</a></td>
+                        <td><a href="/Tasks/Details/@(t.TaskId)@(wsQ)">@t.Title</a></td>
                         <td><span class="badge bg-secondary">@t.Status</span></td>
                         <td>@t.Priority</td>
                         <td>@due</td>

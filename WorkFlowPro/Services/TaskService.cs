@@ -311,12 +311,13 @@ public sealed class TaskService : ITaskService
         var taskIds = tasks.Select(t => t.Id).ToList();
         var assignments = await _db.TaskAssignments
             .AsNoTracking()
-            .Where(a => taskIds.Contains(a.TaskId) && a.Status == TaskAssignmentStatus.Accepted)
+            .Where(a => taskIds.Contains(a.TaskId) &&
+                        (a.Status == TaskAssignmentStatus.Accepted || a.Status == TaskAssignmentStatus.Pending))
             .ToListAsync(cancellationToken);
 
         var assignmentByTaskId = assignments
             .GroupBy(a => a.TaskId)
-            .ToDictionary(g => g.Key, g => g.First());
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.Status == TaskAssignmentStatus.Accepted).First());
 
         var assigneeUserIds = assignments.Select(a => a.AssigneeUserId).Distinct().ToList();
         var users = await _db.Users
@@ -348,6 +349,10 @@ public sealed class TaskService : ITaskService
                             && t.DueDateUtc.Value < utcNow
                             && t.Status != TaskStatus.Done;
 
+            var displayName = assigneeUser?.DisplayName ?? assigneeUser?.Email ?? assigneeUser?.UserName ?? "-";
+            if (assignment is not null && assignment.Status == TaskAssignmentStatus.Pending && assigneeUser is not null)
+                displayName += " (chờ xác nhận)";
+
             list.Add(new TaskCardVm(
                 taskId: t.Id,
                 title: t.Title,
@@ -356,7 +361,7 @@ public sealed class TaskService : ITaskService
                 dueDateUtc: t.DueDateUtc,
                 status: t.Status,
                 assigneeUserId: assigneeUserId ?? string.Empty,
-                assigneeDisplayName: assigneeUser?.DisplayName ?? assigneeUser?.Email ?? assigneeUser?.UserName ?? "-",
+                assigneeDisplayName: displayName,
                 assigneeAvatarUrl: assigneeUser?.AvatarUrl,
                 isOverdue: isOverdue,
                 canDrag: canDrag,
@@ -995,6 +1000,19 @@ public sealed class TaskService : ITaskService
             "TaskUpdated",
             new { taskId = taskId, newStatus = task.Status.ToString() },
             cancellationToken);
+
+        if (assigneeChanged && normalizedAssignee is not null)
+        {
+            await _notifications.CreateAndPushAsync(
+                userId: normalizedAssignee,
+                type: NotificationType.TaskAssignedPending,
+                message: $"Bạn được giao task \"{task.Title}\".",
+                workspaceId: workspaceId,
+                projectId: projectId,
+                taskId: taskId,
+                redirectUrl: $"/Tasks/AcceptReject/{taskId}?workspaceId={workspaceId:D}",
+                cancellationToken: cancellationToken);
+        }
 
         return new TaskUpdateResult(true, null);
     }

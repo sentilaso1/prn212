@@ -9,6 +9,7 @@ namespace WorkFlowPro.Services;
 
 public interface IProjectService
 {
+    Task<IReadOnlyList<Project>> ListForWorkspaceAsync(string userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Project>> ListForPmAsync(string userId, CancellationToken cancellationToken = default);
     Task<Project> CreateAsync(string userId, CreateProjectInput input, CancellationToken cancellationToken = default);
     Task<Project> GetForPmAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
@@ -83,13 +84,34 @@ public sealed class ProjectService : IProjectService
         return $"#{c.ToUpperInvariant()}";
     }
 
+    public async Task<IReadOnlyList<Project>> ListForWorkspaceAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
+        if (workspaceId is null)
+            throw new InvalidOperationException("Missing active workspace.");
+
+        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.UserId == userId && m.WorkspaceId == workspaceId.Value,
+            cancellationToken);
+        if (!isMember)
+            throw new UnauthorizedAccessException("User is not a member of this workspace.");
+
+        return await _db.Projects
+            .Where(p => p.WorkspaceId == workspaceId.Value)
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Project>> ListForPmAsync(
         string userId,
         CancellationToken cancellationToken = default)
     {
-        await RequirePmWorkspaceAsync(userId, cancellationToken);
+        var workspaceId = await RequirePmWorkspaceAsync(userId, cancellationToken);
 
         return await _db.Projects
+            .Where(p => p.WorkspaceId == workspaceId)
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToListAsync(cancellationToken);
     }

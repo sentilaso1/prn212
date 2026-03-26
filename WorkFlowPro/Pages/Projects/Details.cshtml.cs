@@ -26,6 +26,7 @@ public sealed class DetailsModel : PageModel
     public Project? Project { get; private set; }
     public string? ErrorMessage { get; private set; }
     public bool CanManage { get; private set; }
+    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public async Task OnGetAsync([FromRoute] Guid projectId, CancellationToken cancellationToken)
     {

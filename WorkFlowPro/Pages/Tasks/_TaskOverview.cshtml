@@ -17,7 +17,7 @@
     </div>
 
     <div class="mt-3">
-        <form method="post" asp-page-handler="UpdateTask" data-wf-ajax="true" class="mt-2">
+        <form method="post" asp-page-handler="UpdateTask" asp-route-workspaceId="@Model.WorkspaceId" data-wf-ajax="true" class="mt-2">
             @Html.AntiForgeryToken()
 
             <div class="mb-2">
@@ -85,9 +85,10 @@
 
             @if (d.ShowAcceptReject)
             {
+                var wsQ = Model.WorkspaceId is not null ? $"?workspaceId={Model.WorkspaceId.Value:D}" : "";
                 <div class="mt-3">
-                    <a class="btn btn-success me-2" href="/Tasks/AcceptReject/@d.TaskId">Accept</a>
-                    <a class="btn btn-danger" href="/Tasks/AcceptReject/@d.TaskId">Reject</a>
+                    <a class="btn btn-success me-2" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Accept</a>
+                    <a class="btn btn-danger" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Reject</a>
                 </div>
             }
         </form>

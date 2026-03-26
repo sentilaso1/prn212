@@ -69,5 +69,15 @@ public enum NotificationType
     ProjectUpdated = 14,
 
     /// <summary>UC-11: Lời mời workspace được chấp nhận.</summary>
-    InviteAccepted = 15
+    InviteAccepted = 15,
+
+    /// <summary>UC-03: Lời mời workspace bị từ chối.</summary>
+    InviteRejected = 16
+}
+
+public enum InviteStatus
+{
+    Pending = 1,
+    Accepted = 2,
+    Rejected = 3
 }

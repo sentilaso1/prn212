@@ -17,8 +17,7 @@
             onchange="(function(sel){
                 var wsId = sel.value;
                 if(!wsId) return;
-                var ret = encodeURIComponent(window.location.pathname);
-                window.location.href = '/Workspaces/Switch?workspaceId=' + wsId + '&returnUrl=' + ret;
+                window.location.href = '/Workspaces/Switch?workspaceId=' + wsId + '&returnUrl=%2FWorkspaces';
             })(this)">
         @foreach (var w in Model.Workspaces)
         {
@@ -37,13 +36,17 @@
         }
     </select>
 
+    <a class="btn btn-sm btn-outline-secondary" href="/Projects?workspaceId=@Model.ActiveWorkspaceId.ToString("D")">
+        Dự án
+    </a>
+
     <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create">
         + Tạo Workspace mới
     </a>
 
     @if (isPm)
     {
-        <a class="btn btn-sm btn-success" href="/Invite" title="UC-03: Invite members">
+        <a class="btn btn-sm btn-success" href="/Invite?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-03: Invite members">
             + Mời thành viên
         </a>
     }

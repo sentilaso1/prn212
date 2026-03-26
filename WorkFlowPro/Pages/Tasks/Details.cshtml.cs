@@ -43,6 +43,7 @@ public sealed class DetailsModel : PageModel
     public Guid ProjectId { get; private set; }
     public string ActorUserId { get; private set; } = string.Empty;
     public bool IsPm => OverviewVm?.detail.IsPm ?? false;
+    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     [BindProperty]
     public UpdateTaskInputModel UpdateTask { get; set; } = new();
@@ -109,7 +110,8 @@ public sealed class DetailsModel : PageModel
 
         OverviewVm = new TaskOverviewVm(
             detail: detail,
-            assigneeOptions: assigneeOptions);
+            assigneeOptions: assigneeOptions,
+            WorkspaceId: CurrentWorkspaceId);
 
         AttachmentsVm = new AttachmentsVm(
             detail: detail,
@@ -135,18 +137,17 @@ public sealed class DetailsModel : PageModel
 
     private async Task<IReadOnlyList<AssigneeOptionVm>> GetAssigneeOptionsAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
-        // Assignment can target Members (non-PM).
-        var options = await (
+        var raw = await (
             from wm in _db.WorkspaceMembers
             where wm.WorkspaceId == workspaceId && wm.Role != WorkspaceMemberRole.PM
             join u in _db.Users on wm.UserId equals u.Id
-            select new AssigneeOptionVm(
-                u.Id,
-                u.DisplayName ?? u.Email ?? u.UserName ?? u.Id))
-            .OrderBy(o => o.DisplayName)
+            select new { u.Id, u.DisplayName, u.Email, u.UserName })
             .ToListAsync(cancellationToken);
 
-        return options;
+        return raw
+            .Select(r => new AssigneeOptionVm(r.Id, r.DisplayName ?? r.Email ?? r.UserName ?? r.Id))
+            .OrderBy(o => o.DisplayName)
+            .ToList();
     }
 
     private bool IsAjaxRequest() =>
@@ -574,7 +575,8 @@ public sealed record AssigneeOptionVm(string UserId, string DisplayName);
 
 public sealed record TaskOverviewVm(
     TaskDetailVm detail,
-    IReadOnlyList<AssigneeOptionVm> assigneeOptions);
+    IReadOnlyList<AssigneeOptionVm> assigneeOptions,
+    Guid? WorkspaceId = null);
 
 public sealed record AttachmentsVm(
     TaskDetailVm detail,

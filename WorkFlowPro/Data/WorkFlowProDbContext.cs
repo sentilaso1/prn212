@@ -379,11 +379,13 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.Property(x => x.SubRole).HasMaxLength(100);
             e.Property(x => x.TokenHash).HasMaxLength(200).IsRequired();
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<int>().HasDefaultValue(InviteStatus.Pending);
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
 
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.TokenHash).IsUnique();
 
-            e.HasOne<Workspace>()
+            e.HasOne(x => x.Workspace)
              .WithMany()
              .HasForeignKey(x => x.WorkspaceId)
              .OnDelete(DeleteBehavior.Cascade);

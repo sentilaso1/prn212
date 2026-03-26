@@ -2,27 +2,60 @@
 @model WorkFlowPro.Pages.Invite.AcceptInviteModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Accept invitation";
+    ViewData["Title"] = "Lời mời tham gia Workspace";
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<h1>Accept invitation</h1>
+<h1 class="mb-4">Lời mời tham gia Workspace</h1>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
     <div class="alert alert-danger" role="alert">
         @Model.ErrorMessage
     </div>
-
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="/Identity/Account/Login">Login</a>
-        <a class="btn btn-outline-primary" href="/Workspaces">Back</a>
+        <a class="btn btn-outline-secondary" href="/Identity/Account/Login">Đăng nhập</a>
+        <a class="btn btn-outline-primary" href="/Workspaces">Trang chủ</a>
     </div>
 }
-else
+else if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
 {
     <div class="alert alert-info" role="alert">
-        Invitation accepted. Redirecting to workspace...
+        @Model.SuccessMessage
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/Workspaces">Trang chủ</a>
     </div>
 }
+else if (Model.ShowForm && Model.InviteInfo is not null)
+{
+    <div class="card" style="max-width: 500px;">
+        <div class="card-body">
+            <h5 class="card-title">@Model.InviteInfo.WorkspaceName</h5>
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Email</dt>
+                <dd class="col-sm-8">@Model.InviteInfo.Email</dd>
 
+                <dt class="col-sm-4">Vai trò</dt>
+                <dd class="col-sm-8">@Model.InviteInfo.Role</dd>
+
+                @if (!string.IsNullOrWhiteSpace(Model.InviteInfo.SubRole))
+                {
+                    <dt class="col-sm-4">SubRole</dt>
+                    <dd class="col-sm-8">@Model.InviteInfo.SubRole</dd>
+                }
+            </dl>
+
+            <div class="d-flex gap-2 mt-3">
+                <form method="post" asp-page-handler="Accept">
+                    <input type="hidden" name="Token" value="@Model.Token" />
+                    <button type="submit" class="btn btn-success">Chấp nhận</button>
+                </form>
+                <form method="post" asp-page-handler="Reject">
+                    <input type="hidden" name="Token" value="@Model.Token" />
+                    <button type="submit" class="btn btn-outline-danger">Từ chối</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}

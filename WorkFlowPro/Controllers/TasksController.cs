@@ -188,7 +188,7 @@ public sealed class TasksController : ControllerBase
                 projectId: projectId,
                 taskId: task.Id,
                 // UC-05: Member nhận task qua notification -> mở trang accept/reject.
-                redirectUrl: $"/Tasks/AcceptReject/{task.Id}",
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId:D}",
                 cancellationToken: HttpContext.RequestAborted);
         }
 

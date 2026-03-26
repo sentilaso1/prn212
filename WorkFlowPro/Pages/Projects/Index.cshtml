@@ -3,6 +3,8 @@
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     ViewData["Title"] = "Projects";
+    var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
+    var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
@@ -12,7 +14,10 @@
     <div class="text-muted">
         Workspace Projects
     </div>
-    <a class="btn btn-primary" href="/Projects/Create">+ Tạo dự án</a>
+    @if (Model.IsPm)
+    {
+        <a class="btn btn-primary" href="/Projects/Create@(wsQ)">+ Tạo dự án</a>
+    }
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
@@ -33,7 +38,7 @@ else
             <th>Status</th>
             <th>Color</th>
             <th>Created</th>
-            <th style="width: 220px;">Actions</th>
+            <th style="width: 300px;">Actions</th>
         </tr>
         </thead>
         <tbody>
@@ -44,23 +49,27 @@ else
                 <td>
                     @if (p.Status == WorkFlowPro.Data.ProjectStatus.Archived)
                     {
-                        <span class="badge text-bg-secondary">Archived</span>
+                        <span class="badge bg-secondary">Archived</span>
                     }
                     else
                     {
-                        <span class="badge text-bg-success">Active</span>
+                        <span class="badge bg-success">Active</span>
                     }
                 </td>
                 <td>@p.Color</td>
                 <td>@p.CreatedAtUtc.ToString("yyyy-MM-dd")</td>
-                <td class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-secondary" href="/Projects/Details/@p.Id">Details</a>
-                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@p.Id">Settings</a>
-                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@p.Id">Delete</a>
+                <td class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-sm btn-outline-secondary" href="/Projects/Details/@(p.Id)@(wsQ)">Details</a>
+                    <a class="btn btn-sm btn-primary" href="/board?projectId=@(p.Id)@(wsAmp)">Board</a>
+                    <a class="btn btn-sm btn-outline-info" href="/tasks/list?projectId=@(p.Id)@(wsAmp)">Tasks</a>
+                    @if (Model.IsPm)
+                    {
+                        <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@(p.Id)@(wsQ)">Settings</a>
+                        <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@(p.Id)@(wsQ)">Delete</a>
+                    }
                 </td>
             </tr>
         }
         </tbody>
     </table>
 }
-
