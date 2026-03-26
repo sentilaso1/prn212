@@ -4,6 +4,23 @@
 (function () {
     const toastDelayMs = 5000;
 
+    // Normalize redirectUrl for local dev:
+    // If DB/old data stores absolute https://localhost/... while the app runs on http://localhost,
+    // browser will throw ERR_SSL_PROTOCOL_ERROR. Convert it to relative path.
+    function normalizeRedirectUrl(href) {
+        if (!href) return href;
+        try {
+            // If it's already relative, URL constructor throws; keep original.
+            const u = new URL(href, window.location.origin);
+            if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+                return `${u.pathname}${u.search}${u.hash}`;
+            }
+        } catch (_) {
+            // ignore
+        }
+        return href;
+    }
+
     function escapeHtml(s) {
         if (s === null || s === undefined) return "";
         return String(s)
@@ -32,10 +49,11 @@
         el.addEventListener("hidden.bs.toast", () => el.remove());
 
         if (payload.redirectUrl) {
+            const redirect = normalizeRedirectUrl(payload.redirectUrl);
             el.style.cursor = "pointer";
             el.addEventListener("click", function (e) {
                 if (e.target.closest("button")) return;
-                window.location.href = payload.redirectUrl;
+                window.location.href = redirect;
             });
         }
     }
@@ -77,7 +95,7 @@
                 .map(function (m) {
                     const unread = m.isRead === false ? '<span class="badge bg-danger me-1">Mới</span>' : "";
                     const dt = new Date(m.createdAtUtc).toLocaleString();
-                    const href = m.redirectUrl || "#";
+                    const href = normalizeRedirectUrl(m.redirectUrl) || "#";
                     return `<div class="mb-2 pb-2 border-bottom">
                         <a href="${escapeHtml(href)}" class="text-decoration-none text-dark wf-notif-link" data-id="${m.id}">
                             ${unread}<span class="small text-muted">${escapeHtml(dt)}</span><br/>

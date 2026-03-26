@@ -3,6 +3,8 @@
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     ViewData["Title"] = "Project details";
+    var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
+    var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
@@ -22,15 +24,15 @@
                     <h4 class="card-title">@Model.Project.Name</h4>
                     @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
                     {
-                        <span class="badge text-bg-secondary">Archived</span>
+                        <span class="badge bg-secondary">Archived</span>
                     }
                     else
                     {
-                        <span class="badge text-bg-success">Active</span>
+                        <span class="badge bg-success">Active</span>
                     }
                 </div>
                 <div>
-                    <span class="badge text-bg-light border" style="background:@(Model.Project.Color ?? "#FFFFFF"); border-color:#ddd;">
+                    <span class="badge bg-light text-dark border" style="background:@(Model.Project.Color ?? "#FFFFFF") !important; border-color:#ddd;">
                         Color: @Model.Project.Color
                     </span>
                 </div>
@@ -50,11 +52,37 @@
                 <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("yyyy-MM-dd")</dd>
             </dl>
 
-            <div class="d-flex gap-2 mt-3">
-                <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
-                <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+            <hr />
+            <h5>Task Management</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-primary" href="/board?projectId=@(Model.Project.Id)@(wsAmp)">
+                    Kanban Board
+                </a>
+                <a class="btn btn-outline-primary" href="/tasks/list?projectId=@(Model.Project.Id)@(wsAmp)">
+                    Task List
+                </a>
+                @if (Model.CanManage)
+                {
+                    <a class="btn btn-success" href="/Tasks/Create?projectId=@(Model.Project.Id)@(wsAmp)">
+                        + Tạo Task
+                    </a>
+                }
             </div>
+
+            <hr />
+            @if (Model.CanManage)
+            {
+                <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@(Model.Project.Id)@(wsQ)">Settings</a>
+                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@(Model.Project.Id)@(wsQ)">Delete</a>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info mt-3" role="alert">
+                    Bạn đang có quyền xem dự án (read-only). Chỉ PM mới có quyền Settings/Delete.
+                </div>
+            }
         </div>
     </div>
 }
-

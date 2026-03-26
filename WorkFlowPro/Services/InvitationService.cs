@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Net.Mail;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
@@ -15,10 +14,10 @@ namespace WorkFlowPro.Services;
 
 public sealed class InvitationService : IInvitationService
 {
+    private static readonly string[] AllowedSubRoles = ["BA", "DEV", "Designer", "QA"];
     private readonly WorkFlowProDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly IEmailSender _emailSender;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
     private readonly ILogger<InvitationService> _logger;
@@ -28,7 +27,6 @@ public sealed class InvitationService : IInvitationService
         WorkFlowProDbContext db,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        IEmailSender emailSender,
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         ILogger<InvitationService> logger,
@@ -37,7 +35,6 @@ public sealed class InvitationService : IInvitationService
         _db = db;
         _userManager = userManager;
         _signInManager = signInManager;
-        _emailSender = emailSender;
         _httpContextAccessor = httpContextAccessor;
         _configuration = configuration;
         _logger = logger;
@@ -65,12 +62,12 @@ public sealed class InvitationService : IInvitationService
             return new InviteMembersResult { Errors = errors };
         }
 
-        var normalizedSubRole = string.IsNullOrWhiteSpace(subRole)
-            ? null
-            : subRole.Trim();
+        var normalizedSubRole = string.IsNullOrWhiteSpace(subRole) ? null : subRole.Trim();
 
-        if (normalizedSubRole is not null && normalizedSubRole.Length > 100)
-            errors.Add("SubRole không được vượt quá 100 ký tự.");
+        if (string.IsNullOrWhiteSpace(normalizedSubRole))
+            errors.Add("SubRole là bắt buộc.");
+        else if (!IsAllowedSubRole(normalizedSubRole))
+            errors.Add("SubRole không hợp lệ. Chỉ chấp nhận: BA, DEV, Designer, QA.");
 
         var emails = ParseEmails(emailsRaw)
             .Select(NormalizeEmail)
@@ -80,9 +77,6 @@ public sealed class InvitationService : IInvitationService
         if (emails.Count == 0)
             errors.Add("Vui lòng nhập ít nhất 1 email.");
 
-        var now = DateTime.UtcNow;
-
-        // Validation per email.
         foreach (var email in emails)
         {
             if (!IsValidEmail(email))
@@ -91,7 +85,6 @@ public sealed class InvitationService : IInvitationService
                 continue;
             }
 
-            // Người đã là member của workspace -> không cho invite.
             var existingUser = await _userManager.FindByEmailAsync(email);
             if (existingUser is not null)
             {
@@ -105,90 +98,106 @@ public sealed class InvitationService : IInvitationService
                     continue;
                 }
             }
-
-            // Không tạo token mới nếu email đã có token đang active.
-            var hasActiveInvite = await _db.WorkspaceInviteTokens.AnyAsync(
-                t => t.WorkspaceId == workspaceId &&
-                     t.Email == email &&
-                     t.UsedAtUtc == null &&
-                     t.ExpiresAtUtc > now,
-                cancellationToken);
-
-            if (hasActiveInvite)
-                errors.Add($"Email '{email}' đã có lời mời đang chờ (chưa hết hạn).");
         }
 
         if (errors.Count > 0)
             return new InviteMembersResult { Errors = errors };
 
-        // 1) Tạo token + record
-        var baseUrl = _configuration["App:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            baseUrl = "https://yourapp.com";
-        baseUrl = baseUrl.TrimEnd('/');
+        if (role == WorkspaceMemberRole.PM)
+        {
+            var pmCount = await WorkspacePolicies.CountPmsAsync(_db, workspaceId, cancellationToken);
+            if (pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
+            {
+                errors.Add(
+                    $"Đơn vị đã đủ {WorkspacePolicies.MaxPmsPerWorkspace} PM — không thể mời thêm PM.");
+                return new InviteMembersResult { Errors = errors };
+            }
+        }
 
         var workspace = await _db.Workspaces
             .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
 
-        var acceptSubject = $"WorkFlowPro: Bạn được mời vào workspace";
-        var tokensToSend = new List<(string Email, string TokenPlain)>();
-        var inviteRecords = new List<WorkspaceInviteToken>();
+        var now = DateTime.UtcNow;
+        var workspaceName = workspace?.Name ?? "workspace";
+        var roleLabel = role == WorkspaceMemberRole.PM ? "PM" : "Member";
+        var debugAcceptLinks = new List<string>();
 
         foreach (var email in emails)
         {
-            // Random token plain; store only SHA256 hash in DB.
             var tokenPlain = GenerateTokenPlain();
             var tokenHash = ComputeSha256Hex(tokenPlain);
+            var acceptPath = $"/Invite/Accept?token={Uri.EscapeDataString(tokenPlain)}";
 
-            tokensToSend.Add((email, tokenPlain));
-            inviteRecords.Add(new WorkspaceInviteToken
+            var invite = new WorkspaceInviteToken
             {
                 WorkspaceId = workspaceId,
                 Email = email,
                 TokenHash = tokenHash,
                 Role = role,
                 SubRole = normalizedSubRole,
+                Status = InviteStatus.Pending,
+                AcceptUrl = acceptPath,
+                CreatedAtUtc = now,
                 ExpiresAtUtc = now.AddDays(7)
-            });
+            };
+
+            _db.WorkspaceInviteTokens.Add(invite);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            debugAcceptLinks.Add($"{email} => {acceptPath}");
+
+            var subRoleSuffix = string.IsNullOrWhiteSpace(normalizedSubRole)
+                ? string.Empty
+                : $" (SubRole: {normalizedSubRole})";
+
+            var notifMessage =
+                $"Bạn được mời vào workspace \"{workspaceName}\". Vai trò: {roleLabel}.{subRoleSuffix}";
+
+            var inviteeUser = await _userManager.FindByEmailAsync(email);
+            if (inviteeUser is not null)
+            {
+                await _notifications.CreateAndPushAsync(
+                    inviteeUser.Id,
+                    NotificationType.WorkspaceInvite,
+                    notifMessage,
+                    workspaceId: null,
+                    redirectUrl: acceptPath,
+                    cancellationToken: cancellationToken);
+            }
         }
 
-        _db.WorkspaceInviteTokens.AddRange(inviteRecords);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        // 2) Gửi email mời
-        var roleLabel = role == WorkspaceMemberRole.PM ? "PM" : "Member";
-        var workspaceName = workspace?.Name ?? "workspace";
-
-        foreach (var (email, tokenPlain) in tokensToSend)
+        return new InviteMembersResult
         {
-            var acceptLink = $"{baseUrl}/Invite/Accept?token={Uri.EscapeDataString(tokenPlain)}";
+            Errors = Array.Empty<string>(),
+            IsDryRun = false,
+            DebugAcceptLinks = debugAcceptLinks
+        };
+    }
 
-            var bodyHtml = $@"
-<p>Xin chào,</p>
-<p>Bạn đã được mời tham gia <strong>{System.Net.WebUtility.HtmlEncode(workspaceName)}</strong>.</p>
-<p>Vai trò: <strong>{roleLabel}</strong>{(string.IsNullOrWhiteSpace(normalizedSubRole) ? "" : $"<br/>SubRole: <strong>{System.Net.WebUtility.HtmlEncode(normalizedSubRole)}</strong>")}</p>
-<p>Nhấn vào liên kết sau để chấp nhận lời mời:</p>
-<p><a href=""{System.Net.WebUtility.HtmlEncode(acceptLink)}"">Accept invitation</a></p>
-<p>Nếu bạn không yêu cầu lời mời này, bạn có thể bỏ qua email.</p>
-";
+    public async Task<InviteInfoResult?> GetInviteInfoAsync(
+        string token,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
 
-            try
-            {
-                await _emailSender.SendEmailAsync(
-                    email,
-                    acceptSubject,
-                    bodyHtml,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                // For safety, we don't delete tokens already created.
-                _logger.LogError(ex, "Failed to send invite email to {Email}", email);
-                throw new InvalidOperationException($"Gửi email mời tới '{email}' thất bại.");
-            }
-        }
+        var tokenHash = ComputeSha256Hex(token);
 
-        return new InviteMembersResult { Errors = Array.Empty<string>() };
+        var invite = await _db.WorkspaceInviteTokens
+            .Include(t => t.Workspace)
+            .SingleOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
+
+        if (invite is null)
+            return null;
+
+        return new InviteInfoResult
+        {
+            WorkspaceName = invite.Workspace?.Name ?? "Workspace",
+            Email = invite.Email,
+            Role = invite.Role,
+            SubRole = invite.SubRole,
+            Status = invite.Status
+        };
     }
 
     public async Task<AcceptInviteResult> AcceptInviteAsync(
@@ -209,16 +218,14 @@ public sealed class InvitationService : IInvitationService
         var now = DateTime.UtcNow;
 
         if (invitation.UsedAtUtc is not null)
-            return new AcceptInviteResult { Success = false, ErrorMessage = "Lời mời này đã được sử dụng." };
+            return new AcceptInviteResult { Success = false, ErrorMessage = "Lời mời này đã được xử lý." };
 
         if (invitation.ExpiresAtUtc <= now)
             return new AcceptInviteResult { Success = false, ErrorMessage = "Lời mời đã hết hạn." };
 
         var workspaceId = invitation.WorkspaceId;
-        var email = invitation.Email.Trim();
-        var normalizedEmail = NormalizeEmail(email);
+        var normalizedEmail = NormalizeEmail(invitation.Email);
 
-        // 1) Tạo user nếu chưa có.
         var user = await _userManager.FindByEmailAsync(normalizedEmail);
         if (user is null)
         {
@@ -229,6 +236,8 @@ public sealed class InvitationService : IInvitationService
                 Email = normalizedEmail,
                 DisplayName = normalizedEmail,
                 EmailConfirmed = true,
+                AccountStatus = AccountStatus.Approved,
+                AwaitingPmWorkspaceApproval = false
             };
 
             var createRes = await _userManager.CreateAsync(user, password);
@@ -239,10 +248,24 @@ public sealed class InvitationService : IInvitationService
             }
         }
 
-        // 2) Add WorkspaceMember + MemberProfile
         var member = await _db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == workspaceId && m.UserId == user.Id,
             cancellationToken);
+
+        if (invitation.Role == WorkspaceMemberRole.PM)
+        {
+            var pmCount = await WorkspacePolicies.CountPmsAsync(_db, workspaceId, cancellationToken);
+            var targetAlreadyPm = member?.Role == WorkspaceMemberRole.PM;
+            if (!targetAlreadyPm && pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
+            {
+                return new AcceptInviteResult
+                {
+                    Success = false,
+                    ErrorMessage =
+                        $"Đơn vị đã đủ {WorkspacePolicies.MaxPmsPerWorkspace} PM — không thể chấp nhận lời mời PM."
+                };
+            }
+        }
 
         if (member is null)
         {
@@ -263,25 +286,19 @@ public sealed class InvitationService : IInvitationService
         }
 
         var profile = await _db.MemberProfiles.FirstOrDefaultAsync(
-            p => p.UserId == user.Id,
-            cancellationToken);
+            p => p.UserId == user.Id, cancellationToken);
 
         if (profile is null)
         {
-            profile = new MemberProfile
-            {
-                UserId = user.Id
-                // Các default giá trị có sẵn trong entity.
-            };
+            profile = new MemberProfile { UserId = user.Id };
             _db.MemberProfiles.Add(profile);
         }
 
-        // 3) Mark used
         invitation.UsedAtUtc = now;
+        invitation.Status = InviteStatus.Accepted;
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        // UC-11: thông báo PM trong workspace (invite accepted).
         try
         {
             var wsName = await _db.Workspaces.AsNoTracking()
@@ -294,35 +311,30 @@ public sealed class InvitationService : IInvitationService
                 .Select(m => m.UserId)
                 .ToListAsync(cancellationToken);
 
-            var who = user.DisplayName ?? user.Email ?? user.UserName ?? user.Id;
+            var who = user.DisplayName ?? user.Email ?? user.Id;
             foreach (var pmId in pmIds)
             {
-                if (pmId == user.Id)
-                    continue;
+                if (pmId == user.Id) continue;
 
                 await _notifications.CreateAndPushAsync(
                     pmId,
                     NotificationType.InviteAccepted,
                     $"{who} đã chấp nhận lời mời vào workspace \"{wsName ?? ""}\".",
                     workspaceId: workspaceId,
-                    redirectUrl: "/Index",
+                    redirectUrl: "/Invite/Sent",
                     cancellationToken: cancellationToken);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "UC-11: invite accepted notification failed for workspace {Ws}", workspaceId);
+            _logger.LogWarning(ex, "Invite accepted notification failed for workspace {Ws}", workspaceId);
         }
 
-        // 4) Sign-in
         var http = _httpContextAccessor.HttpContext;
         if (http is not null)
         {
             if (http.User?.Identity?.IsAuthenticated == true)
-            {
-                // Ensure claims are consistent with the invitation workspace.
                 await http.SignOutAsync(IdentityConstants.ApplicationScheme);
-            }
 
             var principal = await _signInManager.CreateUserPrincipalAsync(user);
             if (principal.Identity is ClaimsIdentity identity)
@@ -343,19 +355,76 @@ public sealed class InvitationService : IInvitationService
         return new AcceptInviteResult { Success = true, WorkspaceId = workspaceId };
     }
 
+    public async Task<RejectInviteResult> RejectInviteAsync(
+        string token,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return new RejectInviteResult { Success = false, ErrorMessage = "Token không hợp lệ." };
+
+        var tokenHash = ComputeSha256Hex(token);
+
+        var invitation = await _db.WorkspaceInviteTokens
+            .SingleOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
+
+        if (invitation is null)
+            return new RejectInviteResult { Success = false, ErrorMessage = "Token không tồn tại." };
+
+        if (invitation.UsedAtUtc is not null)
+            return new RejectInviteResult { Success = false, ErrorMessage = "Lời mời này đã được xử lý." };
+
+        if (invitation.ExpiresAtUtc <= DateTime.UtcNow)
+            return new RejectInviteResult { Success = false, ErrorMessage = "Lời mời đã hết hạn." };
+
+        invitation.Status = InviteStatus.Rejected;
+        invitation.UsedAtUtc = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            var wsName = await _db.Workspaces.AsNoTracking()
+                .Where(w => w.Id == invitation.WorkspaceId)
+                .Select(w => w.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var pmIds = await _db.WorkspaceMembers.AsNoTracking()
+                .Where(m => m.WorkspaceId == invitation.WorkspaceId && m.Role == WorkspaceMemberRole.PM)
+                .Select(m => m.UserId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var pmId in pmIds)
+            {
+                await _notifications.CreateAndPushAsync(
+                    pmId,
+                    NotificationType.InviteRejected,
+                    $"{invitation.Email} đã từ chối lời mời vào workspace \"{wsName ?? ""}\".",
+                    workspaceId: invitation.WorkspaceId,
+                    redirectUrl: "/Invite/Sent",
+                    cancellationToken: cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Invite rejected notification failed for workspace {Ws}", invitation.WorkspaceId);
+        }
+
+        return new RejectInviteResult { Success = true };
+    }
+
     private static bool IsAllowedRole(WorkspaceMemberRole role) =>
         role == WorkspaceMemberRole.Member || role == WorkspaceMemberRole.PM;
+
+    private static bool IsAllowedSubRole(string subRole) =>
+        AllowedSubRoles.Contains(subRole, StringComparer.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> ParseEmails(string emailsRaw)
     {
         if (string.IsNullOrWhiteSpace(emailsRaw))
             return Array.Empty<string>();
 
-        var parts = emailsRaw.Split(
-            new[] { ',', ';', '\r', '\n' },
-            StringSplitOptions.RemoveEmptyEntries);
-
-        return parts
+        return emailsRaw
+            .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(p => p.Trim())
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .ToList();
@@ -372,18 +441,12 @@ public sealed class InvitationService : IInvitationService
 
     private static string GenerateTokenPlain()
     {
-        // 32 bytes => 43 chars base64url; đủ mạnh cho invite token.
         var bytes = RandomNumberGenerator.GetBytes(32);
-        var base64 = Convert.ToBase64String(bytes);
-        return base64
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     private static string GenerateRandomInvitePassword()
     {
-        // Identity policy in Program.cs: min 8, requires digit + uppercase.
         var digits = RandomNumberGenerator.GetInt32(1000, 9999);
         var tail = Guid.NewGuid().ToString("N")[..10];
         return $"WpA{digits}{tail}";
@@ -395,4 +458,3 @@ public sealed class InvitationService : IInvitationService
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 }
-

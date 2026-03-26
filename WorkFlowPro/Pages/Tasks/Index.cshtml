@@ -1,0 +1,34 @@
+@page "/tasks"
+@model WorkFlowPro.Pages.Tasks.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Task — chọn dự án";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="h3 mb-3">Danh sách task theo dự án</h1>
+<p class="text-muted small mb-3">Mỗi dự án có trang lọc task riêng (cần <code>projectId</code>).</p>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+else if (Model.Projects.Count == 0)
+{
+    <div class="alert alert-info">Chưa có dự án nào trong đơn vị hiện tại.</div>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var p in Model.Projects)
+        {
+            var listUrl = Model.WorkspaceId is { } wid
+                ? $"/tasks/list?projectId={p.Id:D}&workspaceId={wid:D}"
+                : $"/tasks/list?projectId={p.Id:D}";
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>@p.Name</span>
+                <a class="btn btn-sm btn-primary" href="@listUrl">Mở danh sách task</a>
+            </li>
+        }
+    </ul>
+}

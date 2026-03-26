@@ -177,14 +177,12 @@ public sealed class CreateTaskModel : PageModel
                 workspaceId: workspaceId.Value,
                 projectId: project.Id,
                 taskId: task.Id,
-                // UC-05: Member nhận task qua notification -> mở trang accept/reject.
-                redirectUrl: $"/Tasks/AcceptReject/{task.Id}",
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        // Redirect POST -> GET để tránh double-submit.
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}");
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
     }
 
     public async Task<IActionResult> OnPostCreateWithSuggestionAsync(CancellationToken cancellationToken)
@@ -276,13 +274,12 @@ public sealed class CreateTaskModel : PageModel
                 workspaceId: workspaceId.Value,
                 projectId: project.Id,
                 taskId: task.Id,
-                // UC-05: Member nhận task qua notification -> mở trang accept/reject.
-                redirectUrl: $"/Tasks/AcceptReject/{task.Id}",
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}");
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
     }
 
     private bool TryValidateTitleAndDueDate()

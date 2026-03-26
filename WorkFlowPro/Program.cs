@@ -28,6 +28,7 @@ builder.Services.AddControllers()
     });
 builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(60);
@@ -48,8 +49,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.SignIn.RequireConfirmedEmail =
         builder.Configuration.GetValue<bool>("Auth:RequireEmailConfirmation");
 
-    // UC-02 / SEC-03: 5 lần sai -> khóa 15 phút.
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    // UC-02 / SEC-03: 5 lần sai -> khóa 5 phút.
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
 })
@@ -146,6 +147,7 @@ builder.Services.AddScoped<IKanbanService, KanbanService>();
 builder.Services.AddScoped<IKpiDashboardService, KpiDashboardService>();
 builder.Services.AddScoped<IMemberProfileService, MemberProfileService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
+builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -178,5 +180,10 @@ app.MapRazorPages();
 app.MapHub<KanbanHub>("/hubs/kanban");
 app.MapHub<TaskHub>("/hubs/task");
 app.MapHub<NotificationHub>("/hubs/notification");
+
+using (var scope = app.Services.CreateScope())
+{
+    await AdminUserSeed.EnsureSeedAsync(scope.ServiceProvider);
+}
 
 app.Run();

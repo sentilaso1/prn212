@@ -1,0 +1,67 @@
+@page "/Invite/Sent"
+@model WorkFlowPro.Pages.Invite.SentModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Danh sach loi moi da gui";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Danh sach loi moi da gui</h1>
+    <a class="btn btn-primary" href="/Invite@(Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")">+ Mời thành viên</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+
+@if (Model.Invites.Count == 0)
+{
+    <div class="alert alert-info">Chua co loi moi nao duoc gui trong workspace nay.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>SubRole</th>
+                <th>Trang thai</th>
+                <th>Ngay gui</th>
+                <th>Het han</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var inv in Model.Invites)
+            {
+                <tr>
+                    <td>@inv.Email</td>
+                    <td>@inv.Role</td>
+                    <td>@(inv.SubRole ?? "-")</td>
+                    <td>
+                        @if (inv.Status == WorkFlowPro.Data.InviteStatus.Pending)
+                        {
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        }
+                        else if (inv.Status == WorkFlowPro.Data.InviteStatus.Accepted)
+                        {
+                            <span class="badge bg-success">Accepted</span>
+                        }
+                        else if (inv.Status == WorkFlowPro.Data.InviteStatus.Rejected)
+                        {
+                            <span class="badge bg-danger">Rejected</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@inv.Status</span>
+                        }
+                    </td>
+                    <td>@inv.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@inv.ExpiresAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

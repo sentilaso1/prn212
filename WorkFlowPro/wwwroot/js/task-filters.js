@@ -19,8 +19,7 @@
         if (!card) return "";
         const st = (card.status || "").toString();
         const draggableStatuses = ["ToDo", "InProgress", "Review", "Done"];
-        const canDrag =
-            draggableStatuses.includes(st) && (isPm || (card.assigneeUserId && card.assigneeUserId === myUserId));
+        const canDrag = draggableStatuses.includes(st);
         const due = card.dueDateUtc ? new Date(card.dueDateUtc) : null;
         const now = new Date();
         const isDone = st === "Done";
@@ -200,17 +199,20 @@
     function bindFilterCard(root, opts) {
         const projectId = root.getAttribute("data-project-id");
         const view = root.getAttribute("data-view") || "kanban";
+        const wsId = root.getAttribute("data-workspace-id") || "";
         if (!projectId) return;
+
+        const wsQ = wsId ? `?workspaceId=${wsId}` : "";
 
         const run = debounce(async () => {
             const criteria = collectCriteria(root);
             try {
                 if (view === "kanban") {
-                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban`, criteria);
+                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban${wsQ}`, criteria);
                     updateKanbanColumns(data, opts.myUserId, opts.isPm);
                     if (typeof opts.onKanbanUpdated === "function") opts.onKanbanUpdated();
                 } else {
-                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-list`, criteria);
+                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-list${wsQ}`, criteria);
                     updateTaskListTable(data.tasks, opts.myUserId, opts.isPm);
                 }
             } catch (e) {
@@ -231,7 +233,7 @@
         if (clearBtn) {
             clearBtn.addEventListener("click", async () => {
                 try {
-                    const res = await fetch(`/api/projects/${projectId}/tasks/filter-reset`, {
+                    const res = await fetch(`/api/projects/${projectId}/tasks/filter-reset${wsQ}`, {
                         method: "POST",
                         credentials: "include"
                     });
@@ -239,11 +241,11 @@
                     const def = await res.json();
                     applyCriteriaToForm(root, def);
                     if (view === "kanban") {
-                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban`, def);
+                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban${wsQ}`, def);
                         updateKanbanColumns(data, opts.myUserId, opts.isPm);
                         if (typeof opts.onKanbanUpdated === "function") opts.onKanbanUpdated();
                     } else {
-                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-list`, def);
+                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-list${wsQ}`, def);
                         updateTaskListTable(data.tasks, opts.myUserId, opts.isPm);
                     }
                 } catch (e) {

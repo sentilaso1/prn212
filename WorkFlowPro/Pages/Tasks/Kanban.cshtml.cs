@@ -34,6 +34,7 @@ public sealed class KanbanModel : PageModel
 
     public string CurrentUserId { get; private set; } = string.Empty;
     public bool IsPm { get; private set; }
+    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public FilteredKanbanTasksResult Board { get; private set; } = new();
 
@@ -110,6 +111,7 @@ public sealed class KanbanModel : PageModel
         Filters = new TaskFiltersVm
         {
             ProjectId = projectId,
+            WorkspaceId = workspaceId,
             ViewContext = "kanban",
             Criteria = criteria,
             WorkspaceMembers = members,

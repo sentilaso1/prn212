@@ -1,10 +1,17 @@
-﻿@page
-@model IndexModel
+@page
+@model WorkFlowPro.Pages.IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "WorkFlow Pro";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center py-5">
+    <h1 class="display-5 fw-bold mb-3">WorkFlow Pro</h1>
+    <p class="lead text-muted mb-4">
+        Quản lý công việc nhóm — Kanban, phân công, đánh giá. <br />
+        <span class="small">UC-01: Đăng ký để tạo workspace và trở thành PM.</span>
+    </p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+        <a class="btn btn-primary btn-lg px-4" href="/Identity/Account/Register">Đăng ký</a>
+        <a class="btn btn-outline-primary btn-lg px-4" href="/Identity/Account/Login">Đăng nhập</a>
+    </div>
 </div>

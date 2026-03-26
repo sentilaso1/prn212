@@ -19,7 +19,7 @@ else
             <div class="text-muted">Project</div>
             <div><strong>@Model.ProjectName</strong></div>
             <div class="small mt-1">
-                <a href="/tasks/list?projectId=@Model.ProjectId">Task List</a>
+                <a href="/tasks/list?projectId=@(Model.ProjectId)@(Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")">Task List</a>
             </div>
         </div>
         <div class="text-muted small">
@@ -126,6 +126,7 @@ else
             const projectId = "@Model.ProjectId.ToString("D")";
             const myUserId = "@Model.CurrentUserId";
             const isPm = @(Model.IsPm ? "true" : "false");
+            const workspaceId = "@(Model.CurrentWorkspaceId?.ToString("D") ?? "")";
             let wfSearchQuery = "";
 
             const connection = new signalR.HubConnectionBuilder()
@@ -188,6 +189,24 @@ else
                 return id ? document.getElementById(id) : null;
             }
 
+            function updateColumnCounts() {
+                document.querySelectorAll(".kanban-dropzone").forEach(function (zone) {
+                    const status = zone.getAttribute("data-target-status");
+                    const countMap = {
+                        Unassigned: "wf-count-unassigned",
+                        Pending: "wf-count-pending",
+                        ToDo: "wf-count-todo",
+                        InProgress: "wf-count-inprogress",
+                        Review: "wf-count-review",
+                        Done: "wf-count-done"
+                    };
+                    const countEl = document.getElementById(countMap[status]);
+                    if (countEl) {
+                        countEl.textContent = zone.querySelectorAll(".wf-task-card").length;
+                    }
+                });
+            }
+
             document.querySelectorAll(".kanban-dropzone").forEach(function (dz) {
                 dz.addEventListener("dragover", function (e) {
                     e.preventDefault();
@@ -198,11 +217,32 @@ else
                     if (!draggedTaskId) return;
                     const targetStatus = dz.getAttribute("data-target-status");
                     if (!targetStatus) return;
+
+                    const cardEl = document.querySelector(`.wf-task-card[data-task-id="${draggedTaskId}"]`);
+                    const originalParent = cardEl ? cardEl.parentElement : null;
+
+                    if (cardEl && dz !== originalParent) {
+                        dz.appendChild(cardEl);
+                        updateColumnCounts();
+                    }
+
                     try {
-                        await connection.invoke("MoveTask", draggedTaskId, targetStatus);
+                        var result = await connection.invoke("MoveTask", draggedTaskId, targetStatus, workspaceId || null);
+                        if (result && result.success === false) {
+                            if (cardEl && originalParent && dz !== originalParent) {
+                                originalParent.appendChild(cardEl);
+                                updateColumnCounts();
+                            }
+                            alert(result.errorMessage || "Không thể chuyển task.");
+                        }
                     } catch (err) {
-                        console.error(err);
-                        alert("Không thể chuyển task. Vui lòng thử lại.");
+                        console.error("MoveTask error:", err);
+                        if (cardEl && originalParent && dz !== originalParent) {
+                            originalParent.appendChild(cardEl);
+                            updateColumnCounts();
+                        }
+                        var msg = (err && err.message) ? err.message : String(err);
+                        alert("Lỗi: " + msg);
                     }
                 });
             });
@@ -242,6 +282,7 @@ else
                 if (!shouldDisplay) {
                     const existing = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
                     if (existing) existing.remove();
+                    updateColumnCounts();
                     return;
                 }
                 const dropzone = findDropHost(newStatus);
@@ -251,7 +292,11 @@ else
                         const html = renderCardHtml(card);
                         if (!html) return;
                         existing.outerHTML = html;
-                        applySearchToCard(document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`));
+                        const newEl = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
+                        if (newEl && dropzone) {
+                            dropzone.appendChild(newEl);
+                        }
+                        applySearchToCard(newEl);
                     } else if (dropzone) {
                         dropzone.appendChild(existing);
                     }
@@ -264,6 +309,7 @@ else
                         applySearchToCard(el);
                     }
                 }
+                updateColumnCounts();
             });
 
             async function start() {

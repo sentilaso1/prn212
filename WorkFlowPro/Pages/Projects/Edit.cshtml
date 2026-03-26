@@ -46,8 +46,20 @@ else
         </div>
 
         <div class="mb-3">
-            <label asp-for="Input.Color" class="form-label"></label>
-            <input asp-for="Input.Color" class="form-control" placeholder="#RRGGBB" disabled="@Model.IsArchived" />
+            <label asp-for="Input.Color" class="form-label">Color</label>
+            <select asp-for="Input.Color" class="form-select" disabled="@Model.IsArchived">
+                <option value="">-- Chọn màu --</option>
+                <option value="#FF6B6B" style="background:#FF6B6B;color:#fff">Đỏ (#FF6B6B)</option>
+                <option value="#FFA94D" style="background:#FFA94D;color:#fff">Cam (#FFA94D)</option>
+                <option value="#FFD43B" style="background:#FFD43B;color:#333">Vàng (#FFD43B)</option>
+                <option value="#69DB7C" style="background:#69DB7C;color:#333">Xanh lá (#69DB7C)</option>
+                <option value="#4DABF7" style="background:#4DABF7;color:#fff">Xanh dương (#4DABF7)</option>
+                <option value="#9775FA" style="background:#9775FA;color:#fff">Tím (#9775FA)</option>
+                <option value="#F06595" style="background:#F06595;color:#fff">Hồng (#F06595)</option>
+                <option value="#868E96" style="background:#868E96;color:#fff">Xám (#868E96)</option>
+                <option value="#20C997" style="background:#20C997;color:#fff">Ngọc (#20C997)</option>
+                <option value="#339AF0" style="background:#339AF0;color:#fff">Biển (#339AF0)</option>
+            </select>
             <span asp-validation-for="Input.Color" class="text-danger"></span>
         </div>
 
@@ -70,6 +82,14 @@ else
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="ProjectId" />
                 <button type="submit" class="btn btn-warning">Archive</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Unarchive">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ProjectId" />
+                <button type="submit" class="btn btn-success">Unarchive</button>
             </form>
         }
         <a class="btn btn-outline-secondary" href="/Projects/Details/@Model.Project.Id">Back to details</a>

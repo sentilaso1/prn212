@@ -34,17 +34,17 @@ public sealed class UserWorkspaceService : IUserWorkspaceService
         string userId,
         CancellationToken cancellationToken = default)
     {
-        var workspaces = await _db.WorkspaceMembers
+        var raw = await _db.WorkspaceMembers
             .Where(m => m.UserId == userId)
             .Join(
                 _db.Workspaces,
                 m => m.WorkspaceId,
                 w => w.Id,
-                (m, w) => new WorkspaceSwitcherItem(w.Id, w.Name, m.Role))
+                (m, w) => new { w.Id, w.Name, m.Role })
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
-        return workspaces;
+        return raw.Select(x => new WorkspaceSwitcherItem(x.Id, x.Name, x.Role)).ToList();
     }
 
     public async Task<Guid?> GetFirstWorkspaceIdAsync(

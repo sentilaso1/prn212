@@ -1,28 +1,61 @@
+@using WorkFlowPro.Data
 @model WorkFlowPro.ViewModels.WorkspaceSwitcherVm
+
+@{
+    var activeRole = Model.Workspaces.FirstOrDefault(w => w.Id == Model.ActiveWorkspaceId)?.Role;
+    var isPm = activeRole == WorkspaceMemberRole.PM;
+}
 
 <div class="ms-auto d-flex align-items-center gap-2">
     <span class="navbar-text text-muted">
-        Workspace: <strong>@Model.ActiveWorkspaceName</strong>
+        Đơn vị: <strong>@Model.ActiveWorkspaceName</strong>
     </span>
 
-    <form method="get" action="/Workspaces/Switch" class="d-inline">
-        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-
-        <select name="workspaceId"
-                class="form-select form-select-sm"
-                style="width:auto; display:inline-block;"
-                onchange="this.form.submit()">
-            @foreach (var w in Model.Workspaces)
+    <select id="wsSwitcherDropdown"
+            class="form-select form-select-sm"
+            style="width:auto; display:inline-block;"
+            onchange="(function(sel){
+                var wsId = sel.value;
+                if(!wsId) return;
+                var ret = encodeURIComponent(window.location.pathname);
+                window.location.href = '/Workspaces/Switch?workspaceId=' + wsId + '&returnUrl=' + ret;
+            })(this)">
+        @foreach (var w in Model.Workspaces)
+        {
+            @if (w.Id == Model.ActiveWorkspaceId)
             {
-                <option value="@w.Id" selected="@(w.Id == Model.ActiveWorkspaceId)">
+                <option value="@w.Id" selected>
                     @w.Name (@w.Role)
                 </option>
             }
-        </select>
-    </form>
+            else
+            {
+                <option value="@w.Id">
+                    @w.Name (@w.Role)
+                </option>
+            }
+        }
+    </select>
 
-    <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create">
-        + Tạo Workspace mới
-    </a>
+    @if (Model.IsPlatformAdmin)
+    {
+        <a class="btn btn-sm btn-outline-primary" href="/Workspaces/Create" title="Admin nền tảng">
+            + Tạo đơn vị mới
+        </a>
+    }
+
+    @if (isPm)
+    {
+        <a class="btn btn-sm btn-success" href="/Invite?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-03: Invite members">
+            + Mời thành viên
+        </a>
+        <a class="btn btn-sm btn-outline-info" href="/Reports/Dashboard?workspaceId=@Model.ActiveWorkspaceId.ToString("D")" title="UC-13">
+            Báo cáo
+        </a>
+    }
+
+    @if (Model.IsPlatformAdmin)
+    {
+        <a class="btn btn-sm btn-outline-danger" href="/Admin">Admin</a>
+    }
 </div>
-

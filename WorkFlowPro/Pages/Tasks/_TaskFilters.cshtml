@@ -12,7 +12,7 @@
     bool Pr(TaskPriority p) => selPri.Count == 0 || selPri.Contains(p);
 }
 
-<div class="card mb-3" id="@formId" data-project-id="@Model.ProjectId" data-view="@Model.ViewContext">
+<div class="card mb-3" id="@formId" data-project-id="@Model.ProjectId" data-view="@Model.ViewContext" data-workspace-id="@(Model.WorkspaceId?.ToString("D") ?? "")">
     <div class="card-body py-3">
         <div class="row g-2 align-items-end">
             <div class="col-lg-3 col-md-6">

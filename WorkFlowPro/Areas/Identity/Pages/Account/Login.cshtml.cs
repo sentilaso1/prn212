@@ -61,6 +61,25 @@ public class LoginModel : PageModel
             return Page();
         }
 
+        if (user.AccountStatus != AccountStatus.Approved)
+        {
+            if (user.AccountStatus == AccountStatus.PendingApproval && user.AwaitingPmWorkspaceApproval)
+            {
+                ModelState.AddModelError(string.Empty,
+                    "Tài khoản PM đang chờ Admin duyệt. Bạn chưa thể đăng nhập cho đến khi được chấp nhận.");
+            }
+            else if (user.AccountStatus == AccountStatus.Rejected)
+            {
+                ModelState.AddModelError(string.Empty, "Tài khoản đã bị từ chối.");
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Tài khoản chưa được kích hoạt.");
+            }
+
+            return Page();
+        }
+
         // CheckPasswordSignInAsync xử lý lockout theo Identity options.
         var signInResult = await _signInManager.CheckPasswordSignInAsync(
             user,
@@ -69,7 +88,7 @@ public class LoginModel : PageModel
 
         if (signInResult.Succeeded)
         {
-            // UC-15/UC-02: xác định workspace(s) của user.
+            // UC-15/UC-02: workspace có thể rỗng (user thường chờ lời mời vào đơn vị).
             var workspaceIds = await _db.WorkspaceMembers
                 .Where(m => m.UserId == user.Id)
                 .GroupBy(m => m.WorkspaceId)
@@ -77,26 +96,24 @@ public class LoginModel : PageModel
                 .Select(g => g.Key)
                 .ToListAsync(HttpContext.RequestAborted);
 
-            if (workspaceIds.Count == 0)
-            {
-                ModelState.AddModelError(string.Empty, "User has no workspace.");
-                return Page();
-            }
-
-            var activeWorkspaceId = workspaceIds[0];
-
             var principal = await _signInManager.CreateUserPrincipalAsync(user);
-            var workspaceIdValue = activeWorkspaceId.ToString("D");
 
-            // Requirement: add claim CurrentWorkspaceId after login.
             if (principal.Identity is ClaimsIdentity identity)
             {
-                if (!principal.HasClaim("CurrentWorkspaceId", workspaceIdValue))
-                    identity.AddClaim(new Claim("CurrentWorkspaceId", workspaceIdValue));
+                if (user.IsPlatformAdmin && !principal.HasClaim("platform_role", "admin"))
+                    identity.AddClaim(new Claim("platform_role", "admin"));
 
-                // Tương thích JWT claim hiện có.
-                if (!principal.HasClaim("workspace_id", workspaceIdValue))
-                    identity.AddClaim(new Claim("workspace_id", workspaceIdValue));
+                if (workspaceIds.Count > 0)
+                {
+                    var activeWorkspaceId = workspaceIds[0];
+                    var workspaceIdValue = activeWorkspaceId.ToString("D");
+
+                    if (!principal.HasClaim("CurrentWorkspaceId", workspaceIdValue))
+                        identity.AddClaim(new Claim("CurrentWorkspaceId", workspaceIdValue));
+
+                    if (!principal.HasClaim("workspace_id", workspaceIdValue))
+                        identity.AddClaim(new Claim("workspace_id", workspaceIdValue));
+                }
             }
 
             await HttpContext.SignInAsync(
@@ -107,17 +124,41 @@ public class LoginModel : PageModel
                     IsPersistent = Input.RememberMe
                 });
 
-            // Redirect:
-            // - Nhiều workspace -> Workspace Switching (UC-15) => /Workspaces
-            // - 1 workspace -> Dashboard/Kanban => /Workspaces?workspaceId=...
+            if (workspaceIds.Count == 0)
+                return LocalRedirect("/Workspaces");
+
+            var firstWs = workspaceIds[0];
             return workspaceIds.Count > 1
                 ? LocalRedirect("/Workspaces")
-                : LocalRedirect($"/Workspaces?workspaceId={activeWorkspaceId}");
+                : LocalRedirect($"/Workspaces?workspaceId={firstWs}");
         }
 
         if (signInResult.IsLockedOut)
         {
-            ModelState.AddModelError(string.Empty, "Your account is locked due to too many failed login attempts. Please try again later.");
+            // Hiển thị thời gian còn lại đến khi mở khóa (UC-02).
+            var refreshedUser = await _userManager.FindByEmailAsync(email);
+            var lockoutEndUtc = refreshedUser?.LockoutEnd;
+
+            string message;
+            if (lockoutEndUtc.HasValue)
+            {
+                var remaining = lockoutEndUtc.Value - DateTime.UtcNow;
+                if (remaining > TimeSpan.Zero)
+                {
+                    // Ví dụ: "trong 00:12:34"
+                    message = $"Tài khoản bị khóa do nhập sai quá nhiều lần. Vui lòng thử lại sau {remaining.ToString(@"hh\:mm\:ss")}.";
+                }
+                else
+                {
+                    message = "Tài khoản hiện đang bị khóa do nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.";
+                }
+            }
+            else
+            {
+                message = "Tài khoản bị khóa do nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.";
+            }
+
+            ModelState.AddModelError(string.Empty, message);
             return Page();
         }
 

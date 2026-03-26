@@ -29,19 +29,29 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="Input.SubRole" class="form-label"></label>
-        <input asp-for="Input.SubRole" class="form-control" placeholder="BA/DEV/Designer/QA (optional)" />
+        <label asp-for="Input.SubRole" class="form-label">SubRole (bắt buộc)</label>
+        <select asp-for="Input.SubRole" class="form-select">
+            <option value="">-- Chọn SubRole --</option>
+            <option value="BA">BA</option>
+            <option value="DEV">DEV</option>
+            <option value="Designer">Designer</option>
+            <option value="QA">QA</option>
+        </select>
         <span asp-validation-for="Input.SubRole" class="text-danger"></span>
     </div>
 
     <button type="submit" class="btn btn-primary">Send invites</button>
-    <a class="btn btn-outline-secondary" href="/Projects">Cancel</a>
+    <a class="btn btn-outline-info" href="/Invite/Sent@(Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")">Xem lời mời đã gửi</a>
+    <a class="btn btn-outline-secondary"
+       href="/Projects@(Model.CurrentWorkspaceId is null ? string.Empty : $"?workspaceId={Model.CurrentWorkspaceId.Value.ToString("D")}")">
+        Cancel
+    </a>
 </form>
 
 @if (Model.ShowSuccessToast)
 {
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="inviteSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div id="inviteSuccessToast" class="toast align-items-center bg-success text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
                     @Model.InviteSuccessMessage

@@ -24,10 +24,17 @@ public class IndexModel : PageModel
 
     public Guid? ActiveWorkspaceId { get; private set; }
 
+    /// <summary>Vai trò của user trong đơn vị đang chọn (để hiện shortcut UC).</summary>
+    public WorkspaceMemberRole? ActiveWorkspaceRole { get; private set; }
+
     public string? ErrorMessage { get; private set; }
+
+    public string? InfoMessage { get; private set; }
 
     public async Task OnGetAsync(Guid? workspaceId)
     {
+        InfoMessage = TempData["RegisterBlockedMessage"] as string;
+
         ErrorMessage = TempData["WorkspaceSwitchError"] as string;
         if (ErrorMessage is null)
         {
@@ -39,16 +46,17 @@ public class IndexModel : PageModel
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return;
 
-        var list = await _db.WorkspaceMembers
+        var raw = await _db.WorkspaceMembers
             .Where(m => m.UserId == userId)
             .Join(
                 _db.Workspaces,
                 m => m.WorkspaceId,
                 w => w.Id,
-                (m, w) => new WorkspaceVm(w.Id, w.Name, m.Role))
+                (m, w) => new { w.Id, w.Name, m.Role })
             .OrderBy(x => x.Name)
             .ToListAsync(HttpContext.RequestAborted);
 
+        var list = raw.Select(x => new WorkspaceVm(x.Id, x.Name, x.Role)).ToList();
         Workspaces = list;
 
         var claimWorkspaceId =
@@ -65,6 +73,9 @@ public class IndexModel : PageModel
         ActiveWorkspaceId = workspaceId
             ?? claimWorkspaceIdParsed
             ?? (list.Count > 0 ? list[0].Id : (Guid?)null);
+
+        if (ActiveWorkspaceId is { } aid)
+            ActiveWorkspaceRole = list.FirstOrDefault(x => x.Id == aid)?.Role;
     }
 }
 

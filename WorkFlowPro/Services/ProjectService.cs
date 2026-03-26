@@ -9,11 +9,13 @@ namespace WorkFlowPro.Services;
 
 public interface IProjectService
 {
+    Task<IReadOnlyList<Project>> ListForWorkspaceAsync(string userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Project>> ListForPmAsync(string userId, CancellationToken cancellationToken = default);
     Task<Project> CreateAsync(string userId, CreateProjectInput input, CancellationToken cancellationToken = default);
     Task<Project> GetForPmAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task UpdateAsync(string userId, Guid projectId, UpdateProjectInput input, CancellationToken cancellationToken = default);
     Task ArchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
+    Task UnarchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task DeleteAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
 }
 
@@ -83,13 +85,34 @@ public sealed class ProjectService : IProjectService
         return $"#{c.ToUpperInvariant()}";
     }
 
+    public async Task<IReadOnlyList<Project>> ListForWorkspaceAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
+        if (workspaceId is null)
+            throw new InvalidOperationException("Missing active workspace.");
+
+        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.UserId == userId && m.WorkspaceId == workspaceId.Value,
+            cancellationToken);
+        if (!isMember)
+            throw new UnauthorizedAccessException("User is not a member of this workspace.");
+
+        return await _db.Projects
+            .Where(p => p.WorkspaceId == workspaceId.Value)
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Project>> ListForPmAsync(
         string userId,
         CancellationToken cancellationToken = default)
     {
-        await RequirePmWorkspaceAsync(userId, cancellationToken);
+        var workspaceId = await RequirePmWorkspaceAsync(userId, cancellationToken);
 
         return await _db.Projects
+            .Where(p => p.WorkspaceId == workspaceId)
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToListAsync(cancellationToken);
     }
@@ -151,7 +174,7 @@ public sealed class ProjectService : IProjectService
                 $"Project \"{project.Name}\" vừa được tạo trong workspace.",
                 workspaceId: workspaceId,
                 projectId: project.Id,
-                redirectUrl: $"/Projects/Details/{project.Id}",
+                redirectUrl: $"/Projects/Details/{project.Id}?workspaceId={workspaceId}",
                 cancellationToken: cancellationToken);
         }
 
@@ -238,7 +261,7 @@ public sealed class ProjectService : IProjectService
                 $"Project \"{project.Name}\" vừa được cập nhật.",
                 workspaceId: project.WorkspaceId,
                 projectId: project.Id,
-                redirectUrl: $"/Projects/Details/{project.Id}",
+                redirectUrl: $"/Projects/Details/{project.Id}?workspaceId={project.WorkspaceId}",
                 cancellationToken: cancellationToken);
         }
     }
@@ -258,6 +281,25 @@ public sealed class ProjectService : IProjectService
             return;
 
         project.Status = ProjectStatus.Archived;
+        _db.Projects.Update(project);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnarchiveAsync(
+        string userId,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null)
+            throw new KeyNotFoundException("Project not found in current workspace.");
+
+        if (project.Status != ProjectStatus.Archived)
+            return;
+
+        project.Status = ProjectStatus.Active;
         _db.Projects.Update(project);
         await _db.SaveChangesAsync(cancellationToken);
     }

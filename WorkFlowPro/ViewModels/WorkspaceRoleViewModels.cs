@@ -9,6 +9,12 @@ public sealed record WorkspaceMemberRoleRowVm(
     string? AvatarUrl,
     WorkspaceMemberRole Role,
     string? SubRole,
-    bool CanChangeWorkspaceRole);
+    bool CanChangeWorkspaceRole,
+    bool IsActorPlatformAdmin,
+    bool ShowAdminRoleChangeForm,
+    bool ShowPmPromoteRequestForm,
+    bool ShowPmDemoteRequestForm,
+    bool HasPendingPromoteRequest,
+    bool HasPendingDemoteRequest);
 
 public sealed record RoleManagementResult(bool Success, string? ErrorMessage = null);

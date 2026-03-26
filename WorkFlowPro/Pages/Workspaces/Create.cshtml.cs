@@ -7,7 +7,7 @@ using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Pages.Workspaces;
 
-[Authorize]
+[Authorize(Policy = "PlatformAdmin")]
 public sealed class CreateModel : PageModel
 {
     private readonly IWorkspaceCreationService _workspaceCreationService;

@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using WorkFlowPro.Auth;
 using WorkFlowPro.Services;
 using WorkFlowPro.ViewModels;
@@ -29,13 +31,23 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
 
         var items = await _userWorkspaceService.GetUserWorkspacesAsync(userId, HttpContext.RequestAborted);
         if (items.Count == 0)
-            return Content(string.Empty);
+        {
+            var isAdmin = HttpContext.User.HasClaim("platform_role", "admin");
+            var emptyVm = new WorkspaceSwitcherEmptyVm { IsPlatformAdmin = isAdmin };
+            return View("/Pages/Shared/_WorkspaceSwitcherEmpty.cshtml", emptyVm);
+        }
 
         var activeId = _currentWorkspaceService.CurrentWorkspaceId ?? items[0].Id;
         var active = items.FirstOrDefault(x => x.Id == activeId) ?? items[0];
         activeId = active.Id;
 
-        var returnUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+        // Remove workspaceId from returnUrl to prevent duplicated/incorrect workspace switches.
+        var filteredQuery = HttpContext.Request.Query
+            .Where(q => !string.Equals(q.Key, "workspaceId", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string?>(q.Key, v)));
+
+        var queryString = QueryString.Create(filteredQuery);
+        var returnUrl = HttpContext.Request.Path + queryString;
 
         var vm = new WorkspaceSwitcherVm
         {
@@ -47,7 +59,8 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
                 Name = i.Name,
                 Role = i.Role
             }).ToList(),
-            ReturnUrl = returnUrl
+            ReturnUrl = returnUrl,
+            IsPlatformAdmin = HttpContext.User.HasClaim("platform_role", "admin")
         };
 
         return View("/Pages/Shared/_WorkspaceSwitcher.cshtml", vm);

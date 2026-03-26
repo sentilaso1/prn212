@@ -100,6 +100,16 @@ else
                         <input class="form-control" type="number" name="score" min="1" max="10" value="8" />
                     </div>
                     <div class="mb-2">
+                        <label class="form-label">Cập nhật Level thành viên</label>
+                        <select class="form-select" name="newLevel">
+                            <option value="">— Tự động (theo điểm TB) —</option>
+                            <option value="Junior">Junior</option>
+                            <option value="Mid">Mid</option>
+                            <option value="Senior">Senior</option>
+                        </select>
+                        <div class="form-text">Nếu chọn, Level sẽ được cập nhật ngay. Nếu để trống, hệ thống tự tính: ≥8 = Senior, ≥6 = Mid, còn lại = Junior.</div>
+                    </div>
+                    <div class="mb-2">
                         <label class="form-label">Comment (optional, max 2000)</label>
                         <textarea class="form-control" name="comment" rows="3" maxlength="2000"></textarea>
                     </div>

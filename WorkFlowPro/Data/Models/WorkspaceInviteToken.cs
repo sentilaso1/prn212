@@ -17,7 +17,14 @@ public sealed class WorkspaceInviteToken
     public WorkspaceMemberRole Role { get; set; } = WorkspaceMemberRole.Member;
     public string? SubRole { get; set; }
 
+    public InviteStatus Status { get; set; } = InviteStatus.Pending;
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime? UsedAtUtc { get; set; }
-}
 
+    [MaxLength(500)]
+    public string? AcceptUrl { get; set; }
+
+    public Workspace? Workspace { get; set; }
+}

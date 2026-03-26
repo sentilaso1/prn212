@@ -20,26 +20,24 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtTokenService _jwt;
     private readonly IConfiguration _config;
-    private readonly IWorkspaceOnboardingService _workspaceOnboarding;
 
     public AuthController(
         WorkFlowProDbContext db,
         UserManager<ApplicationUser> userManager,
         IJwtTokenService jwt,
-        IConfiguration config,
-        IWorkspaceOnboardingService workspaceOnboarding)
+        IConfiguration config)
     {
         _db = db;
         _userManager = userManager;
         _jwt = jwt;
         _config = config;
-        _workspaceOnboarding = workspaceOnboarding;
     }
 
     public sealed record RegisterRequest(
         string Email,
         string Password,
-        string CompanyName);
+        string? CompanyName,
+        bool RequestPmWorkspace = false);
 
     public sealed record LoginRequest(
         string Email,
@@ -49,11 +47,11 @@ public sealed class AuthController : ControllerBase
 
     public sealed record TokenResponse(
         string accessToken,
-        Guid activeWorkspaceId,
+        Guid? activeWorkspaceId,
         IReadOnlyList<object> workspaces);
 
     [HttpPost("register")]
-    public async Task<ActionResult<TokenResponse>> Register([FromBody] RegisterRequest request)
+    public async Task<ActionResult<object>> Register([FromBody] RegisterRequest request)
     {
         var email = request.Email.Trim();
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
@@ -64,13 +62,27 @@ public sealed class AuthController : ControllerBase
         var existing = await _userManager.FindByEmailAsync(email);
         if (existing is not null) return Conflict("Email already exists.");
 
+        var isPm = request.RequestPmWorkspace;
+        if (!isPm && !RegistrationEmailRules.IsGmailConsumerEmail(email))
+            return BadRequest("Tài khoản thường (API) chỉ chấp nhận email @gmail.com.");
+
+        if (isPm && string.IsNullOrWhiteSpace(request.CompanyName))
+            return BadRequest("CompanyName is required when RequestPmWorkspace is true.");
+
+        var display = string.IsNullOrWhiteSpace(request.CompanyName)
+            ? email.Split('@')[0]
+            : request.CompanyName.Trim();
+
         var user = new ApplicationUser
         {
             UserName = email,
             Email = email,
-            DisplayName = request.CompanyName,
+            DisplayName = display,
             IsPlatformAdmin = false,
-            EmailConfirmed = !requireEmailConfirmation
+            EmailConfirmed = !requireEmailConfirmation,
+            AccountStatus = isPm ? AccountStatus.PendingApproval : AccountStatus.Approved,
+            AwaitingPmWorkspaceApproval = isPm,
+            PendingWorkspaceName = isPm ? request.CompanyName?.Trim() : null
         };
 
         var createResult = await _userManager.CreateAsync(user, request.Password);
@@ -79,18 +91,17 @@ public sealed class AuthController : ControllerBase
             return BadRequest(createResult.Errors.Select(e => e.Description));
         }
 
-        var workspace = await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
-            userId: user.Id,
-            workspaceName: request.CompanyName,
-            cancellationToken: HttpContext.RequestAborted);
-
-        var token = _jwt.GenerateAccessToken(user, workspace.Id);
-        var workspaces = new[]
+        if (isPm)
         {
-            new { workspace.Id, workspace.Name }
-        }.Cast<object>().ToList();
+            return Accepted(new
+            {
+                message = "PM registration pending platform admin approval.",
+                userId = user.Id
+            });
+        }
 
-        return Ok(new TokenResponse(token, workspace.Id, workspaces));
+        var token = _jwt.GenerateAccessToken(user, null);
+        return Ok(new TokenResponse(token, null, Array.Empty<object>()));
     }
 
     [HttpPost("login")]
@@ -107,20 +118,21 @@ public sealed class AuthController : ControllerBase
         var passwordOk = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!passwordOk) return Unauthorized("Invalid credentials.");
 
+        if (user.AccountStatus != AccountStatus.Approved)
+            return Unauthorized("Account is not approved.");
+
         var workspaceIds = await _db.WorkspaceMembers
             .Where(m => m.UserId == user.Id)
             .Select(m => m.WorkspaceId)
             .Distinct()
             .ToListAsync();
 
-        if (workspaceIds.Count == 0) return Forbid("User has no workspace.");
-
         var workspaces = await _db.Workspaces
             .Where(w => workspaceIds.Contains(w.Id))
             .Select(w => new { w.Id, w.Name })
             .ToListAsync();
 
-        var activeWorkspaceId = workspaces[0].Id;
+        Guid? activeWorkspaceId = workspaces.Count > 0 ? workspaces[0].Id : null;
         var token = _jwt.GenerateAccessToken(user, activeWorkspaceId);
 
         return Ok(new TokenResponse(token, activeWorkspaceId, workspaces.Cast<object>().ToList()));

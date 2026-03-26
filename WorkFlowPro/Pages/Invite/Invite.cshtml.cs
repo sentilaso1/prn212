@@ -30,6 +30,9 @@ public sealed class InviteModel : PageModel
 
     public bool ShowSuccessToast => !string.IsNullOrWhiteSpace(InviteSuccessMessage);
 
+    public Guid? CurrentWorkspaceId =>
+        _currentWorkspaceService.CurrentWorkspaceId;
+
     public void OnGet()
     {
     }
@@ -70,8 +73,9 @@ public sealed class InviteModel : PageModel
         [Required]
         public WorkspaceMemberRole Role { get; set; } = WorkspaceMemberRole.Member;
 
+        [Required(ErrorMessage = "SubRole là bắt buộc.")]
         [StringLength(100)]
-        public string? SubRole { get; set; }
+        public string SubRole { get; set; } = default!;
     }
 }
 

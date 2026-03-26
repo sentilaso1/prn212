@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Data;
 
@@ -31,10 +32,20 @@ public sealed record UserNotificationItemVm(
 public sealed class UserNotificationService : IUserNotificationService
 {
     private readonly WorkFlowProDbContext _db;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public UserNotificationService(WorkFlowProDbContext db)
+    public UserNotificationService(WorkFlowProDbContext db, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    private string GetCurrentUserId()
+    {
+        var userId = _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new UnauthorizedAccessException("User not authenticated.");
+        return userId;
     }
 
     public async Task<IReadOnlyList<UserNotificationItemVm>> GetMyNotificationsAsync(
@@ -42,44 +53,74 @@ public sealed class UserNotificationService : IUserNotificationService
         int take,
         CancellationToken cancellationToken = default)
     {
-        if (take <= 0)
-            take = 50;
-        if (take > 200)
-            take = 200;
-        if (skip < 0)
-            skip = 0;
+        if (take <= 0) take = 50;
+        if (take > 200) take = 200;
+        if (skip < 0) skip = 0;
 
-        var list = await _db.UserNotifications
+        var userId = GetCurrentUserId();
+
+        var raw = await _db.UserNotifications
             .AsNoTracking()
+            .Where(n => n.UserId == userId)
             .OrderByDescending(n => n.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
+            .Select(n => new
+            {
+                n.Id,
+                n.Type,
+                n.Message,
+                n.IsRead,
+                n.RedirectUrl,
+                n.WorkspaceId,
+                n.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        var list = raw
             .Select(n => new UserNotificationItemVm(
                 n.Id,
                 n.Type,
                 n.Type.ToString(),
                 n.Message,
                 n.IsRead,
-                n.RedirectUrl,
+                FixRedirectUrl(n.RedirectUrl, n.WorkspaceId),
                 n.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return list;
     }
 
+    private static string? FixRedirectUrl(string? redirectUrl, Guid? workspaceId)
+    {
+        if (string.IsNullOrWhiteSpace(redirectUrl))
+            return redirectUrl;
+
+        if (workspaceId is null)
+            return redirectUrl;
+
+        if (redirectUrl.Contains("workspaceId=", StringComparison.OrdinalIgnoreCase))
+            return redirectUrl;
+
+        var joinChar = redirectUrl.Contains('?') ? "&" : "?";
+        return $"{redirectUrl}{joinChar}workspaceId={workspaceId.Value:D}";
+    }
+
     public async Task<int> GetUnreadCountAsync(CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
         return await _db.UserNotifications
             .AsNoTracking()
-            .CountAsync(n => !n.IsRead, cancellationToken);
+            .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
     }
 
     public async Task<bool> MarkAsReadAsync(
         Guid notificationId,
         CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
         var n = await _db.UserNotifications.FirstOrDefaultAsync(
-            x => x.Id == notificationId,
+            x => x.Id == notificationId && x.UserId == userId,
             cancellationToken);
         if (n is null)
             return false;
@@ -94,8 +135,9 @@ public sealed class UserNotificationService : IUserNotificationService
 
     public async Task<int> MarkAllAsReadAsync(CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
         var rows = await _db.UserNotifications
-            .Where(n => !n.IsRead)
+            .Where(n => n.UserId == userId && !n.IsRead)
             .ToListAsync(cancellationToken);
 
         foreach (var n in rows)
@@ -112,8 +154,9 @@ public sealed class UserNotificationService : IUserNotificationService
         Guid notificationId,
         CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
         var n = await _db.UserNotifications.FirstOrDefaultAsync(
-            x => x.Id == notificationId,
+            x => x.Id == notificationId && x.UserId == userId,
             cancellationToken);
         if (n is null)
             return false;

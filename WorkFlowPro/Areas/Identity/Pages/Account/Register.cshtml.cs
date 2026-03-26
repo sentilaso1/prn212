@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using WorkFlowPro.Auth;
+using WorkFlowPro.Data;
 using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Areas.Identity.Pages.Account;
@@ -15,22 +17,25 @@ public class RegisterModel : PageModel
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly IWorkspaceOnboardingService _workspaceOnboarding;
     private readonly IConfiguration _config;
     private readonly ILogger<RegisterModel> _logger;
+    private readonly WorkFlowProDbContext _db;
+    private readonly INotificationService _notifications;
 
     public RegisterModel(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        IWorkspaceOnboardingService workspaceOnboarding,
         IConfiguration config,
-        ILogger<RegisterModel> logger)
+        ILogger<RegisterModel> logger,
+        WorkFlowProDbContext db,
+        INotificationService notifications)
     {
         _userManager = userManager;
         _signInManager = signInManager;
-        _workspaceOnboarding = workspaceOnboarding;
         _config = config;
         _logger = logger;
+        _db = db;
+        _notifications = notifications;
     }
 
     [BindProperty]
@@ -41,6 +46,14 @@ public class RegisterModel : PageModel
         [Required]
         [EmailAddress]
         public string Email { get; set; } = default!;
+
+        /// <summary>0 = user thường (Gmail), 1 = PM — chờ Admin duyệt mới có đơn vị.</summary>
+        [Required]
+        public RegistrationAccountType AccountType { get; set; } = RegistrationAccountType.NormalUser;
+
+        /// <summary>Tên đơn vị / công ty — bắt buộc khi đăng ký PM.</summary>
+        [StringLength(200)]
+        public string? WorkspaceOrCompanyName { get; set; }
 
         [StringLength(100)]
         public string? FullName { get; set; }
@@ -55,8 +68,38 @@ public class RegisterModel : PageModel
         public string ConfirmPassword { get; set; } = default!;
     }
 
+    public IActionResult OnGet()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            TempData["RegisterBlockedMessage"] =
+                "Bạn đang đăng nhập. Đăng xuất trước hoặc dùng cửa sổ ẩn danh để đăng ký tài khoản mới.";
+            return RedirectToPage("/Workspaces/Index");
+        }
+
+        return Page();
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
+        if (Input.AccountType == RegistrationAccountType.RequestPmWorkspace)
+        {
+            if (string.IsNullOrWhiteSpace(Input.WorkspaceOrCompanyName))
+                ModelState.AddModelError(nameof(Input.WorkspaceOrCompanyName),
+                    "Nhập tên đơn vị (sẽ tạo sau khi Admin duyệt).");
+        }
+        else
+        {
+            Input.WorkspaceOrCompanyName = null;
+        }
+
+        if (Input.AccountType == RegistrationAccountType.NormalUser &&
+            !RegistrationEmailRules.IsGmailConsumerEmail(Input.Email))
+        {
+            ModelState.AddModelError(nameof(Input.Email),
+                "Tài khoản thường chỉ chấp nhận email @gmail.com.");
+        }
+
         if (!ModelState.IsValid)
             return Page();
 
@@ -69,59 +112,78 @@ public class RegisterModel : PageModel
             return Page();
         }
 
-        var fullName = string.IsNullOrWhiteSpace(Input.FullName)
+        var displayName = string.IsNullOrWhiteSpace(Input.FullName)
             ? email.Split('@')[0]
             : Input.FullName.Trim();
 
-        var workspaceName = $"Workspace của {fullName}";
-
         var requireEmailConfirmation = _config.GetValue<bool>("Auth:RequireEmailConfirmation");
 
-        // UC-01 yêu cầu auto SignIn sau đăng ký.
-        // Identity vẫn có option email-confirm, nhưng trong scope này ta ưu tiên UX sign-in ngay.
+        var isPmRequest = Input.AccountType == RegistrationAccountType.RequestPmWorkspace;
+        var pendingName = isPmRequest ? Input.WorkspaceOrCompanyName?.Trim() : null;
+
         var user = new ApplicationUser
         {
             UserName = email,
             Email = email,
-            DisplayName = fullName,
+            DisplayName = displayName,
             IsPlatformAdmin = false,
-            EmailConfirmed = true
+            EmailConfirmed = !requireEmailConfirmation,
+            AccountStatus = isPmRequest ? AccountStatus.PendingApproval : AccountStatus.Approved,
+            AwaitingPmWorkspaceApproval = isPmRequest,
+            PendingWorkspaceName = string.IsNullOrWhiteSpace(pendingName) ? null : pendingName
         };
 
         var createResult = await _userManager.CreateAsync(user, Input.Password);
         if (!createResult.Succeeded)
         {
             foreach (var error in createResult.Errors)
-            {
                 ModelState.AddModelError(string.Empty, error.Description);
-            }
-
             return Page();
         }
 
         if (requireEmailConfirmation)
         {
-            // TODO: Gửi email xác nhận (SendGrid/SMTP) + route ConfirmEmail.
-            // Hiện tại app cấu hình Auth:RequireEmailConfirmation=false theo appsettings.Development.
-            _logger.LogInformation("Email confirmation is enabled, but email sending is not implemented yet.");
+            _logger.LogInformation("Email confirmation enabled; SMTP chưa gắn.");
         }
 
         try
         {
-            var workspace = await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
-                userId: user.Id,
-                workspaceName: workspaceName,
-                cancellationToken: HttpContext.RequestAborted);
+            if (isPmRequest)
+            {
+                var adminIds = await _db.Users.AsNoTracking()
+                    .Where(u => u.IsPlatformAdmin)
+                    .Select(u => u.Id)
+                    .ToListAsync(HttpContext.RequestAborted);
 
+                foreach (var adminId in adminIds)
+                {
+                    await _notifications.CreateAndPushAsync(
+                        adminId,
+                        NotificationType.RegistrationPendingPm,
+                        $"Đăng ký PM mới: {email} — đơn vị dự kiến: \"{pendingName ?? "—"}\".",
+                        workspaceId: null,
+                        redirectUrl: "/Admin",
+                        cancellationToken: HttpContext.RequestAborted);
+                }
+
+                return RedirectToPage("./RegisterPending");
+            }
+
+            // User thường: không tạo đơn vị — đăng nhập ngay, vào trang chưa có đơn vị.
             await _signInManager.SignInAsync(user, isPersistent: false);
-            return LocalRedirect($"/Workspaces?workspaceId={workspace.Id}");
+            return LocalRedirect("/Workspaces");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to bootstrap workspace for newly registered user.");
-            ModelState.AddModelError(string.Empty, "Tạo Workspace tự động thất bại. Vui lòng thử lại.");
+            _logger.LogError(ex, "Register bootstrap failed for {Email}", email);
+            ModelState.AddModelError(string.Empty, "Đăng ký thất bại. Vui lòng thử lại.");
             return Page();
         }
     }
 }
 
+public enum RegistrationAccountType
+{
+    NormalUser = 0,
+    RequestPmWorkspace = 1
+}
