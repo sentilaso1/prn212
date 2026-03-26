@@ -19,6 +19,8 @@ public interface IInvitationService
 public sealed class InviteMembersResult
 {
     public required IReadOnlyList<string> Errors { get; init; }
+    public bool IsDryRun { get; init; }
+    public IReadOnlyList<string> DebugAcceptLinks { get; init; } = Array.Empty<string>();
 
     public bool Success => Errors.Count == 0;
 }

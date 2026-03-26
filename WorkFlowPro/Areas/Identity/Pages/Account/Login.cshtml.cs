@@ -117,7 +117,22 @@ public class LoginModel : PageModel
 
         if (signInResult.IsLockedOut)
         {
-            ModelState.AddModelError(string.Empty, "Your account is locked due to too many failed login attempts. Please try again later.");
+            // UC-02: Hiển thị rõ thời gian khóa theo cấu hình.
+            // Identity mặc định đang khóa 5 phút, nhưng để hiển thị đúng thực tế ta vẫn tính remaining khi có dữ liệu.
+            var refreshedUser = await _userManager.FindByEmailAsync(email);
+            var lockoutEndUtc = refreshedUser?.LockoutEnd;
+
+            var remaining = lockoutEndUtc.HasValue
+                ? lockoutEndUtc.Value - DateTime.UtcNow
+                : TimeSpan.FromMinutes(5);
+
+            if (remaining > TimeSpan.Zero)
+                ModelState.AddModelError(string.Empty,
+                    $"Tài khoản bị khóa 5 phút do nhập sai quá nhiều lần. Vui lòng thử lại sau {remaining.ToString(@"mm\:ss")}.");
+            else
+                ModelState.AddModelError(string.Empty,
+                    "Tài khoản bị khóa 5 phút do nhập sai quá nhiều lần. Vui lòng thử lại.");
+
             return Page();
         }
 

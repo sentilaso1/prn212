@@ -37,7 +37,8 @@ public sealed class AcceptInviteModel : PageModel
             return Page();
         }
 
-        return LocalRedirect($"/Projects?workspaceId={result.WorkspaceId}");
+        // Tránh chuyển sang trang PM-only khi user được mời có thể là Member.
+        return LocalRedirect($"/Workspaces?workspaceId={result.WorkspaceId}");
     }
 }
 

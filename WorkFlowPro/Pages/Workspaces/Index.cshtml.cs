@@ -39,16 +39,17 @@ public class IndexModel : PageModel
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return;
 
-        var list = await _db.WorkspaceMembers
+        var raw = await _db.WorkspaceMembers
             .Where(m => m.UserId == userId)
             .Join(
                 _db.Workspaces,
                 m => m.WorkspaceId,
                 w => w.Id,
-                (m, w) => new WorkspaceVm(w.Id, w.Name, m.Role))
+                (m, w) => new { w.Id, w.Name, m.Role })
             .OrderBy(x => x.Name)
             .ToListAsync(HttpContext.RequestAborted);
 
+        var list = raw.Select(x => new WorkspaceVm(x.Id, x.Name, x.Role)).ToList();
         Workspaces = list;
 
         var claimWorkspaceId =

@@ -151,7 +151,7 @@ public sealed class ProjectService : IProjectService
                 $"Project \"{project.Name}\" vừa được tạo trong workspace.",
                 workspaceId: workspaceId,
                 projectId: project.Id,
-                redirectUrl: $"/Projects/Details/{project.Id}",
+                redirectUrl: $"/Projects/Details/{project.Id}?workspaceId={workspaceId}",
                 cancellationToken: cancellationToken);
         }
 
@@ -238,7 +238,7 @@ public sealed class ProjectService : IProjectService
                 $"Project \"{project.Name}\" vừa được cập nhật.",
                 workspaceId: project.WorkspaceId,
                 projectId: project.Id,
-                redirectUrl: $"/Projects/Details/{project.Id}",
+                redirectUrl: $"/Projects/Details/{project.Id}?workspaceId={project.WorkspaceId}",
                 cancellationToken: cancellationToken);
         }
     }

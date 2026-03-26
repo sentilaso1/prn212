@@ -48,8 +48,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.SignIn.RequireConfirmedEmail =
         builder.Configuration.GetValue<bool>("Auth:RequireEmailConfirmation");
 
-    // UC-02 / SEC-03: 5 lần sai -> khóa 15 phút.
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    // UC-02 / SEC-03: 5 lần sai -> khóa 5 phút.
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
 })

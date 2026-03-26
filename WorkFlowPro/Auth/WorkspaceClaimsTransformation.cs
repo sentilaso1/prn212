@@ -33,7 +33,10 @@ public sealed class WorkspaceClaimsTransformation : IClaimsTransformation
 
         // UC-15: workspaceId ưu tiên từ query/sesion (đảm bảo bền vững qua nhiều request).
         Guid? workspaceIdFromQuery = null;
-        var query = http?.Request?.Query["workspaceId"].FirstOrDefault();
+        // Nếu URL có nhiều `workspaceId` (do redirect trước đó), phải lấy giá trị “mới nhất”
+        // để không bị đảo ngược thứ tự theo hướng chuyển workspace.
+        var queryValues = http?.Request?.Query["workspaceId"].ToArray();
+        var query = (queryValues is not null && queryValues.Length > 0) ? queryValues[^1] : null;
         if (!string.IsNullOrWhiteSpace(query) && Guid.TryParse(query, out var qid))
             workspaceIdFromQuery = qid;
 

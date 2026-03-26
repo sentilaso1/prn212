@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using WorkFlowPro.Auth;
+using Microsoft.EntityFrameworkCore;
+using WorkFlowPro.Data;
 using WorkFlowPro.Services;
+using WorkFlowPro.Auth;
 
 namespace WorkFlowPro.Areas.Identity.Pages.Account;
 
@@ -18,19 +20,25 @@ public class RegisterModel : PageModel
     private readonly IWorkspaceOnboardingService _workspaceOnboarding;
     private readonly IConfiguration _config;
     private readonly ILogger<RegisterModel> _logger;
+    private readonly WorkFlowProDbContext _db;
+    private readonly INotificationService _notifications;
 
     public RegisterModel(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IWorkspaceOnboardingService workspaceOnboarding,
         IConfiguration config,
-        ILogger<RegisterModel> logger)
+        ILogger<RegisterModel> logger,
+        WorkFlowProDbContext db,
+        INotificationService notifications)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _workspaceOnboarding = workspaceOnboarding;
         _config = config;
         _logger = logger;
+        _db = db;
+        _notifications = notifications;
     }
 
     [BindProperty]
@@ -108,6 +116,54 @@ public class RegisterModel : PageModel
 
         try
         {
+            // UC-03 extend: nếu email đang có lời mời chưa dùng, tạo notification cho user vừa đăng ký.
+            var emailNormalized = email.ToLowerInvariant();
+            var now = DateTime.UtcNow;
+
+            var activeInvites = await _db.WorkspaceInviteTokens
+                .AsNoTracking()
+                .Where(t => t.Email == emailNormalized &&
+                            t.UsedAtUtc == null &&
+                            t.ExpiresAtUtc > now &&
+                            t.AcceptUrl != null)
+                .Join(
+                    _db.Workspaces.AsNoTracking(),
+                    t => t.WorkspaceId,
+                    w => w.Id,
+                    (t, w) => new { t.AcceptUrl, t.Role, t.SubRole, WorkspaceName = w.Name })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            foreach (var inv in activeInvites)
+            {
+                // Tránh tạo trùng nếu user đăng ký và hệ thống đã tạo trước đó.
+                var alreadyNotified = await _db.UserNotifications
+                    .AsNoTracking()
+                    .AnyAsync(n =>
+                        n.UserId == user.Id &&
+                        n.Type == NotificationType.WorkspaceInvite &&
+                        n.RedirectUrl == inv.AcceptUrl,
+                        HttpContext.RequestAborted);
+
+                if (alreadyNotified)
+                    continue;
+
+                var roleLabel = inv.Role == WorkspaceMemberRole.PM ? "PM" : "Member";
+                var subRoleSuffix = string.IsNullOrWhiteSpace(inv.SubRole)
+                    ? string.Empty
+                    : $" (SubRole: {inv.SubRole})";
+
+                var notifMessage =
+                    $"Bạn được mời vào workspace \"{inv.WorkspaceName}\". Vai trò: {roleLabel}.{subRoleSuffix}";
+
+                await _notifications.CreateAndPushAsync(
+                    user.Id,
+                    NotificationType.WorkspaceInvite,
+                    notifMessage,
+                    workspaceId: null,
+                    redirectUrl: inv.AcceptUrl,
+                    cancellationToken: HttpContext.RequestAborted);
+            }
+
             var workspace = await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
                 userId: user.Id,
                 workspaceName: workspaceName,

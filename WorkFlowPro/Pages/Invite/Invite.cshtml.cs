@@ -30,6 +30,9 @@ public sealed class InviteModel : PageModel
 
     public bool ShowSuccessToast => !string.IsNullOrWhiteSpace(InviteSuccessMessage);
 
+    public Guid? CurrentWorkspaceId =>
+        _currentWorkspaceService.CurrentWorkspaceId;
+
     public void OnGet()
     {
     }

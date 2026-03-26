@@ -3,24 +3,29 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
-using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Pages.Projects;
 
-[Authorize(Policy = "IsPM")]
+[Authorize]
 public sealed class DetailsModel : PageModel
 {
-    private readonly IProjectService _projectService;
+    private readonly WorkFlowProDbContext _db;
+    private readonly ICurrentWorkspaceService _currentWorkspaceService;
 
-    public DetailsModel(IProjectService projectService)
+    public DetailsModel(
+        WorkFlowProDbContext db,
+        ICurrentWorkspaceService currentWorkspaceService)
     {
-        _projectService = projectService;
+        _db = db;
+        _currentWorkspaceService = currentWorkspaceService;
     }
 
     public Project? Project { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public bool CanManage { get; private set; }
 
     public async Task OnGetAsync([FromRoute] Guid projectId, CancellationToken cancellationToken)
     {
@@ -28,22 +33,38 @@ public sealed class DetailsModel : PageModel
         if (string.IsNullOrWhiteSpace(userId))
             return;
 
-        try
+        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
+        if (workspaceId is null)
         {
-            Project = await _projectService.GetForPmAsync(userId, projectId, cancellationToken);
+            ErrorMessage = "Workspace không hợp lệ.";
+            return;
         }
-        catch (UnauthorizedAccessException)
+
+        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.UserId == userId &&
+            m.WorkspaceId == workspaceId.Value,
+            cancellationToken);
+
+        if (!isMember)
         {
             Forbid();
         }
-        catch (KeyNotFoundException)
+
+        Project = await _db.Projects.FirstOrDefaultAsync(p =>
+            p.Id == projectId &&
+            p.WorkspaceId == workspaceId.Value,
+            cancellationToken);
+
+        if (Project is null)
         {
-            ErrorMessage = "Project not found.";
+            ErrorMessage = "Project không tồn tại trong workspace hiện tại.";
+            return;
         }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-        }
+
+        CanManage = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.UserId == userId &&
+            m.WorkspaceId == workspaceId.Value &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
     }
 }
-

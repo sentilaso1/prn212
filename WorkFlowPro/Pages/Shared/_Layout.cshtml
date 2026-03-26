@@ -26,13 +26,27 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
                     </ul>
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <ul class="navbar-nav align-items-sm-center">
+                    <ul class="navbar-nav align-items-sm-center gap-1">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
                             <partial name="_NotificationBell" />
-                        </ul>
-                    }
-                    @await Component.InvokeAsync("WorkspaceSwitcher")
+                            @await Component.InvokeAsync("WorkspaceSwitcher")
+                            <li class="nav-item">
+                                <form class="d-inline" asp-area="Identity" asp-page="/Account/Logout" method="post">
+                                    <button type="submit" class="btn btn-link nav-link text-dark py-0 px-2">Đăng xuất</button>
+                                </form>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/Identity/Account/Login">Đăng nhập</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-primary fw-semibold" href="/Identity/Account/Register">Đăng ký</a>
+                            </li>
+                        }
+                    </ul>
                 </div>
             </div>
         </nav>
@@ -63,5 +77,28 @@
     }
 
     @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+    // Fix workspace switch: always redirect to /Workspaces after switching
+    // to avoid AccessDenied when leaving PM-only pages as Member.
+    (function(){
+        var form = document.querySelector('form[action="/Workspaces/Switch"]');
+        if (!form) return;
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var sel = form.querySelector('select[name="workspaceId"]');
+            if (!sel || !sel.value) return;
+            window.location.href = '/Workspaces/Switch?workspaceId=' + sel.value + '&returnUrl=%2FWorkspaces';
+        });
+        var sel = form.querySelector('select[name="workspaceId"]');
+        if (sel) {
+            sel.removeAttribute('onchange');
+            sel.addEventListener('change', function() {
+                if (!this.value) return;
+                window.location.href = '/Workspaces/Switch?workspaceId=' + this.value + '&returnUrl=%2FWorkspaces';
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

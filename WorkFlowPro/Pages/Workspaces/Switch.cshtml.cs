@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using WorkFlowPro.Services;
 
@@ -47,13 +48,22 @@ public sealed class SwitchModel : PageModel
             ? "/Workspaces"
             : returnUrl;
 
-        // Always store workspaceId in querystring so claims transformation cập nhật session/claims.
-        var redirectUrl = QueryHelpers.AddQueryString(
-            target,
-            "workspaceId",
-            workspaceId.ToString("D"));
+        // Strip ALL existing workspaceId from target to prevent accumulation,
+        // then append exactly one workspaceId.
+        var queryIndex = target.IndexOf('?');
+        var path = queryIndex >= 0 ? target[..queryIndex] : target;
+        var queryPart = queryIndex >= 0 ? target[(queryIndex + 1)..] : string.Empty;
+
+        var cleanQuery = string.IsNullOrWhiteSpace(queryPart)
+            ? new List<KeyValuePair<string, string?>>()
+            : QueryHelpers.ParseQuery(queryPart)
+                .Where(kvp => !string.Equals(kvp.Key, "workspaceId", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(kvp => kvp.Value.Select(v => new KeyValuePair<string, string?>(kvp.Key, v)))
+                .ToList();
+
+        cleanQuery.Add(new KeyValuePair<string, string?>("workspaceId", workspaceId.ToString("D")));
+        var redirectUrl = path + QueryString.Create(cleanQuery);
 
         return LocalRedirect(redirectUrl);
     }
 }
-

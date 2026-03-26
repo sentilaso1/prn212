@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using WorkFlowPro.Auth;
 using WorkFlowPro.Services;
 using WorkFlowPro.ViewModels;
@@ -35,7 +37,13 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
         var active = items.FirstOrDefault(x => x.Id == activeId) ?? items[0];
         activeId = active.Id;
 
-        var returnUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+        // Remove workspaceId from returnUrl to prevent duplicated/incorrect workspace switches.
+        var filteredQuery = HttpContext.Request.Query
+            .Where(q => !string.Equals(q.Key, "workspaceId", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string?>(q.Key, v)));
+
+        var queryString = QueryString.Create(filteredQuery);
+        var returnUrl = HttpContext.Request.Path + queryString;
 
         var vm = new WorkspaceSwitcherVm
         {

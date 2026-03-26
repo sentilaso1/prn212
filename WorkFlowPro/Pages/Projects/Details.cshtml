@@ -50,10 +50,19 @@
                 <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("yyyy-MM-dd")</dd>
             </dl>
 
-            <div class="d-flex gap-2 mt-3">
-                <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
-                <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
-            </div>
+            @if (Model.CanManage)
+            {
+                <div class="d-flex gap-2 mt-3">
+                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
+                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info mt-3" role="alert">
+                    Bạn đang có quyền xem dự án (read-only). Chỉ PM mới có quyền Settings/Delete.
+                </div>
+            }
         </div>
     </div>
 }

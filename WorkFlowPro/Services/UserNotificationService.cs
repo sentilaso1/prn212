@@ -49,22 +49,55 @@ public sealed class UserNotificationService : IUserNotificationService
         if (skip < 0)
             skip = 0;
 
-        var list = await _db.UserNotifications
+        var raw = await _db.UserNotifications
             .AsNoTracking()
             .OrderByDescending(n => n.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
+            .Select(n => new
+            {
+                n.Id,
+                n.Type,
+                n.Message,
+                n.IsRead,
+                n.RedirectUrl,
+                n.WorkspaceId,
+                n.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        var list = raw
             .Select(n => new UserNotificationItemVm(
                 n.Id,
                 n.Type,
                 n.Type.ToString(),
                 n.Message,
                 n.IsRead,
-                n.RedirectUrl,
+                FixRedirectUrl(n.RedirectUrl, n.WorkspaceId),
                 n.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return list;
+    }
+
+    private static string? FixRedirectUrl(string? redirectUrl, Guid? workspaceId)
+    {
+        if (string.IsNullOrWhiteSpace(redirectUrl))
+            return redirectUrl;
+
+        if (workspaceId is null)
+            return redirectUrl;
+
+        // Chỉ sửa các link chi tiết dự án; còn lại giữ nguyên.
+        if (!redirectUrl.StartsWith("/Projects/Details/", StringComparison.OrdinalIgnoreCase))
+            return redirectUrl;
+
+        // Nếu đã có workspaceId thì không đụng thêm.
+        if (redirectUrl.Contains("workspaceId=", StringComparison.OrdinalIgnoreCase))
+            return redirectUrl;
+
+        var joinChar = redirectUrl.Contains('?') ? "&" : "?";
+        return $"{redirectUrl}{joinChar}workspaceId={workspaceId.Value:D}";
     }
 
     public async Task<int> GetUnreadCountAsync(CancellationToken cancellationToken = default)

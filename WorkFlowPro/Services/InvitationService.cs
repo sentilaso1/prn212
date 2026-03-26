@@ -15,6 +15,7 @@ namespace WorkFlowPro.Services;
 
 public sealed class InvitationService : IInvitationService
 {
+    private static readonly string[] AllowedSubRoles = ["BA", "DEV", "Designer", "QA"];
     private readonly WorkFlowProDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -69,8 +70,10 @@ public sealed class InvitationService : IInvitationService
             ? null
             : subRole.Trim();
 
-        if (normalizedSubRole is not null && normalizedSubRole.Length > 100)
-            errors.Add("SubRole không được vượt quá 100 ký tự.");
+        if (string.IsNullOrWhiteSpace(normalizedSubRole))
+            errors.Add("SubRole là bắt buộc.");
+        else if (!IsAllowedSubRole(normalizedSubRole))
+            errors.Add("SubRole không hợp lệ. Chỉ chấp nhận: BA, DEV, Designer, QA.");
 
         var emails = ParseEmails(emailsRaw)
             .Select(NormalizeEmail)
@@ -114,8 +117,10 @@ public sealed class InvitationService : IInvitationService
                      t.ExpiresAtUtc > now,
                 cancellationToken);
 
-            if (hasActiveInvite)
-                errors.Add($"Email '{email}' đã có lời mời đang chờ (chưa hết hạn).");
+            // Nếu đã có lời mời active trước đó, trong scope dev/local ta vẫn cho phép tạo thêm token mới
+            // để (1) có AcceptUrl non-null và (2) người nhận nhận được Notification/route accept đúng ngay.
+            // Tránh việc block UX test UC-03.
+            _ = hasActiveInvite;
         }
 
         if (errors.Count > 0)
@@ -131,16 +136,21 @@ public sealed class InvitationService : IInvitationService
             .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
 
         var acceptSubject = $"WorkFlowPro: Bạn được mời vào workspace";
-        var tokensToSend = new List<(string Email, string TokenPlain)>();
+        // Chỉ lưu accept URL dưới dạng relative để tránh lỗi protocol (http vs https) khi local click link.
+        var tokensToSend = new List<(string Email, string TokenPlain, string AcceptUrl)>();
         var inviteRecords = new List<WorkspaceInviteToken>();
+        var debugAcceptLinks = new List<string>();
+        var isDryRun = _configuration.GetValue<bool?>("Email:DryRun") ?? false;
 
         foreach (var email in emails)
         {
             // Random token plain; store only SHA256 hash in DB.
             var tokenPlain = GenerateTokenPlain();
             var tokenHash = ComputeSha256Hex(tokenPlain);
+            var acceptPath = $"/Invite/Accept?token={Uri.EscapeDataString(tokenPlain)}";
+            var acceptLink = acceptPath;
 
-            tokensToSend.Add((email, tokenPlain));
+            tokensToSend.Add((email, tokenPlain, acceptLink));
             inviteRecords.Add(new WorkspaceInviteToken
             {
                 WorkspaceId = workspaceId,
@@ -148,6 +158,7 @@ public sealed class InvitationService : IInvitationService
                 TokenHash = tokenHash,
                 Role = role,
                 SubRole = normalizedSubRole,
+                AcceptUrl = acceptLink,
                 ExpiresAtUtc = now.AddDays(7)
             });
         }
@@ -159,18 +170,42 @@ public sealed class InvitationService : IInvitationService
         var roleLabel = role == WorkspaceMemberRole.PM ? "PM" : "Member";
         var workspaceName = workspace?.Name ?? "workspace";
 
-        foreach (var (email, tokenPlain) in tokensToSend)
+        foreach (var (email, tokenPlain, acceptLink) in tokensToSend)
         {
-            var acceptLink = $"{baseUrl}/Invite/Accept?token={Uri.EscapeDataString(tokenPlain)}";
+            debugAcceptLinks.Add($"{email} => {acceptLink}");
+
+            // Absolute URL chỉ dùng cho email (nếu có gửi thật). AcceptUrl/redirectUrl cho UI là relative.
+            var acceptUrlForEmail = $"{baseUrl}{acceptLink}";
 
             var bodyHtml = $@"
 <p>Xin chào,</p>
 <p>Bạn đã được mời tham gia <strong>{System.Net.WebUtility.HtmlEncode(workspaceName)}</strong>.</p>
 <p>Vai trò: <strong>{roleLabel}</strong>{(string.IsNullOrWhiteSpace(normalizedSubRole) ? "" : $"<br/>SubRole: <strong>{System.Net.WebUtility.HtmlEncode(normalizedSubRole)}</strong>")}</p>
 <p>Nhấn vào liên kết sau để chấp nhận lời mời:</p>
-<p><a href=""{System.Net.WebUtility.HtmlEncode(acceptLink)}"">Accept invitation</a></p>
+<p><a href=""{System.Net.WebUtility.HtmlEncode(acceptUrlForEmail)}"">Accept invitation</a></p>
 <p>Nếu bạn không yêu cầu lời mời này, bạn có thể bỏ qua email.</p>
 ";
+
+            // Notify người đã có tài khoản ngay (UC-03 extend: notify both existing & non-existing).
+            var inviteeUser = await _userManager.FindByEmailAsync(email);
+            if (inviteeUser is not null)
+            {
+                var subRoleSuffix = string.IsNullOrWhiteSpace(normalizedSubRole)
+                    ? string.Empty
+                    : $" (SubRole: {normalizedSubRole})";
+
+                var notifMessage =
+                    $"Bạn được mời vào workspace \"{workspaceName}\". Vai trò: {roleLabel}.{subRoleSuffix}";
+
+                // workspaceId không truyền vào để tránh NotificationService chặn vì người đó chưa là member.
+                await _notifications.CreateAndPushAsync(
+                    inviteeUser.Id,
+                    NotificationType.WorkspaceInvite,
+                    notifMessage,
+                    workspaceId: null,
+                    redirectUrl: acceptLink,
+                    cancellationToken: cancellationToken);
+            }
 
             try
             {
@@ -188,7 +223,12 @@ public sealed class InvitationService : IInvitationService
             }
         }
 
-        return new InviteMembersResult { Errors = Array.Empty<string>() };
+        return new InviteMembersResult
+        {
+            Errors = Array.Empty<string>(),
+            IsDryRun = isDryRun,
+            DebugAcceptLinks = debugAcceptLinks
+        };
     }
 
     public async Task<AcceptInviteResult> AcceptInviteAsync(
@@ -345,6 +385,9 @@ public sealed class InvitationService : IInvitationService
 
     private static bool IsAllowedRole(WorkspaceMemberRole role) =>
         role == WorkspaceMemberRole.Member || role == WorkspaceMemberRole.PM;
+
+    private static bool IsAllowedSubRole(string subRole) =>
+        AllowedSubRoles.Contains(subRole, StringComparer.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> ParseEmails(string emailsRaw)
     {

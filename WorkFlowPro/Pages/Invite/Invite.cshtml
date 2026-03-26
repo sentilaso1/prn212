@@ -35,7 +35,10 @@
     </div>
 
     <button type="submit" class="btn btn-primary">Send invites</button>
-    <a class="btn btn-outline-secondary" href="/Projects">Cancel</a>
+    <a class="btn btn-outline-secondary"
+       href="/Projects@(Model.CurrentWorkspaceId is null ? string.Empty : $"?workspaceId={Model.CurrentWorkspaceId.Value.ToString("D")}")">
+        Cancel
+    </a>
 </form>
 
 @if (Model.ShowSuccessToast)
