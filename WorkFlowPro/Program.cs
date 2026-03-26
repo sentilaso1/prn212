@@ -62,8 +62,8 @@ var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtS
 builder.Services
     .AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = IdentityConstants.ApplicationScheme;
+        options.DefaultChallengeScheme = IdentityConstants.ApplicationScheme;
     })
     .AddJwtBearer(options =>
     {
@@ -103,9 +103,15 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    // Global authorization (Razor Pages): yêu cầu authenticated đa scheme.
-    // - Razor Pages dùng cookie Identity
+    // FallbackPolicy: chỉ cookie → unauthenticated request redirect về /Login (302).
+    // Không thêm JWT ở đây để tránh JWT challenge ghi đè redirect thành 401.
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddAuthenticationSchemes(IdentityConstants.ApplicationScheme)
+        .Build();
+
+    // DefaultPolicy ([Authorize] không có args): accept cả cookie lẫn JWT Bearer.
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .AddAuthenticationSchemes(
             IdentityConstants.ApplicationScheme,
