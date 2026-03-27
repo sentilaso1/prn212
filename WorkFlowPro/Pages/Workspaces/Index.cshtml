@@ -38,56 +38,41 @@ else
         Đơn vị đang chọn: <strong>@(Model.ActiveWorkspaceId?.ToString() ?? "-")</strong>
     </p>
 
-    @if (Model.ActiveWorkspaceId is { } activeWs)
-    {
-        <div class="card border-primary border-opacity-25 mb-3">
-            <div class="card-body py-3">
-                <h2 class="h6 card-title mb-2">Tiếp theo — task &amp; Kanban (UC-07)</h2>
-                <p class="small text-muted mb-2">
-                    UC-07 không nằm trên trang Đơn vị: bảng Kanban và cập nhật task realtime nằm ở màn <strong>theo từng dự án</strong>.
-                </p>
-                <ul class="small mb-0">
-                    <li>
-                        <a href="/tasks?workspaceId=@activeWs.ToString("D")"><strong>Chọn dự án → danh sách task</strong></a>
-                        — sau đó mở <strong>Kanban Board</strong> trên trang đó (route <code>/board?projectId=…</code>).
-                    </li>
-                    <li>
-                        Hoặc dùng menu <strong>Danh sách task</strong> trên thanh trên, rồi chọn dự án.
-                    </li>
-                    @if (Model.ActiveWorkspaceRole == WorkFlowPro.Data.WorkspaceMemberRole.PM)
-                    {
-                        <li class="mt-1">
-                            <a href="/Projects?workspaceId=@activeWs.ToString("D")">Quản lý dự án (UC-12)</a>
-                            ·
-                            <a href="/Reports/Dashboard?workspaceId=@activeWs.ToString("D")">Báo cáo KPI (UC-13)</a>
-                        </li>
-                    }
-                </ul>
-            </div>
-        </div>
-    }
-
     <table class="table table-striped">
         <thead>
-        <tr>
-            <th>Tên đơn vị</th>
-            <th>Vai trò</th>
-            <th style="width:1%; white-space:nowrap;">Id</th>
-        </tr>
+            <tr>
+                <th>Tên đơn vị</th>
+                <th>Vai trò</th>
+                <th style="min-width: 160px;">Quản lý dự án</th>
+                <th style="width:1%; white-space:nowrap;">Id</th>
+            </tr>
         </thead>
         <tbody>
-        @foreach (var w in Model.Workspaces)
-        {
-            <tr>
-                <td>
-                    <a href="/Workspaces/Switch?workspaceId=@w.Id&returnUrl=@Uri.EscapeDataString("/Workspaces")">@w.Name</a>
-                    @(w.Id == Model.ActiveWorkspaceId ? " (đang chọn)" : "")
-                </td>
-                <td>@w.Role</td>
-                <td class="small">@w.Id</td>
-            </tr>
-        }
+            @foreach (var w in Model.Workspaces)
+            {
+                <tr>
+                    <td>
+                        <a href="/Workspaces/Switch?workspaceId=@w.Id&returnUrl=@Uri.EscapeDataString("/Workspaces")">@w.Name</a>
+                        @(w.Id == Model.ActiveWorkspaceId ? " (đang chọn)" : "")
+                    </td>
+                    <td class="align-middle">@w.Role</td>
+                    <td class="align-middle">
+                        @if (w.IsWorkspacePm)
+                        {
+                            <a class="btn btn-sm btn-primary"
+                               href="/Projects?workspaceId=@w.Id.ToString("D")"
+                               title="Danh sách dự án — tạo task theo dự án (UC-04 / UC-12)">
+                                Quản lý dự án
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td class="small">@w.Id</td>
+                </tr>
+            }
         </tbody>
     </table>
 }
-

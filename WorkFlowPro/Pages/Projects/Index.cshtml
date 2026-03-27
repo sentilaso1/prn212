@@ -27,49 +27,84 @@
 
 @if (Model.Projects.Count == 0)
 {
-    <div class="alert alert-info">Chưa có dự án trong workspace hiện tại.</div>
+    <div class="alert alert-info py-4 text-center">
+        <p class="mb-0">Chưa có dự án nào trong workspace hiện tại.</p>
+        @if (Model.IsPm)
+        {
+            <a href="/Projects/Create@(wsQ)" class="btn btn-primary mt-3">
+                Tạo dự án đầu tiên
+            </a>
+        }
+    </div>
 }
 else
 {
-    <table class="table table-striped">
-        <thead>
-        <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Color</th>
-            <th>Created</th>
-            <th style="width: 300px;">Actions</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var p in Model.Projects)
-        {
-            <tr>
-                <td>@p.Name</td>
-                <td>
-                    @if (p.Status == WorkFlowPro.Data.ProjectStatus.Archived)
-                    {
-                        <span class="badge bg-secondary">Archived</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-success">Active</span>
-                    }
-                </td>
-                <td>@p.Color</td>
-                <td>@p.CreatedAtUtc.ToString("yyyy-MM-dd")</td>
-                <td class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-sm btn-outline-secondary" href="/Projects/Details/@(p.Id)@(wsQ)">Details</a>
-                    <a class="btn btn-sm btn-primary" href="/board?projectId=@(p.Id)@(wsAmp)">Board</a>
-                    <a class="btn btn-sm btn-outline-info" href="/tasks/list?projectId=@(p.Id)@(wsAmp)">Tasks</a>
-                    @if (Model.IsPm)
-                    {
-                        <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@(p.Id)@(wsQ)">Settings</a>
-                        <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@(p.Id)@(wsQ)">Delete</a>
-                    }
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Tên dự án</th>
+                    <th>Trạng thái</th>
+                    <th>Màu</th>
+                    <th>Ngày tạo</th>
+                    <th class="text-end" style="width: 320px;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Projects)
+                {
+                    <tr>
+                        <td class="fw-medium">@p.Name</td>
+                        <td>
+                            @if (p.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                            {
+                                <span class="badge bg-secondary">Đã lưu trữ</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">Đang hoạt động</span>
+                            }
+                        </td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(p.Color))
+                            {
+                                <span class="badge" style="background-color: @p.Color; color: white;">
+                                    @p.Color
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td class="text-muted">@p.CreatedAtUtc.ToString("dd/MM/yyyy")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a class="btn btn-outline-secondary"
+                                   href="/Projects/Details/@(p.Id)@(wsQ)">Chi tiết</a>
+
+                                <a class="btn btn-primary"
+                                   href="/board?projectId=@(p.Id)@(wsAmp)">Board</a>
+
+                                <a class="btn btn-outline-info"
+                                   href="/tasks/list?projectId=@(p.Id)@(wsAmp)">Tasks</a>
+
+                                @if (Model.IsPm)
+                                {
+                                    <a class="btn btn-outline-primary"
+                                       href="/Projects/Settings/@(p.Id)@(wsQ)">Cài đặt</a>
+
+                                    <a class="btn btn-outline-danger"
+                                       href="/Projects/Delete/@(p.Id)@(wsQ)"
+                                       onclick="return confirm('Bạn có chắc muốn xóa dự án này?');">
+                                        Xóa
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
