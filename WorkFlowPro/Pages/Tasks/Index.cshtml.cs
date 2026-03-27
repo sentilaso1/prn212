@@ -8,7 +8,6 @@ using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Pages.Tasks;
 
-/// <summary>Trung tâm vào UC task: chọn dự án rồi mở /tasks/list (cần projectId).</summary>
 [Authorize]
 public sealed class IndexModel : PageModel
 {

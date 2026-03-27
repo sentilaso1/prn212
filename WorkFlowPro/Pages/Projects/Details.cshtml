@@ -2,85 +2,123 @@
 @model WorkFlowPro.Pages.Projects.DetailsModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Project details";
+    ViewData["Title"] = "Chi tiết dự án";
+
     var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
     var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<h1>Project Details</h1>
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 fw-semibold mb-1">Chi tiết dự án</h1>
+        @if (Model.Project is not null)
+        {
+            <p class="text-muted mb-0">@Model.Project.Name</p>
+        }
+    </div>
+    
+    @if (Model.CanManage)
+    {
+        <div class="btn-group">
+            <a class="btn btn-outline-primary btn-sm" href="/Projects/Settings/@(Model.Project?.Id)@wsQ">
+                Cài đặt
+            </a>
+            <a class="btn btn-outline-danger btn-sm"
+                   href="/Projects/Delete/@(Model.Project?.Id)@wsQ"
+                   onclick="return confirm('Bạn có chắc muốn xóa dự án này không?');">
+                Xóa dự án
+            </a>
+        </div>
+    }
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
-    <div class="alert alert-warning">@Model.ErrorMessage</div>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 @if (Model.Project is not null)
 {
-    <div class="card">
+    <div class="card shadow-sm">
         <div class="card-body">
-            <div class="d-flex justify-content-between">
+            <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <h4 class="card-title">@Model.Project.Name</h4>
+                    <h4 class="card-title mb-2">@Model.Project.Name</h4>
                     @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
                     {
-                        <span class="badge bg-secondary">Archived</span>
+                        <span class="badge bg-secondary">Đã lưu trữ</span>
                     }
                     else
                     {
-                        <span class="badge bg-success">Active</span>
+                        <span class="badge bg-success">Đang hoạt động</span>
                     }
                 </div>
-                <div>
-                    <span class="badge bg-light text-dark border" style="background:@(Model.Project.Color ?? "#FFFFFF") !important; border-color:#ddd;">
-                        Color: @Model.Project.Color
-                    </span>
-                </div>
-            </div>
 
-            <dl class="row mt-3">
-                <dt class="col-sm-3">Description</dt>
-                <dd class="col-sm-9">@Model.Project.Description</dd>
-
-                <dt class="col-sm-3">Start</dt>
-                <dd class="col-sm-9">@Model.Project.StartDateUtc?.ToString("yyyy-MM-dd")</dd>
-
-                <dt class="col-sm-3">End</dt>
-                <dd class="col-sm-9">@Model.Project.EndDateUtc?.ToString("yyyy-MM-dd")</dd>
-
-                <dt class="col-sm-3">Created</dt>
-                <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("yyyy-MM-dd")</dd>
-            </dl>
-
-            <hr />
-            <h5>Task Management</h5>
-            <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary" href="/board?projectId=@(Model.Project.Id)@(wsAmp)">
-                    Kanban Board
-                </a>
-                <a class="btn btn-outline-primary" href="/tasks/list?projectId=@(Model.Project.Id)@(wsAmp)">
-                    Task List
-                </a>
-                @if (Model.CanManage)
+                @if (!string.IsNullOrEmpty(Model.Project.Color))
                 {
-                    <a class="btn btn-success" href="/Tasks/Create?projectId=@(Model.Project.Id)@(wsAmp)">
-                        + Tạo Task
-                    </a>
+                    <span class="badge px-3 py-2"
+                          style="background-color: @Model.Project.Color; color: white; font-size: 0.95rem;">
+                        Màu: @Model.Project.Color
+                    </span>
                 }
             </div>
 
             <hr />
-            @if (Model.CanManage)
+
+            <dl class="row">
+                <dt class="col-sm-3 fw-normal text-muted">Mô tả</dt>
+                <dd class="col-sm-9">
+                    @if (string.IsNullOrWhiteSpace(Model.Project.Description))
+                    {
+                        <span class="text-muted fst-italic">Chưa có mô tả</span>
+                    }
+                    else
+                    {
+                        @Model.Project.Description
+                    }
+                </dd>
+
+                <dt class="col-sm-3 fw-normal text-muted">Ngày bắt đầu</dt>
+                <dd class="col-sm-9">
+                    @(Model.Project.StartDateUtc?.ToString("dd/MM/yyyy") ?? "—")
+                </dd>
+
+                <dt class="col-sm-3 fw-normal text-muted">Ngày kết thúc</dt>
+                <dd class="col-sm-9">
+                    @(Model.Project.EndDateUtc?.ToString("dd/MM/yyyy") ?? "—")
+                </dd>
+
+                <dt class="col-sm-3 fw-normal text-muted">Ngày tạo</dt>
+                <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("dd/MM/yyyy")</dd>
+            </dl>
+
+            <hr />
+
+            <h5 class="mb-3">Quản lý công việc</h5>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary" href="/board?projectId=@(Model.Project.Id)@wsAmp">
+                    Mở Kanban Board
+                </a>
+                <a class="btn btn-outline-primary" href="/tasks/list?projectId=@(Model.Project.Id)@wsAmp">
+                    Danh sách Task
+                </a>
+                
+                @if (Model.CanManage)
+                {
+                    <a class="btn btn-success" href="/Tasks/Create?projectId=@(Model.Project.Id)@wsAmp">
+                        + Tạo task mới
+                    </a>
+                }
+            </div>
+
+            @if (!Model.CanManage)
             {
-                <div class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@(Model.Project.Id)@(wsQ)">Settings</a>
-                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@(Model.Project.Id)@(wsQ)">Delete</a>
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-info mt-3" role="alert">
-                    Bạn đang có quyền xem dự án (read-only). Chỉ PM mới có quyền Settings/Delete.
+                <div class="alert alert-info mt-4 mb-0">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    Bạn đang xem ở chế độ chỉ đọc. Chỉ người quản lý dự án (PM) mới có quyền chỉnh sửa hoặc xóa dự án.
                 </div>
             }
         </div>

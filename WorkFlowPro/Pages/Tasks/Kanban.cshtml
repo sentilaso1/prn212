@@ -6,40 +6,52 @@
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<h1>Kanban Board</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-semibold mb-1">Kanban Board</h1>
+        <div class="text-muted">
+            Dự án: <strong>@Model.ProjectName</strong>
+        </div>
+    </div>
+    
+    <div class="small">
+        <a href="/tasks/list?projectId=@(Model.ProjectId)@(Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")"
+               class="text-decoration-none">
+            → Xem danh sách task
+        </a>
+    </div>
+</div>
 
 @if (Model.ErrorMessage is not null)
 {
-    <div class="alert alert-warning">@Model.ErrorMessage</div>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <div class="text-muted">Project</div>
-            <div><strong>@Model.ProjectName</strong></div>
-            <div class="small mt-1">
-                <a href="/tasks/list?projectId=@(Model.ProjectId)@(Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")">Task List</a>
-            </div>
-        </div>
-        <div class="text-muted small">
-            PM xem mọi task; Member chỉ task được giao (Pending/Accepted). Kéo thả trên cột workflow.
-        </div>
-    </div>
-
     <partial name="_TaskFilters" model="Model.Filters" />
 
-    <div class="row mb-2">
-        <div class="col-md-4">
-            <input id="wfSearch" class="form-control form-control-sm" type="text" placeholder="Tìm nhanh theo tiêu đề (client)..." />
+    <!-- Ô tìm kiếm nhanh -->
+    <div class="row mb-3">
+        <div class="col-md-5 col-lg-4">
+            <input id="wfSearch"
+                   class="form-control"
+                   type="text"
+                   placeholder="Tìm nhanh theo tiêu đề task..." />
         </div>
     </div>
 
-    <div class="kanban-board d-flex flex-wrap gap-3" id="kanbanBoard">
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Unassigned">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>Unassigned</strong></div>
-                <span class="text-muted" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
+    <!-- Kanban Board -->
+    <div class="kanban-board d-flex flex-nowrap gap-3 overflow-auto pb-3" id="kanbanBoard"
+         style="min-height: 500px;">
+        
+        <!-- Unassigned -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Unassigned">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold">Chưa phân công</h6>
+                <span class="badge bg-secondary" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
             </div>
             <div class="kanban-stack wf-kanban-stack" id="wf-stack-unassigned">
                 @foreach (var t in Model.Board.Unassigned)
@@ -49,10 +61,11 @@ else
             </div>
         </div>
 
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Pending">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>Pending</strong></div>
-                <span class="text-muted" id="wf-count-pending">@Model.Board.Pending.Count</span>
+        <!-- Pending -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Pending">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold">Đang chờ</h6>
+                <span class="badge bg-secondary" id="wf-count-pending">@Model.Board.Pending.Count</span>
             </div>
             <div class="kanban-stack wf-kanban-stack" id="wf-stack-pending">
                 @foreach (var t in Model.Board.Pending)
@@ -62,10 +75,11 @@ else
             </div>
         </div>
 
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="ToDo" id="col-ToDo">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>To Do</strong></div>
-                <span class="text-muted" id="wf-count-todo">@Model.Board.ToDo.Count</span>
+        <!-- To Do -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="ToDo" id="col-ToDo">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold text-primary">To Do</h6>
+                <span class="badge bg-secondary" id="wf-count-todo">@Model.Board.ToDo.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="ToDo" id="wf-drop-todo">
                 @foreach (var t in Model.Board.ToDo)
@@ -75,10 +89,11 @@ else
             </div>
         </div>
 
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="InProgress" id="col-InProgress">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>In Progress</strong></div>
-                <span class="text-muted" id="wf-count-inprogress">@Model.Board.InProgress.Count</span>
+        <!-- In Progress -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="InProgress" id="col-InProgress">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold text-warning">In Progress</h6>
+                <span class="badge bg-secondary" id="wf-count-inprogress">@Model.Board.InProgress.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="InProgress" id="wf-drop-inprogress">
                 @foreach (var t in Model.Board.InProgress)
@@ -88,10 +103,11 @@ else
             </div>
         </div>
 
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Review" id="col-Review">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>Review / Testing</strong></div>
-                <span class="text-muted" id="wf-count-review">@Model.Board.Review.Count</span>
+        <!-- Review -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Review" id="col-Review">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold text-info">Review / Testing</h6>
+                <span class="badge bg-secondary" id="wf-count-review">@Model.Board.Review.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="Review" id="wf-drop-review">
                 @foreach (var t in Model.Board.Review)
@@ -101,10 +117,11 @@ else
             </div>
         </div>
 
-        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Done" id="col-Done">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div><strong>Done</strong></div>
-                <span class="text-muted" id="wf-count-done">@Model.Board.Done.Count</span>
+        <!-- Done -->
+        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Done" id="col-Done">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-semibold text-success">Done</h6>
+                <span class="badge bg-secondary" id="wf-count-done">@Model.Board.Done.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="Done" id="wf-drop-done">
                 @foreach (var t in Model.Board.Done)
@@ -115,7 +132,6 @@ else
         </div>
     </div>
 }
-
 @section Scripts {
 @if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
 {

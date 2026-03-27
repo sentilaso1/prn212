@@ -16,7 +16,9 @@
     </div>
     @if (Model.IsPm)
     {
-        <a class="btn btn-primary" href="/Projects/Create@(wsQ)">+ Tạo dự án</a>
+        <a class="btn btn-primary" href="/Projects/Create@(wsQ)">
+            + Tạo dự án mới
+        </a>
     }
 </div>
 
@@ -82,10 +84,10 @@ else
                             <div class="btn-group btn-group-sm" role="group">
                                 <a class="btn btn-outline-secondary"
                                    href="/Projects/Details/@(p.Id)@(wsQ)">Chi tiết</a>
-
+                                
                                 <a class="btn btn-primary"
                                    href="/board?projectId=@(p.Id)@(wsAmp)">Board</a>
-
+                                
                                 <a class="btn btn-outline-info"
                                    href="/tasks/list?projectId=@(p.Id)@(wsAmp)">Tasks</a>
 
@@ -93,10 +95,10 @@ else
                                 {
                                     <a class="btn btn-outline-primary"
                                        href="/Projects/Settings/@(p.Id)@(wsQ)">Cài đặt</a>
-
+                                    
                                     <a class="btn btn-outline-danger"
-                                       href="/Projects/Delete/@(p.Id)@(wsQ)"
-                                       onclick="return confirm('Bạn có chắc muốn xóa dự án này?');">
+                                           href="/Projects/Delete/@(p.Id)@(wsQ)"
+                                           onclick="return confirm('Bạn có chắc muốn xóa dự án này?');">
                                         Xóa
                                     </a>
                                 }

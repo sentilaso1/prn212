@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace WorkFlowPro.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class RecreateInitial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -33,6 +33,9 @@ namespace WorkFlowPro.Migrations
                     DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     IsPlatformAdmin = table.Column<bool>(type: "bit", nullable: false),
+                    AccountStatus = table.Column<int>(type: "int", nullable: false),
+                    AwaitingPmWorkspaceApproval = table.Column<bool>(type: "bit", nullable: false),
+                    PendingWorkspaceName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -347,8 +350,11 @@ namespace WorkFlowPro.Migrations
                     TokenHash = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Role = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     SubRole = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false, defaultValue: 1),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
                     ExpiresAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UsedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    UsedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    AcceptUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -382,6 +388,34 @@ namespace WorkFlowPro.Migrations
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_WorkspaceMembers_Workspaces_WorkspaceId",
+                        column: x => x.WorkspaceId,
+                        principalTable: "Workspaces",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "WorkspaceRoleChangeRequests",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    WorkspaceId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TargetUserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
+                    RequestedByUserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
+                    Kind = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    ReviewedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ReviewedByAdminId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: true),
+                    AdminNote = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WorkspaceRoleChangeRequests", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WorkspaceRoleChangeRequests_Workspaces_WorkspaceId",
                         column: x => x.WorkspaceId,
                         principalTable: "Workspaces",
                         principalColumn: "Id",
@@ -773,6 +807,11 @@ namespace WorkFlowPro.Migrations
                 name: "IX_WorkspaceMembers_UserId",
                 table: "WorkspaceMembers",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WorkspaceRoleChangeRequests_WorkspaceId_Status",
+                table: "WorkspaceRoleChangeRequests",
+                columns: new[] { "WorkspaceId", "Status" });
         }
 
         /// <inheritdoc />
@@ -828,6 +867,9 @@ namespace WorkFlowPro.Migrations
 
             migrationBuilder.DropTable(
                 name: "WorkspaceMembers");
+
+            migrationBuilder.DropTable(
+                name: "WorkspaceRoleChangeRequests");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

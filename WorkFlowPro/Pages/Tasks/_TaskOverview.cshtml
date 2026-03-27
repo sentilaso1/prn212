@@ -4,36 +4,36 @@
     var canChangeAssignee = d.CanEditCore && (d.Status == WorkFlowPro.Data.TaskStatus.Unassigned || d.Status == WorkFlowPro.Data.TaskStatus.Pending);
 }
 
-<div class="card card-body">
-    <div class="d-flex justify-content-between align-items-start gap-3">
-        <div>
-            <div class="text-muted">Project</div>
-            <div class="fw-semibold">@d.ProjectName</div>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div>
+                <div class="text-muted small">Dự án</div>
+                <div class="fw-semibold">@d.ProjectName</div>
+            </div>
+            <div class="text-end">
+                <div class="text-muted small">Trạng thái</div>
+                <span class="badge bg-info">@d.Status</span>
+            </div>
         </div>
-        <div class="text-end">
-            <div class="text-muted">Status</div>
-            <span class="badge bg-info">@d.Status</span>
-        </div>
-    </div>
 
-    <div class="mt-3">
-        <form method="post" asp-page-handler="UpdateTask" asp-route-workspaceId="@Model.WorkspaceId" data-wf-ajax="true" class="mt-2">
+        <form method="post" asp-page-handler="UpdateTask" asp-route-workspaceId="@Model.WorkspaceId" data-wf-ajax="true">
             @Html.AntiForgeryToken()
 
-            <div class="mb-2">
-                <label class="form-label">Title</label>
+            <div class="mb-3">
+                <label class="form-label">Tiêu đề</label>
                 <input class="form-control" type="text"
                        name="UpdateTask.Title"
                        value="@d.Title"
-                       @(d.CanEditCore ? null : "disabled=\"disabled\"") />
+                @(d.CanEditCore ? null : "disabled=\"disabled\"") />
             </div>
 
             <div class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label">Priority</label>
+                    <label class="form-label">Ưu tiên</label>
                     <select class="form-select"
                             name="UpdateTask.Priority"
-                            @(d.CanEditCore ? null : "disabled=\"disabled\"")>
+                        @(d.CanEditCore ? null : "disabled=\"disabled\"")>
                         @foreach (var p in Enum.GetValues<WorkFlowPro.Data.TaskPriority>())
                         {
                             var selected = d.Priority == p;
@@ -42,63 +42,46 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Due Date</label>
+                    <label class="form-label">Hạn chót</label>
                     <input class="form-control" type="date"
                            name="UpdateTask.DueDateUtc"
                            value="@(d.DueDateUtc?.ToString("yyyy-MM-dd") ?? "")"
-                           @(d.CanEditCore ? null : "disabled=\"disabled\"") />
+                    @(d.CanEditCore ? null : "disabled=\"disabled\"") />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Assignee</label>
+                    <label class="form-label">Người thực hiện</label>
                     <select class="form-select"
                             name="UpdateTask.NewAssigneeUserId"
-                            @(canChangeAssignee ? null : "disabled=\"disabled\"")>
-                        <option value="" selected="@(string.IsNullOrWhiteSpace(d.AssigneeUserId) ? "selected" : null)">Unassigned</option>
+                        @(canChangeAssignee ? null : "disabled=\"disabled\"")>
+                        <option value="" selected="@(string.IsNullOrWhiteSpace(d.AssigneeUserId) ? "selected" : null)">Chưa phân công</option>
                         @foreach (var opt in Model.assigneeOptions)
                         {
                             <option value="@opt.UserId" selected="@(opt.UserId == d.AssigneeUserId ? "selected" : null)">@opt.DisplayName</option>
                         }
                     </select>
-                    @if (!canChangeAssignee)
-                    {
-                        <div class="form-text">Assignee chỉ thay đổi khi task ở trạng thái Unassigned/Pending.</div>
-                    }
                 </div>
             </div>
 
-            <div class="mt-3 mb-2">
-                <label class="form-label">Description</label>
-                <textarea class="form-control"
-                          rows="4"
+            <div class="mt-3">
+                <label class="form-label">Mô tả</label>
+                <textarea class="form-control" rows="5"
                           name="UpdateTask.Description"
-                          @(d.CanEditDescription ? null : "disabled=\"disabled\"")>@(d.Description ?? "")</textarea>
+                @(d.CanEditDescription ? null : "disabled=\"disabled\"")>@(d.Description ?? "")</textarea>
             </div>
 
-            <div class="d-flex gap-2 mt-3">
-                @if (d.CanEditCore || d.CanEditDescription)
-                {
-                    <button class="btn btn-primary" type="submit" @(d.CanEditCore || d.CanEditDescription ? null : "disabled")>
-                        Lưu thay đổi
-                    </button>
-                }
-            </div>
+            @if (d.CanEditCore || d.CanEditDescription)
+            {
+                <button class="btn btn-primary mt-4" type="submit">Lưu thay đổi</button>
+            }
 
             @if (d.ShowAcceptReject)
             {
                 var wsQ = Model.WorkspaceId is not null ? $"?workspaceId={Model.WorkspaceId.Value:D}" : "";
-                <div class="mt-3">
-                    <a class="btn btn-success me-2" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Accept</a>
-                    <a class="btn btn-danger" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Reject</a>
+                <div class="mt-4">
+                    <a class="btn btn-success me-2" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Chấp nhận</a>
+                    <a class="btn btn-danger" href="/Tasks/AcceptReject/@(d.TaskId)@wsQ">Từ chối</a>
                 </div>
             }
         </form>
     </div>
-
-    <div class="mt-4 small text-muted">
-        <div><strong>Created by:</strong> @d.CreatedByDisplayName (@d.CreatedByUserId)</div>
-        <div><strong>Created at:</strong> @d.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</div>
-        <div><strong>Updated at:</strong> @d.UpdatedAtUtc.ToString("yyyy-MM-dd HH:mm")</div>
-        <div class="mt-2"><strong>Assignee:</strong> @d.AssigneeDisplayName</div>
-    </div>
 </div>
-

@@ -2,74 +2,104 @@
 @model WorkFlowPro.Pages.Tasks.TaskListModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Task List";
+    ViewData["Title"] = "Danh sách công việc";
+
     var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
     var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<h1>Task List</h1>
-
-@if (Model.ErrorMessage is not null)
-{
-    <div class="alert alert-warning">@Model.ErrorMessage</div>
-}
-else
-{
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <div class="text-muted">Project</div>
-            <div><strong>@Model.ProjectName</strong></div>
-            <div class="small mt-1">
-                <a href="/board?projectId=@(Model.ProjectId)@(wsAmp)">Kanban Board</a>
-            </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-semibold mb-1">Danh sách công việc</h1>
+        <div class="text-muted">
+            Dự án: <strong>@Model.ProjectName</strong>
         </div>
     </div>
 
+    <div>
+        <a href="/board?projectId=@(Model.ProjectId)@wsAmp" class="text-decoration-none small">
+            → Xem Kanban Board
+        </a>
+    </div>
+</div>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+else
+{
     <partial name="_TaskFilters" model="Model.Filters" />
 
     <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle">
-            <thead>
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
                 <tr>
-                    <th>Tiêu đề</th>
+                    <th style="width: 45%;">Tiêu đề</th>
                     <th>Trạng thái</th>
                     <th>Ưu tiên</th>
-                    <th>Hạn</th>
-                    <th>Assignee</th>
+                    <th>Hạn chót</th>
+                    <th>Người thực hiện</th>
+                    <th class="text-end" style="width: 110px;">Thao tác</th>
                 </tr>
             </thead>
             <tbody id="wfTaskListBody">
                 @foreach (var t in Model.Tasks)
                 {
-                    var due = t.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-";
+                    var due = t.DueDateUtc?.ToString("dd/MM/yyyy") ?? "—";
                     <tr>
-                        <td><a href="/Tasks/Details/@(t.TaskId)@(wsQ)">@t.Title</a></td>
-                        <td><span class="badge bg-secondary">@t.Status</span></td>
+                        <td>
+                            <a href="/Tasks/Details/@(t.TaskId)@wsQ" class="fw-medium text-decoration-none">
+                                @t.Title
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">@t.Status</span>
+                        </td>
                         <td>@t.Priority</td>
-                        <td>@due</td>
-                        <td>@t.AssigneeDisplayName</td>
+                        <td class="text-muted">@due</td>
+                        <td>@(string.IsNullOrEmpty(t.AssigneeDisplayName) ? "—" : t.AssigneeDisplayName)</td>
+                        <td class="text-end">
+                            <a href="/Tasks/Details/@(t.TaskId)@wsQ"
+                                   class="btn btn-sm btn-outline-primary">
+                                Chi tiết
+                            </a>
+                        </td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
+
+    @if (Model.Tasks.Count == 0)
+    {
+        <div class="alert alert-info text-center py-4 mt-3">
+            Không tìm thấy công việc nào phù hợp với bộ lọc hiện tại.
+        </div>
+    }
 }
 
 @section Scripts {
-@if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
-{
-    <script src="~/js/task-filters.js" asp-append-version="true"></script>
-    <script>
-        (function () {
-            const projectId = "@Model.ProjectId.ToString("D")";
-            const myUserId = "@Model.CurrentUserId";
-            const isPm = @(Model.IsPm ? "true" : "false");
-            const filterRoot = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"list\"]");
-            if (filterRoot && window.wfTaskFilters) {
-                window.wfTaskFilters.bindFilterCard(filterRoot, { myUserId: myUserId, isPm: isPm });
-            }
-        })();
-    </script>
-}
+    @if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
+    {
+        <script src="~/js/task-filters.js" asp-append-version="true"></script>
+        <script>
+            (function () {
+                const projectId = "@Model.ProjectId.ToString("D")";
+                const myUserId = "@Model.CurrentUserId";
+                const isPm = @(Model.IsPm ? "true" : "false");
+
+                const filterRoot = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"list\"]");
+                if (filterRoot && window.wfTaskFilters) {
+                    window.wfTaskFilters.bindFilterCard(filterRoot, {
+                        myUserId: myUserId,
+                        isPm: isPm
+                    });
+                }
+            })();
+        </script>
+    }
 }
