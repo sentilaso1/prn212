@@ -9,6 +9,14 @@ using WorkFlowPro.Data;
 
 namespace WorkFlowPro.Pages.Projects;
 
+/// <summary>Thành viên workspace (dự án dùng chung đơn vị — không có bảng ProjectMember).</summary>
+public sealed record ProjectWorkspaceMemberRowVm(
+    string UserId,
+    string DisplayName,
+    string? Email,
+    WorkspaceMemberRole Role,
+    string? SubRole);
+
 [Authorize]
 public sealed class DetailsModel : PageModel
 {
@@ -26,7 +34,12 @@ public sealed class DetailsModel : PageModel
     public Project? Project { get; private set; }
     public string? ErrorMessage { get; private set; }
     public bool CanManage { get; private set; }
-    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
+
+    /// <summary>Để build link Kanban / danh sách task / tạo task.</summary>
+    public Guid? CurrentWorkspaceId { get; private set; }
+
+    public IReadOnlyList<ProjectWorkspaceMemberRowVm> WorkspaceMembers { get; private set; } =
+        Array.Empty<ProjectWorkspaceMemberRowVm>();
 
     public async Task OnGetAsync([FromRoute] Guid projectId, CancellationToken cancellationToken)
     {
@@ -40,6 +53,8 @@ public sealed class DetailsModel : PageModel
             ErrorMessage = "Workspace không hợp lệ.";
             return;
         }
+
+        CurrentWorkspaceId = workspaceId.Value;
 
         var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
             m.UserId == userId &&
@@ -67,5 +82,18 @@ public sealed class DetailsModel : PageModel
             m.WorkspaceId == workspaceId.Value &&
             m.Role == WorkspaceMemberRole.PM,
             cancellationToken);
+
+        WorkspaceMembers = await (
+            from m in _db.WorkspaceMembers
+            where m.WorkspaceId == workspaceId.Value
+            join u in _db.Users on m.UserId equals u.Id
+            orderby m.Role, u.DisplayName, u.Email
+            select new ProjectWorkspaceMemberRowVm(
+                m.UserId,
+                u.DisplayName ?? u.Email ?? u.UserName ?? m.UserId,
+                u.Email,
+                m.Role,
+                m.SubRole)
+        ).ToListAsync(cancellationToken);
     }
 }
