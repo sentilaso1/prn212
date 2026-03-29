@@ -49,11 +49,11 @@
                     <a class="btn btn-sm btn-outline-primary" href="/board?projectId=@Model.Project.Id">Kanban</a>
                     @if (Model.CurrentWorkspaceId is { } wid)
                     {
-                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id&workspaceId=@wid">Danh sách task (lọc)</a>
+                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id&workspaceId=@wid">Danh sách task </a>
                     }
                     else
                     {
-                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id">Danh sách task (lọc)</a>
+                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id">Danh sách task </a>
                     }
                     @if (Model.CanManage && Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Active)
                     {
@@ -104,14 +104,6 @@
     <div class="card mt-4">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <div>
-                    <h2 class="h5 card-title mb-1">Thành viên đơn vị (workspace)</h2>
-                    <p class="card-text small text-muted mb-0">
-                        Lời mời (<strong>Mời thành viên</strong>) gắn với <strong>cả đơn vị</strong>, không gắn từng dự án.
-                        Mọi dự án trong đơn vị dùng chung một danh sách người; <strong>vai trò (PM/Member) và SubRole (BA, DEV…)</strong> lưu theo người trong đơn vị — đổi một lần ở <a href="/Roles">/Roles</a> thì hiển thị giống nhau trên mọi dự án.
-                        Xóa khỏi đơn vị cũng thực hiện từ đó.
-                    </p>
-                </div>
                 @if (Model.CanManage)
                 {
                     <a class="btn btn-sm btn-outline-primary" href="/Roles" title="Quản lý thành viên và vai trò trong đơn vị">
