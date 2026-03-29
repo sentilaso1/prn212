@@ -23,6 +23,10 @@ public sealed class MyTasksPendingModel : PageModel
     }
 
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>Để ghép ?workspaceId= vào link Accept (đúng đơn vị).</summary>
+    public Guid? ActiveWorkspaceId { get; private set; }
+
     public List<PendingTaskVm> PendingTasks { get; private set; } = new();
 
     public sealed record PendingTaskVm(
@@ -40,6 +44,8 @@ public sealed class MyTasksPendingModel : PageModel
             ErrorMessage = "Workspace không hợp lệ.";
             return;
         }
+
+        ActiveWorkspaceId = workspaceId.Value;
 
         var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(actorUserId))

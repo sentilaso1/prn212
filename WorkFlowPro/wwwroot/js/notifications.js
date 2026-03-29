@@ -10,7 +10,6 @@
     function normalizeRedirectUrl(href) {
         if (!href) return href;
         try {
-            // If it's already relative, URL constructor throws; keep original.
             const u = new URL(href, window.location.origin);
             if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
                 return `${u.pathname}${u.search}${u.hash}`;

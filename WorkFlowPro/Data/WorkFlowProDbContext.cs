@@ -35,6 +35,7 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<WorkspaceInviteToken> WorkspaceInviteTokens => Set<WorkspaceInviteToken>();
     public DbSet<WorkspaceRoleChangeRequest> WorkspaceRoleChangeRequests => Set<WorkspaceRoleChangeRequest>();
+    public DbSet<LevelAdjustmentRequest> LevelAdjustmentRequests => Set<LevelAdjustmentRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -384,6 +385,25 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.Property(x => x.Kind).HasConversion<int>();
             e.Property(x => x.Status).HasConversion<int>();
             e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.AdminNote).HasMaxLength(500);
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasIndex(x => new { x.WorkspaceId, x.Status });
+
+            e.HasOne(x => x.Workspace)
+                .WithMany()
+                .HasForeignKey(x => x.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── LevelAdjustmentRequest (UC-10 / UC-13 §2) ────────────────────
+        b.Entity<LevelAdjustmentRequest>(e =>
+        {
+            e.ToTable("LevelAdjustmentRequests");
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.FromLevel).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ToLevel).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Justification).HasMaxLength(2000).IsRequired();
             e.Property(x => x.AdminNote).HasMaxLength(500);
             e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
 

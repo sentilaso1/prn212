@@ -15,6 +15,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
     private readonly INotificationService _notifications;
     private readonly IHubContext<TaskHub> _taskHub;
     private readonly IRoleManagementService _roleManagement;
+    private readonly IMemberProfileService _memberProfile;
     private readonly ILogger<PlatformAdminService> _logger;
 
     public PlatformAdminService(
@@ -24,6 +25,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
         INotificationService notifications,
         IHubContext<TaskHub> taskHub,
         IRoleManagementService roleManagement,
+        IMemberProfileService memberProfile,
         ILogger<PlatformAdminService> logger)
     {
         _db = db;
@@ -32,6 +34,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
         _notifications = notifications;
         _taskHub = taskHub;
         _roleManagement = roleManagement;
+        _memberProfile = memberProfile;
         _logger = logger;
     }
 
@@ -117,10 +120,17 @@ public sealed class PlatformAdminService : IPlatformAdminService
     public async Task<AdminActionResult> RejectPmRegistrationAsync(
         string adminUserId,
         string targetUserId,
+        string reason,
         CancellationToken cancellationToken = default)
     {
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin mới được từ chối.");
+
+        reason = reason?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(reason))
+            return new AdminActionResult(false, "Cần nhập lý do từ chối.");
+        if (reason.Length > 500)
+            return new AdminActionResult(false, "Lý do tối đa 500 ký tự.");
 
         var user = await _userManager.FindByIdAsync(targetUserId);
         if (user is null)
@@ -140,7 +150,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
         await _notifications.CreateAndPushAsync(
             targetUserId,
             NotificationType.RegistrationPendingPm,
-            "Yêu cầu tạo đơn vị (PM) đã bị Admin từ chối.",
+            $"Yêu cầu tạo đơn vị (PM) đã bị Admin từ chối. Lý do: {reason}",
             workspaceId: null,
             redirectUrl: "/Identity/Account/Login",
             cancellationToken: cancellationToken);
@@ -355,10 +365,17 @@ public sealed class PlatformAdminService : IPlatformAdminService
         string adminUserId,
         Guid workspaceId,
         string targetUserId,
+        string reason,
         CancellationToken cancellationToken = default)
     {
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin.");
+
+        reason = reason?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(reason))
+            return new AdminActionResult(false, "Cần nhập lý do hạ PM.");
+        if (reason.Length > 500)
+            return new AdminActionResult(false, "Lý do tối đa 500 ký tự.");
 
         var member = await _db.WorkspaceMembers
             .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
@@ -390,12 +407,138 @@ public sealed class PlatformAdminService : IPlatformAdminService
         await _notifications.CreateAndPushAsync(
             targetUserId,
             NotificationType.RoleChanged,
-            "Admin đã hạ bạn từ PM xuống Member trong đơn vị.",
+            $"Admin đã hạ bạn từ PM xuống Member trong đơn vị. Lý do: {reason}",
             workspaceId: workspaceId,
             redirectUrl: "/Workspaces",
             cancellationToken: cancellationToken);
 
         await BroadcastWorkspaceAsync(workspaceId, targetUserId, cancellationToken);
+
+        return new AdminActionResult(true);
+    }
+
+    public async Task<IReadOnlyList<PendingLevelAdjustmentVm>> GetPendingLevelAdjustmentRequestsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var q =
+            from r in _db.LevelAdjustmentRequests.AsNoTracking()
+            join w in _db.Workspaces.AsNoTracking() on r.WorkspaceId equals w.Id
+            join tu in _db.Users.AsNoTracking() on r.TargetUserId equals tu.Id
+            join pu in _db.Users.AsNoTracking() on r.ProposedByPmUserId equals pu.Id
+            join mp in _db.MemberProfiles.AsNoTracking() on r.TargetUserId equals mp.UserId into mpj
+            from mp in mpj.DefaultIfEmpty()
+            where r.Status == LevelAdjustmentRequestStatus.Pending
+            orderby r.CreatedAtUtc
+            select new PendingLevelAdjustmentVm(
+                r.Id,
+                r.WorkspaceId,
+                w.Name,
+                r.TargetUserId,
+                tu.DisplayName ?? tu.Email ?? tu.UserName ?? r.TargetUserId,
+                r.ProposedByPmUserId,
+                pu.DisplayName ?? pu.Email ?? pu.UserName ?? r.ProposedByPmUserId,
+                r.FromLevel,
+                r.ToLevel,
+                r.Justification,
+                mp != null ? mp.CompletionRate : 0,
+                mp != null ? mp.AvgScore : 0,
+                mp != null ? mp.CurrentWorkload : 0,
+                r.CreatedAtUtc);
+
+        return await q.ToListAsync(cancellationToken);
+    }
+
+    public async Task<AdminActionResult> ApproveLevelAdjustmentRequestAsync(
+        string adminUserId,
+        int requestId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
+            return new AdminActionResult(false, "Chỉ Platform Admin.");
+
+        var req = await _db.LevelAdjustmentRequests
+            .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+        if (req is null || req.Status != LevelAdjustmentRequestStatus.Pending)
+            return new AdminActionResult(false, "Yêu cầu không hợp lệ.");
+
+        var apply = await _memberProfile.ApplyApprovedLevelAdjustmentAsync(
+            req.WorkspaceId,
+            req.TargetUserId,
+            req.ToLevel,
+            req.ProposedByPmUserId,
+            cancellationToken);
+
+        if (!apply.Success)
+            return new AdminActionResult(false, apply.ErrorMessage);
+
+        req.Status = LevelAdjustmentRequestStatus.Approved;
+        req.ReviewedAtUtc = DateTime.UtcNow;
+        req.ReviewedByAdminUserId = adminUserId;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await _notifications.CreateAndPushAsync(
+            req.ProposedByPmUserId,
+            NotificationType.LevelChanged,
+            $"Admin đã duyệt đề xuất đổi Level (#{req.Id}) cho thành viên trong đơn vị.",
+            workspaceId: req.WorkspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
+
+        try
+        {
+            await _taskHub.Clients.Group(TaskHub.WorkspaceGroupName(req.WorkspaceId))
+                .SendAsync("memberProfileUpdated", req.TargetUserId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SignalR after level adjustment approval");
+        }
+
+        return new AdminActionResult(true);
+    }
+
+    public async Task<AdminActionResult> RejectLevelAdjustmentRequestAsync(
+        string adminUserId,
+        int requestId,
+        string? adminNote,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
+            return new AdminActionResult(false, "Chỉ Platform Admin.");
+
+        var req = await _db.LevelAdjustmentRequests
+            .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+        if (req is null || req.Status != LevelAdjustmentRequestStatus.Pending)
+            return new AdminActionResult(false, "Yêu cầu không hợp lệ.");
+
+        req.Status = LevelAdjustmentRequestStatus.Rejected;
+        req.ReviewedAtUtc = DateTime.UtcNow;
+        req.ReviewedByAdminUserId = adminUserId;
+        req.AdminNote = string.IsNullOrWhiteSpace(adminNote) ? null : adminNote.Trim();
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var note = string.IsNullOrWhiteSpace(req.AdminNote) ? string.Empty : $" Ghi chú Admin: {req.AdminNote}";
+        var msg =
+            $"Đề xuất đổi Level ({req.FromLevel} → {req.ToLevel}) bị từ chối.{note}";
+
+        await _notifications.CreateAndPushAsync(
+            req.TargetUserId,
+            NotificationType.LevelChanged,
+            msg,
+            workspaceId: req.WorkspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
+
+        await _notifications.CreateAndPushAsync(
+            req.ProposedByPmUserId,
+            NotificationType.LevelChanged,
+            $"Đề xuất đổi Level #{req.Id} bị Admin từ chối.{note}",
+            workspaceId: req.WorkspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
 
         return new AdminActionResult(true);
     }

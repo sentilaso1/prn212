@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Data;
 
@@ -32,20 +31,10 @@ public sealed record UserNotificationItemVm(
 public sealed class UserNotificationService : IUserNotificationService
 {
     private readonly WorkFlowProDbContext _db;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public UserNotificationService(WorkFlowProDbContext db, IHttpContextAccessor httpContextAccessor)
+    public UserNotificationService(WorkFlowProDbContext db)
     {
         _db = db;
-        _httpContextAccessor = httpContextAccessor;
-    }
-
-    private string GetCurrentUserId()
-    {
-        var userId = _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new UnauthorizedAccessException("User not authenticated.");
-        return userId;
     }
 
     public async Task<IReadOnlyList<UserNotificationItemVm>> GetMyNotificationsAsync(
@@ -53,15 +42,15 @@ public sealed class UserNotificationService : IUserNotificationService
         int take,
         CancellationToken cancellationToken = default)
     {
-        if (take <= 0) take = 50;
-        if (take > 200) take = 200;
-        if (skip < 0) skip = 0;
-
-        var userId = GetCurrentUserId();
+        if (take <= 0)
+            take = 50;
+        if (take > 200)
+            take = 200;
+        if (skip < 0)
+            skip = 0;
 
         var raw = await _db.UserNotifications
             .AsNoTracking()
-            .Where(n => n.UserId == userId)
             .OrderByDescending(n => n.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
@@ -99,6 +88,12 @@ public sealed class UserNotificationService : IUserNotificationService
         if (workspaceId is null)
             return redirectUrl;
 
+        // Bổ sung workspaceId để transformation chọn đúng đơn vị khi mở từ thông báo.
+        if (!redirectUrl.StartsWith("/Projects/Details/", StringComparison.OrdinalIgnoreCase) &&
+            !redirectUrl.StartsWith("/Tasks/AcceptReject/", StringComparison.OrdinalIgnoreCase))
+            return redirectUrl;
+
+        // Nếu đã có workspaceId thì không đụng thêm.
         if (redirectUrl.Contains("workspaceId=", StringComparison.OrdinalIgnoreCase))
             return redirectUrl;
 
@@ -108,19 +103,17 @@ public sealed class UserNotificationService : IUserNotificationService
 
     public async Task<int> GetUnreadCountAsync(CancellationToken cancellationToken = default)
     {
-        var userId = GetCurrentUserId();
         return await _db.UserNotifications
             .AsNoTracking()
-            .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+            .CountAsync(n => !n.IsRead, cancellationToken);
     }
 
     public async Task<bool> MarkAsReadAsync(
         Guid notificationId,
         CancellationToken cancellationToken = default)
     {
-        var userId = GetCurrentUserId();
         var n = await _db.UserNotifications.FirstOrDefaultAsync(
-            x => x.Id == notificationId && x.UserId == userId,
+            x => x.Id == notificationId,
             cancellationToken);
         if (n is null)
             return false;
@@ -135,9 +128,8 @@ public sealed class UserNotificationService : IUserNotificationService
 
     public async Task<int> MarkAllAsReadAsync(CancellationToken cancellationToken = default)
     {
-        var userId = GetCurrentUserId();
         var rows = await _db.UserNotifications
-            .Where(n => n.UserId == userId && !n.IsRead)
+            .Where(n => !n.IsRead)
             .ToListAsync(cancellationToken);
 
         foreach (var n in rows)
@@ -154,9 +146,8 @@ public sealed class UserNotificationService : IUserNotificationService
         Guid notificationId,
         CancellationToken cancellationToken = default)
     {
-        var userId = GetCurrentUserId();
         var n = await _db.UserNotifications.FirstOrDefaultAsync(
-            x => x.Id == notificationId && x.UserId == userId,
+            x => x.Id == notificationId,
             cancellationToken);
         if (n is null)
             return false;

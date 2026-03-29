@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
@@ -32,7 +32,6 @@ public sealed class SentModel : PageModel
 
     public IReadOnlyList<SentInviteVm> Invites { get; private set; } = Array.Empty<SentInviteVm>();
     public string? ErrorMessage { get; private set; }
-    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {

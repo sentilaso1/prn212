@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,63 +7,57 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/WorkFlowPro.styles.css" asp-append-version="true" />
-
-    <!-- Optional: Font Awesome cho icon (nếu chưa có) -->
-    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" /> -->
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm border-bottom mb-4">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
-                <!-- Logo -->
-                <a class="navbar-brand fw-bold text-primary d-flex align-items-center" asp-area="" asp-page="/Index">
-                    <span class="me-2">📋</span> WorkFlowPro
-                </a>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <a class="navbar-brand" asp-area="" asp-page="/Index">WorkFlowPro</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav flex-grow-1 align-items-lg-center">
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1 align-items-sm-center">
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Index">Trang chủ</a>
+                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
-
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
+                        </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <a class="nav-link" href="/Workspaces">Đơn vị</a>
+                                <a class="nav-link text-dark" href="/Workspaces">Đơn vị</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="/Tasks/MyTasks/Pending">Việc chờ xử lý</a>
+                                <a class="nav-link text-dark" href="/Projects" title="Danh sách dự án trong đơn vị đang chọn (UC-12)">Dự án</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="/tasks">Danh sách task</a>
+                                <a class="nav-link text-dark" href="/Tasks/MyTasks/Pending" title="Chấp nhận / từ chối task được giao (Pending) — không phải màn Admin duyệt PM">Task chờ nhận</a>
+                            </li>
+                            @if (User.HasClaim("platform_role", "admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-danger fw-semibold" href="/Admin" title="Duyệt đăng ký PM, yêu cầu nâng/hạ role trong đơn vị">Admin — duyệt PM</a>
+                                </li>
+                            }
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/tasks" title="Chọn dự án rồi lọc task; PM tạo task trên trang đó hoặc trang dự án">Danh sách task</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="/Profile">Hồ sơ</a>
+                                <a class="nav-link text-dark" href="/Profile">Hồ sơ</a>
                             </li>
                         }
                     </ul>
-
-                    <!-- Phần bên phải -->
-                    <ul class="navbar-nav align-items-lg-center gap-2">
+                    <ul class="navbar-nav align-items-sm-center gap-1">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <!-- Notification -->
                             <partial name="_NotificationBell" />
-
-                            <!-- Workspace Switcher -->
                             @await Component.InvokeAsync("WorkspaceSwitcher")
-
-                            <!-- Logout -->
                             <li class="nav-item">
                                 <form class="d-inline" asp-area="Identity" asp-page="/Account/Logout" method="post">
-                                    <button type="submit" class="btn btn-outline-danger btn-sm px-3">
-                                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
-                                    </button>
+                                    <button type="submit" class="btn btn-link nav-link text-dark py-0 px-2">Đăng xuất</button>
                                 </form>
                             </li>
                         }
@@ -73,8 +67,7 @@
                                 <a class="nav-link text-dark" href="/Identity/Account/Login">Đăng nhập</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link btn btn-primary text-white px-4 fw-semibold"
-                                   href="/Identity/Account/Register">Đăng ký</a>
+                                <a class="nav-link text-primary fw-semibold" href="/Identity/Account/Register">Đăng ký</a>
                             </li>
                         }
                     </ul>
@@ -82,32 +75,25 @@
             </div>
         </nav>
     </header>
-
-    <!-- Notification Toast chỉ hiển thị khi đã đăng nhập -->
     @if (User.Identity?.IsAuthenticated == true)
     {
         <partial name="_NotificationToast" />
     }
-
     <div class="container">
-        <main role="main" class="pb-5">
+        <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top bg-light py-4 mt-5">
-        <div class="container text-center text-muted small">
-            &copy; 2026 WorkFlowPro. All rights reserved.
-            <span class="mx-3">•</span>
-            <a asp-area="" asp-page="/Privacy" class="text-muted">Chính sách bảo mật</a>
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2026 - WorkFlowPro - <a asp-area="" asp-page="/Privacy">Privacy</a>
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-
     @if (User.Identity?.IsAuthenticated == true)
     {
         <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
@@ -123,7 +109,7 @@
         var form = document.querySelector('form[action="/Workspaces/Switch"]');
         if (!form) return;
         form.addEventListener('submit', function(e) {
-        e.preventDefault();
+            e.preventDefault();
             var sel = form.querySelector('select[name="workspaceId"]');
             if (!sel || !sel.value) return;
             window.location.href = '/Workspaces/Switch?workspaceId=' + sel.value + '&returnUrl=%2FWorkspaces';
@@ -134,9 +120,9 @@
             sel.addEventListener('change', function() {
                 if (!this.value) return;
                 window.location.href = '/Workspaces/Switch?workspaceId=' + this.value + '&returnUrl=%2FWorkspaces';
-        });
+            });
         }
-        })();
+    })();
     </script>
 </body>
 </html>

@@ -24,6 +24,14 @@ public enum WorkspaceRoleRequestStatus
     Rejected = 2
 }
 
+/// <summary>UC-13 §2: đề xuất điều chỉnh Level member.</summary>
+public enum LevelAdjustmentRequestStatus
+{
+    Pending = 0,
+    Approved = 1,
+    Rejected = 2
+}
+
 public enum WorkspaceMemberRole
 {
     PM = 1,
@@ -105,7 +113,10 @@ public enum NotificationType
     WorkspacePmRoleRequest = 18,
 
     /// <summary>UC-03 Path C: thành viên bị PM xóa khỏi workspace.</summary>
-    RemovedFromWorkspace = 19
+    RemovedFromWorkspace = 19,
+
+    /// <summary>UC-13 §2: PM gửi đề xuất đổi Level — thông báo cho Admin.</summary>
+    LevelAdjustmentProposal = 20
 }
 
 public enum InviteStatus

@@ -27,6 +27,9 @@ public sealed class IndexModel : PageModel
     public IReadOnlyList<WorkspaceRoleRequestListVm> PendingRoleRequests { get; private set; } =
         Array.Empty<WorkspaceRoleRequestListVm>();
 
+    public IReadOnlyList<PendingLevelAdjustmentVm> PendingLevelAdjustments { get; private set; } =
+        Array.Empty<PendingLevelAdjustmentVm>();
+
     public IReadOnlyList<AdminWorkspaceListItemVm> AllWorkspaces { get; private set; } =
         Array.Empty<AdminWorkspaceListItemVm>();
 
@@ -40,6 +43,7 @@ public sealed class IndexModel : PageModel
     {
         PendingRegistrations = await _admin.GetPendingPmRegistrationsAsync(cancellationToken);
         PendingRoleRequests = await _admin.GetPendingWorkspaceRoleRequestsAsync(cancellationToken);
+        PendingLevelAdjustments = await _admin.GetPendingLevelAdjustmentRequestsAsync(cancellationToken);
         AllWorkspaces = await _admin.ListAllWorkspacesAsync(cancellationToken);
 
         Guid? selected =
@@ -66,10 +70,11 @@ public sealed class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostRejectRegistrationAsync(
         string targetUserId,
+        string reason,
         CancellationToken cancellationToken)
     {
         var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var r = await _admin.RejectPmRegistrationAsync(adminId, targetUserId, cancellationToken);
+        var r = await _admin.RejectPmRegistrationAsync(adminId, targetUserId, reason, cancellationToken);
         ToastMessage = r.Success ? "Đã từ chối đăng ký PM." : r.ErrorMessage;
         return RedirectToPage();
     }
@@ -98,11 +103,33 @@ public sealed class IndexModel : PageModel
     public async Task<IActionResult> OnPostDemotePmDirectAsync(
         Guid workspaceId,
         string targetUserId,
+        string reason,
         CancellationToken cancellationToken)
     {
         var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var r = await _admin.DemotePmDirectAsync(adminId, workspaceId, targetUserId, cancellationToken);
+        var r = await _admin.DemotePmDirectAsync(adminId, workspaceId, targetUserId, reason, cancellationToken);
         ToastMessage = r.Success ? "Đã hạ PM xuống Member." : r.ErrorMessage;
         return RedirectToPage(new { DemoteWorkspaceId = workspaceId });
+    }
+
+    public async Task<IActionResult> OnPostApproveLevelAdjustmentAsync(
+        int requestId,
+        CancellationToken cancellationToken)
+    {
+        var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var r = await _admin.ApproveLevelAdjustmentRequestAsync(adminId, requestId, cancellationToken);
+        ToastMessage = r.Success ? "Đã duyệt đề xuất đổi Level." : r.ErrorMessage;
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRejectLevelAdjustmentAsync(
+        int requestId,
+        string? adminNote,
+        CancellationToken cancellationToken)
+    {
+        var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var r = await _admin.RejectLevelAdjustmentRequestAsync(adminId, requestId, adminNote, cancellationToken);
+        ToastMessage = r.Success ? "Đã từ chối đề xuất Level." : r.ErrorMessage;
+        return RedirectToPage();
     }
 }

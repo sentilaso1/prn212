@@ -15,11 +15,30 @@
             .replace(/'/g, "&#039;");
     }
 
+    /** SignalR / JSON .NET có thể trả PascalCase — chuẩn hóa trước khi render. */
+    function normalizeTaskCardShape(c) {
+        if (!c) return null;
+        return {
+            taskId: c.taskId ?? c.TaskId,
+            title: c.title ?? c.Title ?? "",
+            projectId: c.projectId ?? c.ProjectId,
+            priority: c.priority ?? c.Priority ?? "",
+            dueDateUtc: c.dueDateUtc ?? c.DueDateUtc,
+            status: c.status ?? c.Status ?? "",
+            assigneeUserId: c.assigneeUserId ?? c.AssigneeUserId ?? "",
+            assigneeDisplayName: c.assigneeDisplayName ?? c.AssigneeDisplayName ?? "",
+            assigneeAvatarUrl: c.assigneeAvatarUrl ?? c.AssigneeAvatarUrl
+        };
+    }
+
     function wfTaskCardHtml(card, myUserId, isPm) {
+        if (!card) return "";
+        card = normalizeTaskCardShape(card);
         if (!card) return "";
         const st = (card.status || "").toString();
         const draggableStatuses = ["ToDo", "InProgress", "Review", "Done"];
-        const canDrag = draggableStatuses.includes(st);
+        const canDrag =
+            draggableStatuses.includes(st) && (isPm || (card.assigneeUserId && card.assigneeUserId === myUserId));
         const due = card.dueDateUtc ? new Date(card.dueDateUtc) : null;
         const now = new Date();
         const isDone = st === "Done";
@@ -199,20 +218,17 @@
     function bindFilterCard(root, opts) {
         const projectId = root.getAttribute("data-project-id");
         const view = root.getAttribute("data-view") || "kanban";
-        const wsId = root.getAttribute("data-workspace-id") || "";
         if (!projectId) return;
-
-        const wsQ = wsId ? `?workspaceId=${wsId}` : "";
 
         const run = debounce(async () => {
             const criteria = collectCriteria(root);
             try {
                 if (view === "kanban") {
-                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban${wsQ}`, criteria);
+                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban`, criteria);
                     updateKanbanColumns(data, opts.myUserId, opts.isPm);
                     if (typeof opts.onKanbanUpdated === "function") opts.onKanbanUpdated();
                 } else {
-                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-list${wsQ}`, criteria);
+                    const data = await postJson(`/api/projects/${projectId}/tasks/filter-list`, criteria);
                     updateTaskListTable(data.tasks, opts.myUserId, opts.isPm);
                 }
             } catch (e) {
@@ -233,7 +249,7 @@
         if (clearBtn) {
             clearBtn.addEventListener("click", async () => {
                 try {
-                    const res = await fetch(`/api/projects/${projectId}/tasks/filter-reset${wsQ}`, {
+                    const res = await fetch(`/api/projects/${projectId}/tasks/filter-reset`, {
                         method: "POST",
                         credentials: "include"
                     });
@@ -241,11 +257,11 @@
                     const def = await res.json();
                     applyCriteriaToForm(root, def);
                     if (view === "kanban") {
-                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban${wsQ}`, def);
+                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban`, def);
                         updateKanbanColumns(data, opts.myUserId, opts.isPm);
                         if (typeof opts.onKanbanUpdated === "function") opts.onKanbanUpdated();
                     } else {
-                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-list${wsQ}`, def);
+                        const data = await postJson(`/api/projects/${projectId}/tasks/filter-list`, def);
                         updateTaskListTable(data.tasks, opts.myUserId, opts.isPm);
                     }
                 } catch (e) {
@@ -256,11 +272,43 @@
         }
     }
 
+    /** Gọi lại API list theo form lọc hiện tại — dùng khi SignalR báo task đổi (trang /tasks/list). */
+    async function refreshTaskListForProject(root, opts) {
+        const projectId = root.getAttribute("data-project-id");
+        const view = root.getAttribute("data-view") || "list";
+        if (!projectId || view !== "list") return;
+        try {
+            const criteria = collectCriteria(root);
+            const data = await postJson(`/api/projects/${projectId}/tasks/filter-list`, criteria);
+            updateTaskListTable(data.tasks, opts.myUserId, opts.isPm);
+        } catch (e) {
+            console.warn("refreshTaskListForProject", e);
+        }
+    }
+
+    /** Đồng bộ lại cả board từ server theo bộ lọc (fallback sau kéo Kanban / taskMoved). */
+    async function refreshKanbanForProject(root, opts) {
+        const projectId = root.getAttribute("data-project-id");
+        const view = root.getAttribute("data-view") || "kanban";
+        if (!projectId || view !== "kanban") return;
+        try {
+            const criteria = collectCriteria(root);
+            const data = await postJson(`/api/projects/${projectId}/tasks/filter-kanban`, criteria);
+            updateKanbanColumns(data, opts.myUserId, opts.isPm);
+            if (typeof opts.onKanbanUpdated === "function") opts.onKanbanUpdated();
+        } catch (e) {
+            console.warn("refreshKanbanForProject", e);
+        }
+    }
+
     window.wfTaskFilters = {
         collectCriteria,
         applyCriteriaToForm,
         updateKanbanColumns,
         wfTaskCardHtml,
+        normalizeTaskCardShape,
+        refreshTaskListForProject,
+        refreshKanbanForProject,
         bindFilterCard
     };
 })();

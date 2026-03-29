@@ -311,13 +311,12 @@ public sealed class TaskService : ITaskService
         var taskIds = tasks.Select(t => t.Id).ToList();
         var assignments = await _db.TaskAssignments
             .AsNoTracking()
-            .Where(a => taskIds.Contains(a.TaskId) &&
-                        (a.Status == TaskAssignmentStatus.Accepted || a.Status == TaskAssignmentStatus.Pending))
+            .Where(a => taskIds.Contains(a.TaskId) && a.Status == TaskAssignmentStatus.Accepted)
             .ToListAsync(cancellationToken);
 
         var assignmentByTaskId = assignments
             .GroupBy(a => a.TaskId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.Status == TaskAssignmentStatus.Accepted).First());
+            .ToDictionary(g => g.Key, g => g.First());
 
         var assigneeUserIds = assignments.Select(a => a.AssigneeUserId).Distinct().ToList();
         var users = await _db.Users
@@ -342,15 +341,12 @@ public sealed class TaskService : ITaskService
             var assigneeUserId = assignment?.AssigneeUserId;
             userById.TryGetValue(assigneeUserId ?? string.Empty, out var assigneeUser);
 
-            var canDrag = draggable.Contains(t.Status);
+            var canDrag = draggable.Contains(t.Status) &&
+                          (isPm || (!string.IsNullOrEmpty(assigneeUserId) && assigneeUserId == actorUserId));
 
             var isOverdue = t.DueDateUtc.HasValue
                             && t.DueDateUtc.Value < utcNow
                             && t.Status != TaskStatus.Done;
-
-            var displayName = assigneeUser?.DisplayName ?? assigneeUser?.Email ?? assigneeUser?.UserName ?? "-";
-            if (assignment is not null && assignment.Status == TaskAssignmentStatus.Pending && assigneeUser is not null)
-                displayName += " (chờ xác nhận)";
 
             list.Add(new TaskCardVm(
                 taskId: t.Id,
@@ -360,7 +356,7 @@ public sealed class TaskService : ITaskService
                 dueDateUtc: t.DueDateUtc,
                 status: t.Status,
                 assigneeUserId: assigneeUserId ?? string.Empty,
-                assigneeDisplayName: displayName,
+                assigneeDisplayName: assigneeUser?.DisplayName ?? assigneeUser?.Email ?? assigneeUser?.UserName ?? "-",
                 assigneeAvatarUrl: assigneeUser?.AvatarUrl,
                 isOverdue: isOverdue,
                 canDrag: canDrag,
@@ -1000,19 +996,6 @@ public sealed class TaskService : ITaskService
             new { taskId = taskId, newStatus = task.Status.ToString() },
             cancellationToken);
 
-        if (assigneeChanged && normalizedAssignee is not null)
-        {
-            await _notifications.CreateAndPushAsync(
-                userId: normalizedAssignee,
-                type: NotificationType.TaskAssignedPending,
-                message: $"Bạn được giao task \"{task.Title}\".",
-                workspaceId: workspaceId,
-                projectId: projectId,
-                taskId: taskId,
-                redirectUrl: $"/Tasks/AcceptReject/{taskId}?workspaceId={workspaceId:D}",
-                cancellationToken: cancellationToken);
-        }
-
         return new TaskUpdateResult(true, null);
     }
 
@@ -1513,7 +1496,8 @@ public sealed class TaskService : ITaskService
         string? comment,
         CancellationToken cancellationToken = default)
     {
-        return await EvaluateTaskAsync(taskId, actorUserId, workspaceId, score, comment, newLevel: null, cancellationToken);
+        // Backward compatible handler; now uses UC-08 semantics.
+        return await EvaluateTaskAsync(taskId, actorUserId, workspaceId, score, comment, cancellationToken);
     }
 
     public async Task<EvaluationUpdateResult> EvaluateTaskAsync(
@@ -1522,7 +1506,6 @@ public sealed class TaskService : ITaskService
         Guid workspaceId,
         int score,
         string? comment,
-        MemberLevel? newLevel = null,
         CancellationToken cancellationToken = default)
     {
         var detail = await GetTaskDetailAsync(taskId, actorUserId, workspaceId, cancellationToken);
@@ -1560,27 +1543,53 @@ public sealed class TaskService : ITaskService
         var memberUserId = acceptedAssignment.AssigneeUserId;
         var now = DateTime.UtcNow;
 
-        // UC-08: once evaluated & locked -> cannot evaluate again.
-        var alreadyEvaluated = await _db.TaskEvaluations.AnyAsync(
-            e => e.TaskId == taskId,
-            cancellationToken);
-        if (alreadyEvaluated)
-            return new EvaluationUpdateResult(false, "Task đã được đánh giá và đã khoá. Không thể đánh giá lại.", null);
+        var latestEval = await _db.TaskEvaluations
+            .Where(e => e.TaskId == taskId)
+            .OrderByDescending(e => e.EvaluatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latestEval is not null && TaskEvaluationRules.IsEvaluationEditWindowClosed(
+                latestEval.EvaluatedAtUtc,
+                now))
+            return new EvaluationUpdateResult(
+                false,
+                "Đã hết thời gian sửa đánh giá (24 giờ).",
+                null);
 
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
 
-        var eval = new TaskEvaluation
-        {
-            TaskId = taskId,
-            PmUserId = actorUserId,
-            Score = score,
-            Comment = normalizedComment,
-            EvaluatedAtUtc = now,
-            IsLocked = true
-        };
-        _db.TaskEvaluations.Add(eval);
+        TaskEvaluation eval;
+        string action;
 
-        var action = $"Evaluated task with score {score}";
+        if (latestEval is null)
+        {
+            eval = new TaskEvaluation
+            {
+                TaskId = taskId,
+                PmUserId = actorUserId,
+                Score = score,
+                Comment = normalizedComment,
+                EvaluatedAtUtc = now,
+                IsLocked = false
+            };
+            _db.TaskEvaluations.Add(eval);
+            action = $"Evaluated task with score {score}";
+        }
+        else
+        {
+            latestEval.Score = score;
+            latestEval.Comment = normalizedComment;
+            latestEval.PmUserId = actorUserId;
+            eval = latestEval;
+            action = $"Cập nhật đánh giá task — điểm {score}";
+        }
+
+        // Update profile KPIs (AvgScore, CompletionRate, workload computed).
+        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, cancellationToken);
+
+        // UC-08: khoá sau 24h từ mốc EvaluatedAtUtc (lần đầu tạo).
+        eval.IsLocked = now - eval.EvaluatedAtUtc > TaskEvaluationRules.EditWindow;
+
         if (action.Length > 500) action = action[..500];
 
         var entry = new TaskHistoryEntry
@@ -1595,10 +1604,6 @@ public sealed class TaskService : ITaskService
         _db.TaskHistoryEntries.Add(entry);
 
         await _db.SaveChangesAsync(cancellationToken);
-
-        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, newLevel, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
-
         await tx.CommitAsync(cancellationToken);
 
         // Realtime: notify assignee.
@@ -1646,7 +1651,6 @@ public sealed class TaskService : ITaskService
     private async Task UpdateMemberProfileFromEvaluationsAsync(
         Guid workspaceId,
         string memberUserId,
-        MemberLevel? overrideLevel,
         CancellationToken cancellationToken)
     {
         var scores = await _db.TaskEvaluations
@@ -1689,8 +1693,7 @@ public sealed class TaskService : ITaskService
         profile.AvgScore = avgScore;
         profile.CompletionRate = completionRate;
         profile.CurrentWorkload = workload;
-        profile.Level = overrideLevel
-            ?? (avgScore >= 8m ? MemberLevel.Senior : avgScore >= 6m ? MemberLevel.Mid : MemberLevel.Junior);
+        profile.Level = avgScore >= 8m ? MemberLevel.Senior : avgScore >= 6m ? MemberLevel.Mid : MemberLevel.Junior;
     }
 
     private async Task<string> GetUserDisplayNameAsync(string userId, CancellationToken cancellationToken)

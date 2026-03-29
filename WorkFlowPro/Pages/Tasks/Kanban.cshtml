@@ -6,52 +6,46 @@
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 fw-semibold mb-1">Kanban Board</h1>
-        <div class="text-muted">
-            Dự án: <strong>@Model.ProjectName</strong>
-        </div>
-    </div>
-    
-    <div class="small">
-        <a href="/tasks/list?projectId=@(Model.ProjectId)@(Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")"
-               class="text-decoration-none">
-            → Xem danh sách task
-        </a>
-    </div>
-</div>
+<h1>Kanban Board</h1>
 
 @if (Model.ErrorMessage is not null)
 {
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
 }
 else
 {
-    <partial name="_TaskFilters" model="Model.Filters" />
-
-    <!-- Ô tìm kiếm nhanh -->
-    <div class="row mb-3">
-        <div class="col-md-5 col-lg-4">
-            <input id="wfSearch"
-                   class="form-control"
-                   type="text"
-                   placeholder="Tìm nhanh theo tiêu đề task..." />
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <div class="text-muted">Project</div>
+            <div><strong>@Model.ProjectName</strong></div>
+            <div class="small mt-1">
+                <a href="/tasks/list?projectId=@Model.ProjectId">Task List</a>
+            </div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-2">
+            @if (Model.IsPm)
+            {
+                <a class="btn btn-sm btn-primary" href="/Tasks/Create?projectId=@Model.ProjectId">+ Tạo task</a>
+            }
+            <div class="text-muted small text-end">
+                PM xem mọi task; Member chỉ task được giao (Pending/Accepted). Kéo thả trên cột workflow.
+            </div>
         </div>
     </div>
 
-    <!-- Kanban Board -->
-    <div class="kanban-board d-flex flex-nowrap gap-3 overflow-auto pb-3" id="kanbanBoard"
-         style="min-height: 500px;">
-        
-        <!-- Unassigned -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Unassigned">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold">Chưa phân công</h6>
-                <span class="badge bg-secondary" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
+    <partial name="_TaskFilters" model="Model.Filters" />
+
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <input id="wfSearch" class="form-control form-control-sm" type="text" placeholder="Tìm nhanh theo tiêu đề (client)..." />
+        </div>
+    </div>
+
+    <div class="kanban-board d-flex flex-wrap gap-3" id="kanbanBoard">
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Unassigned">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Unassigned</strong></div>
+                <span class="text-muted" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
             </div>
             <div class="kanban-stack wf-kanban-stack" id="wf-stack-unassigned">
                 @foreach (var t in Model.Board.Unassigned)
@@ -61,11 +55,10 @@ else
             </div>
         </div>
 
-        <!-- Pending -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Pending">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold">Đang chờ</h6>
-                <span class="badge bg-secondary" id="wf-count-pending">@Model.Board.Pending.Count</span>
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Pending">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Pending</strong></div>
+                <span class="text-muted" id="wf-count-pending">@Model.Board.Pending.Count</span>
             </div>
             <div class="kanban-stack wf-kanban-stack" id="wf-stack-pending">
                 @foreach (var t in Model.Board.Pending)
@@ -75,11 +68,10 @@ else
             </div>
         </div>
 
-        <!-- To Do -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="ToDo" id="col-ToDo">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold text-primary">To Do</h6>
-                <span class="badge bg-secondary" id="wf-count-todo">@Model.Board.ToDo.Count</span>
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="ToDo" id="col-ToDo">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>To Do</strong></div>
+                <span class="text-muted" id="wf-count-todo">@Model.Board.ToDo.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="ToDo" id="wf-drop-todo">
                 @foreach (var t in Model.Board.ToDo)
@@ -89,11 +81,10 @@ else
             </div>
         </div>
 
-        <!-- In Progress -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="InProgress" id="col-InProgress">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold text-warning">In Progress</h6>
-                <span class="badge bg-secondary" id="wf-count-inprogress">@Model.Board.InProgress.Count</span>
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="InProgress" id="col-InProgress">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>In Progress</strong></div>
+                <span class="text-muted" id="wf-count-inprogress">@Model.Board.InProgress.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="InProgress" id="wf-drop-inprogress">
                 @foreach (var t in Model.Board.InProgress)
@@ -103,11 +94,10 @@ else
             </div>
         </div>
 
-        <!-- Review -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Review" id="col-Review">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold text-info">Review / Testing</h6>
-                <span class="badge bg-secondary" id="wf-count-review">@Model.Board.Review.Count</span>
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Review" id="col-Review">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Review / Testing</strong></div>
+                <span class="text-muted" id="wf-count-review">@Model.Board.Review.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="Review" id="wf-drop-review">
                 @foreach (var t in Model.Board.Review)
@@ -117,11 +107,10 @@ else
             </div>
         </div>
 
-        <!-- Done -->
-        <div class="kanban-column flex-fill" style="min-width: 260px;" data-status-column="Done" id="col-Done">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-semibold text-success">Done</h6>
-                <span class="badge bg-secondary" id="wf-count-done">@Model.Board.Done.Count</span>
+        <div class="kanban-column flex-fill" style="min-width: 220px;" data-status-column="Done" id="col-Done">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><strong>Done</strong></div>
+                <span class="text-muted" id="wf-count-done">@Model.Board.Done.Count</span>
             </div>
             <div class="kanban-dropzone" data-target-status="Done" id="wf-drop-done">
                 @foreach (var t in Model.Board.Done)
@@ -132,6 +121,7 @@ else
         </div>
     </div>
 }
+
 @section Scripts {
 @if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
 {
@@ -142,12 +132,13 @@ else
             const projectId = "@Model.ProjectId.ToString("D")";
             const myUserId = "@Model.CurrentUserId";
             const isPm = @(Model.IsPm ? "true" : "false");
-            const workspaceId = "@(Model.CurrentWorkspaceId?.ToString("D") ?? "")";
             let wfSearchQuery = "";
 
             const connection = new signalR.HubConnectionBuilder()
                 .withUrl("/hubs/task")
                 .build();
+
+            let hubReady = false;
 
             function applySearchToCard(cardEl) {
                 if (!cardEl) return;
@@ -193,34 +184,36 @@ else
             document.addEventListener("dragend", function () { draggedTaskId = null; });
 
             function findDropHost(newStatus) {
+                const key = (newStatus || "").toString().trim().toLowerCase();
                 const map = {
-                    Unassigned: "wf-stack-unassigned",
-                    Pending: "wf-stack-pending",
-                    ToDo: "wf-drop-todo",
-                    InProgress: "wf-drop-inprogress",
-                    Review: "wf-drop-review",
-                    Done: "wf-drop-done"
+                    unassigned: "wf-stack-unassigned",
+                    pending: "wf-stack-pending",
+                    todo: "wf-drop-todo",
+                    inprogress: "wf-drop-inprogress",
+                    review: "wf-drop-review",
+                    done: "wf-drop-done"
                 };
-                const id = map[newStatus];
+                const id = map[key];
                 return id ? document.getElementById(id) : null;
             }
 
-            function updateColumnCounts() {
-                document.querySelectorAll(".kanban-dropzone").forEach(function (zone) {
-                    const status = zone.getAttribute("data-target-status");
-                    const countMap = {
-                        Unassigned: "wf-count-unassigned",
-                        Pending: "wf-count-pending",
-                        ToDo: "wf-count-todo",
-                        InProgress: "wf-count-inprogress",
-                        Review: "wf-count-review",
-                        Done: "wf-count-done"
-                    };
-                    const countEl = document.getElementById(countMap[status]);
-                    if (countEl) {
-                        countEl.textContent = zone.querySelectorAll(".wf-task-card").length;
-                    }
-                });
+            function bumpKanbanCount(statusKey, delta) {
+                const k = (statusKey || "").toString().trim().toLowerCase();
+                const countIds = {
+                    unassigned: "wf-count-unassigned",
+                    pending: "wf-count-pending",
+                    todo: "wf-count-todo",
+                    inprogress: "wf-count-inprogress",
+                    review: "wf-count-review",
+                    done: "wf-count-done"
+                };
+                const cid = countIds[k];
+                if (!cid) return;
+                const el = document.getElementById(cid);
+                if (!el) return;
+                const n = parseInt(el.textContent, 10);
+                const cur = Number.isFinite(n) ? n : 0;
+                el.textContent = String(Math.max(0, cur + delta));
             }
 
             document.querySelectorAll(".kanban-dropzone").forEach(function (dz) {
@@ -233,32 +226,50 @@ else
                     if (!draggedTaskId) return;
                     const targetStatus = dz.getAttribute("data-target-status");
                     if (!targetStatus) return;
-
-                    const cardEl = document.querySelector(`.wf-task-card[data-task-id="${draggedTaskId}"]`);
-                    const originalParent = cardEl ? cardEl.parentElement : null;
-
-                    if (cardEl && dz !== originalParent) {
-                        dz.appendChild(cardEl);
-                        updateColumnCounts();
+                    if (!hubReady || connection.state !== "Connected") {
+                        alert("Đang kết nối tới server — vui lòng đợi vài giây rồi thử kéo lại.");
+                        return;
                     }
-
+                    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(draggedTaskId)) {
+                        alert("Task id không hợp lệ — tải lại trang.");
+                        return;
+                    }
                     try {
-                        var result = await connection.invoke("MoveTask", draggedTaskId, targetStatus, workspaceId || null);
-                        if (result && result.success === false) {
-                            if (cardEl && originalParent && dz !== originalParent) {
-                                originalParent.appendChild(cardEl);
-                                updateColumnCounts();
+                        const r = await connection.invoke("MoveTask", draggedTaskId, targetStatus);
+                        const ok = r && (r.success === true || r.Success === true);
+                        if (!ok) {
+                            const msg = (r && (r.errorMessage || r.ErrorMessage)) || "Không thể chuyển task.";
+                            showToast(msg, "danger");
+                        } else {
+                            // Cập nhật UI ngay (optimistic) — SignalR taskMoved có thể tới sau hoặc payload lệch casing.
+                            const cardEl = document.querySelector(`.wf-task-card[data-task-id="${draggedTaskId}"]`);
+                            if (cardEl && dz) {
+                                const fromSt = (cardEl.getAttribute("data-status") || "").trim();
+                                dz.appendChild(cardEl);
+                                cardEl.setAttribute("data-status", targetStatus);
+                                const fk = fromSt.toLowerCase();
+                                const tk = targetStatus.toLowerCase();
+                                if (fk !== tk) {
+                                    bumpKanbanCount(fk, -1);
+                                    bumpKanbanCount(tk, 1);
+                                }
+                                applySearchToCard(cardEl);
                             }
-                            alert(result.errorMessage || "Không thể chuyển task.");
+                            // Đồng bộ lại toàn board theo filter trên server (tránh lệch UI / số đếm).
+                            const fr = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"kanban\"]");
+                            if (fr && window.wfTaskFilters && window.wfTaskFilters.refreshKanbanForProject) {
+                                setTimeout(function () {
+                                    window.wfTaskFilters.refreshKanbanForProject(fr, {
+                                        myUserId: myUserId,
+                                        isPm: isPm,
+                                        onKanbanUpdated: applySearchAll
+                                    });
+                                }, 300);
+                            }
                         }
                     } catch (err) {
-                        console.error("MoveTask error:", err);
-                        if (cardEl && originalParent && dz !== originalParent) {
-                            originalParent.appendChild(cardEl);
-                            updateColumnCounts();
-                        }
-                        var msg = (err && err.message) ? err.message : String(err);
-                        alert("Lỗi: " + msg);
+                        console.error(err);
+                        alert((err && err.message) ? err.message : "Không thể chuyển task. Vui lòng thử lại.");
                     }
                 });
             });
@@ -290,49 +301,59 @@ else
             }
 
             connection.on("taskMoved", function (payload) {
-                if (!payload || !payload.taskId) return;
-                const newStatus = payload.newStatus;
-                const card = payload.card || null;
+                if (!payload) return;
+                const rawId = payload.taskId !== undefined && payload.taskId !== null ? payload.taskId : payload.TaskId;
+                if (rawId === undefined || rawId === null) return;
+                const taskIdStr = String(rawId);
+                const newStatusRaw = (payload.newStatus || payload.NewStatus || "").toString();
+                const cardRaw = payload.card || payload.Card || null;
+
                 const display = ["Unassigned", "Pending", "ToDo", "InProgress", "Review", "Done"];
-                const shouldDisplay = display.includes(newStatus);
+                const canonical = display.find(function (d) {
+                    return d.toLowerCase() === newStatusRaw.trim().toLowerCase();
+                });
+                const newStatus = canonical || newStatusRaw;
+
+                const shouldDisplay = !!canonical;
                 if (!shouldDisplay) {
-                    const existing = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
+                    const existing = document.querySelector(`.wf-task-card[data-task-id="${taskIdStr}"]`);
                     if (existing) existing.remove();
-                    updateColumnCounts();
                     return;
                 }
+
                 const dropzone = findDropHost(newStatus);
-                const existing = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
+                const existing = document.querySelector(`.wf-task-card[data-task-id="${taskIdStr}"]`);
                 if (existing) {
-                    if (card) {
-                        const html = renderCardHtml(card);
+                    if (cardRaw) {
+                        const html = renderCardHtml(cardRaw);
                         if (!html) return;
                         existing.outerHTML = html;
-                        const newEl = document.querySelector(`.wf-task-card[data-task-id="${payload.taskId}"]`);
-                        if (newEl && dropzone) {
-                            dropzone.appendChild(newEl);
-                        }
-                        applySearchToCard(newEl);
+                        applySearchToCard(document.querySelector(`.wf-task-card[data-task-id="${taskIdStr}"]`));
                     } else if (dropzone) {
                         dropzone.appendChild(existing);
+                        existing.setAttribute("data-status", newStatus);
+                        applySearchToCard(existing);
                     }
-                } else if (card && dropzone) {
+                } else if (cardRaw && dropzone) {
                     const wrapper = document.createElement("div");
-                    wrapper.innerHTML = renderCardHtml(card);
+                    wrapper.innerHTML = renderCardHtml(cardRaw);
                     const el = wrapper.firstElementChild;
                     if (el) {
                         dropzone.appendChild(el);
                         applySearchToCard(el);
                     }
                 }
-                updateColumnCounts();
             });
 
             async function start() {
                 await connection.start();
                 await connection.invoke("JoinProject", projectId);
+                hubReady = true;
             }
-            start().catch(function (err) { console.error(err.toString()); });
+            start().catch(function (err) {
+                hubReady = false;
+                console.error(err.toString());
+            });
 
             connection.on("CommentAdded", function () { showToast("Có comment mới trong một task.", "primary"); });
             connection.on("CommentUpdated", function () { showToast("Một comment vừa được chỉnh sửa.", "primary"); });

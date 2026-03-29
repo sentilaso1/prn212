@@ -13,19 +13,16 @@ namespace WorkFlowPro.Pages.Projects;
 public sealed class CreateModel : PageModel
 {
     private readonly IProjectService _projectService;
-    private readonly ICurrentWorkspaceService _currentWorkspaceService;
 
-    public CreateModel(IProjectService projectService, ICurrentWorkspaceService currentWorkspaceService)
+    public CreateModel(IProjectService projectService)
     {
         _projectService = projectService;
-        _currentWorkspaceService = currentWorkspaceService;
     }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
     public string? ErrorMessage { get; private set; }
-    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public void OnGet()
     {
@@ -51,9 +48,10 @@ public sealed class CreateModel : PageModel
                 Color = Input.Color
             }, cancellationToken);
 
-            var wsId = CurrentWorkspaceId;
-            if (wsId is not null)
-                return LocalRedirect($"/Projects?workspaceId={wsId.Value:D}");
+            // Keep current workspaceId in querystring (UC-15 reload).
+            var workspaceId = Request.Query["workspaceId"].ToString();
+            if (!string.IsNullOrWhiteSpace(workspaceId))
+                return LocalRedirect($"/Projects?workspaceId={workspaceId}");
 
             return LocalRedirect("/Projects");
         }

@@ -130,28 +130,5 @@ public sealed class EditModel : PageModel
 
         return LocalRedirect($"/Projects/Settings/{ProjectId}");
     }
-
-    public async Task<IActionResult> OnPostUnarchiveAsync(CancellationToken cancellationToken)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-            return Challenge();
-
-        try
-        {
-            await _projectService.UnarchiveAsync(userId, ProjectId, cancellationToken);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Forbid();
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-            return Page();
-        }
-
-        return LocalRedirect($"/Projects/Settings/{ProjectId}");
-    }
 }
 

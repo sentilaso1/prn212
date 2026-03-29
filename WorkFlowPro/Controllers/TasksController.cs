@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
 using WorkFlowPro.Extensions;
 using WorkFlowPro.Hubs;
@@ -20,19 +21,48 @@ public sealed class TasksController : ControllerBase
     private readonly ITaskHistoryService _history;
     private readonly INotificationService _notifications;
     private readonly ITaskService _taskService;
+    private readonly ICurrentWorkspaceService _currentWorkspace;
 
     public TasksController(
         WorkFlowProDbContext db,
         IHubContext<TaskHub> hub,
         ITaskHistoryService history,
         INotificationService notifications,
-        ITaskService taskService)
+        ITaskService taskService,
+        ICurrentWorkspaceService currentWorkspace)
     {
         _db = db;
         _hub = hub;
         _history = history;
         _notifications = notifications;
         _taskService = taskService;
+        _currentWorkspace = currentWorkspace;
+    }
+
+    private bool TryResolveWorkspaceId(out Guid workspaceId, out ActionResult? errorResult)
+    {
+        var c = User.TryGetWorkspaceIdFromClaims();
+        if (c is { } wc)
+        {
+            workspaceId = wc;
+            errorResult = null;
+            return true;
+        }
+
+        var s = _currentWorkspace.CurrentWorkspaceId;
+        if (s is { } ws)
+        {
+            workspaceId = ws;
+            errorResult = null;
+            return true;
+        }
+
+        workspaceId = default;
+        errorResult = BadRequest(new
+        {
+            error = "Thiếu workspace. Chọn đơn vị trên menu hoặc mở URL có ?workspaceId=..."
+        });
+        return false;
     }
 
     public sealed record CreateTaskRequest(
@@ -48,14 +78,14 @@ public sealed class TasksController : ControllerBase
 
     public sealed record RejectTaskRequest(string Reason);
 
-    public sealed record EvaluateTaskRequest(int Score, string? Comment, string? NewLevel = null);
+    public sealed record EvaluateTaskRequest(int Score, string? Comment);
 
     [Authorize]
     [HttpGet("projects/{projectId:guid}/kanban")]
     public async Task<ActionResult<object>> GetKanban(Guid projectId)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (project is null) return NotFound();
@@ -121,7 +151,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult<object>> CreateTask(Guid projectId, [FromBody] CreateTaskRequest request)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (project is null) return NotFound();
@@ -205,7 +235,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult> Accept(Guid taskId, [FromBody] AcceptTaskRequest _)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId);
 
@@ -265,7 +295,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult> Reject(Guid taskId, [FromBody] RejectTaskRequest request)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId);
         if (task is null) return NotFound();
@@ -330,7 +360,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult> Move(Guid projectId, Guid taskId, [FromBody] MoveTaskRequest request)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (project is null) return NotFound();
@@ -399,7 +429,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult<object>> FilterKanban(Guid projectId, [FromBody] TaskFilterCriteria? criteria)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (project is null)
@@ -431,7 +461,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult<object>> FilterTaskList(Guid projectId, [FromBody] TaskFilterCriteria? criteria)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (project is null)
@@ -462,7 +492,7 @@ public sealed class TasksController : ControllerBase
     [HttpGet("projects/{projectId:guid}/tasks/filter-state")]
     public async Task<ActionResult<TaskFilterCriteria>> GetFilterState(Guid projectId)
     {
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
         var ok = await _db.Projects.AnyAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (!ok)
             return NotFound();
@@ -476,7 +506,7 @@ public sealed class TasksController : ControllerBase
     [HttpPost("projects/{projectId:guid}/tasks/filter-reset")]
     public async Task<ActionResult<TaskFilterCriteria>> ResetFilterState(Guid projectId)
     {
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
         var ok = await _db.Projects.AnyAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId);
         if (!ok)
             return NotFound();
@@ -548,11 +578,7 @@ public sealed class TasksController : ControllerBase
     public async Task<ActionResult<object>> Evaluate(Guid taskId, [FromBody] EvaluateTaskRequest request)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
-
-        MemberLevel? level = null;
-        if (!string.IsNullOrWhiteSpace(request.NewLevel) && Enum.TryParse<MemberLevel>(request.NewLevel, true, out var parsed))
-            level = parsed;
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var result = await _taskService.EvaluateTaskAsync(
             taskId,
@@ -560,7 +586,6 @@ public sealed class TasksController : ControllerBase
             workspaceId: workspaceId,
             score: request.Score,
             comment: request.Comment,
-            newLevel: level,
             cancellationToken: HttpContext.RequestAborted);
 
         if (!result.Success)
@@ -625,7 +650,7 @@ public sealed class TasksController : ControllerBase
         [FromQuery] TaskPriority priority,
         CancellationToken cancellationToken)
     {
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
         var list = await _taskService.GetSuggestedAssigneesAsync(workspaceId, priority, 5, cancellationToken);
         return Ok(list);
     }

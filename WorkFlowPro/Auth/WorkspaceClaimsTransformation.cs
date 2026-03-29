@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -122,12 +123,15 @@ public sealed class WorkspaceClaimsTransformation : IClaimsTransformation
 
         if (principal.Identity is ClaimsIdentity identity)
         {
-            if (!principal.HasClaim("CurrentWorkspaceId", workspaceId))
-                identity.AddClaim(new Claim("CurrentWorkspaceId", workspaceId));
+            // Tránh nhiều claim cùng loại — FindFirstValue lấy cái đầu (có thể là workspace lúc đăng nhập, đã lỗi thời).
+            foreach (var type in new[] { "CurrentWorkspaceId", "workspace_id" })
+            {
+                foreach (var c in identity.FindAll(type).ToList())
+                    identity.RemoveClaim(c);
+            }
 
-            // Tương thích với phần code JWT hiện có: dùng workspace_id.
-            if (!principal.HasClaim("workspace_id", workspaceId))
-                identity.AddClaim(new Claim("workspace_id", workspaceId));
+            identity.AddClaim(new Claim("CurrentWorkspaceId", workspaceId));
+            identity.AddClaim(new Claim("workspace_id", workspaceId));
         }
 
         return principal;

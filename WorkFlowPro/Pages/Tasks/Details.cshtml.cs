@@ -39,11 +39,14 @@ public sealed class DetailsModel : PageModel
     public ActivityLogVm? ActivityLogVm { get; private set; }
     public IReadOnlyList<TaskEvaluationVm> EvaluationHistoryVm { get; private set; } = Array.Empty<TaskEvaluationVm>();
 
+    public bool EvaluationCanEdit { get; private set; }
+    public int EvaluationPrefillScore { get; private set; } = 8;
+    public string? EvaluationPrefillComment { get; private set; }
+
     public Guid TaskId { get; private set; }
     public Guid ProjectId { get; private set; }
     public string ActorUserId { get; private set; } = string.Empty;
     public bool IsPm => OverviewVm?.detail.IsPm ?? false;
-    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     [BindProperty]
     public UpdateTaskInputModel UpdateTask { get; set; } = new();
@@ -111,7 +114,7 @@ public sealed class DetailsModel : PageModel
         OverviewVm = new TaskOverviewVm(
             detail: detail,
             assigneeOptions: assigneeOptions,
-            WorkspaceId: CurrentWorkspaceId);
+            acceptRejectWorkspaceId: workspaceId);
 
         AttachmentsVm = new AttachmentsVm(
             detail: detail,
@@ -127,6 +130,12 @@ public sealed class DetailsModel : PageModel
 
         EvaluationHistoryVm = evaluations;
 
+        var latestEv = evaluations.FirstOrDefault();
+        var utcNow = DateTime.UtcNow;
+        EvaluationCanEdit = TaskEvaluationRules.CanPmEditEvaluation(detail.Status, latestEv, utcNow);
+        EvaluationPrefillScore = latestEv?.Score ?? 8;
+        EvaluationPrefillComment = latestEv?.Comment;
+
         // Initialize bound inputs with current values for better UX (PM edit).
         UpdateTask.Title = detail.Title;
         UpdateTask.Description = detail.Description;
@@ -137,16 +146,17 @@ public sealed class DetailsModel : PageModel
 
     private async Task<IReadOnlyList<AssigneeOptionVm>> GetAssigneeOptionsAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
-        var raw = await (
-            from wm in _db.WorkspaceMembers
+        // Assignment can target Members (non-PM). Sort in memory — EF cannot translate OrderBy on projected VM.
+        var rows = await (
+            from wm in _db.WorkspaceMembers.AsNoTracking()
             where wm.WorkspaceId == workspaceId && wm.Role != WorkspaceMemberRole.PM
-            join u in _db.Users on wm.UserId equals u.Id
-            select new { u.Id, u.DisplayName, u.Email, u.UserName })
+            join u in _db.Users.AsNoTracking() on wm.UserId equals u.Id
+            select new { u.Id, DisplayName = u.DisplayName ?? u.Email ?? u.UserName ?? u.Id })
             .ToListAsync(cancellationToken);
 
-        return raw
-            .Select(r => new AssigneeOptionVm(r.Id, r.DisplayName ?? r.Email ?? r.UserName ?? r.Id))
-            .OrderBy(o => o.DisplayName)
+        return rows
+            .OrderBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select(r => new AssigneeOptionVm(r.Id, r.DisplayName))
             .ToList();
     }
 
@@ -351,18 +361,14 @@ public sealed class DetailsModel : PageModel
     // ────────────────────────────────────────────────────────────────
     // POST: Evaluation (PM only)
     // ────────────────────────────────────────────────────────────────
-    public async Task<IActionResult> OnPostUpsertEvaluationAsync(Guid taskId, int score, string? comment, string? newLevel, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUpsertEvaluationAsync(Guid taskId, int score, string? comment, CancellationToken cancellationToken)
     {
         var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
         var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (workspaceId is null || string.IsNullOrWhiteSpace(actorUserId))
             return Unauthorized();
 
-        MemberLevel? level = null;
-        if (!string.IsNullOrWhiteSpace(newLevel) && Enum.TryParse<MemberLevel>(newLevel, true, out var parsed))
-            level = parsed;
-
-        var result = await _taskService.EvaluateTaskAsync(taskId, actorUserId, workspaceId.Value, score, comment, level, cancellationToken);
+        var result = await _taskService.EvaluateTaskAsync(taskId, actorUserId, workspaceId.Value, score, comment, cancellationToken);
         if (!result.Success)
         {
             ErrorMessage = result.ErrorMessage ?? "Không thể đánh giá task.";
@@ -561,11 +567,17 @@ public sealed class DetailsModel : PageModel
             return Forbid();
         }
 
+        var latest = EvaluationHistoryVm.FirstOrDefault();
+        var utcNow = DateTime.UtcNow;
+        var canEdit = TaskEvaluationRules.CanPmEditEvaluation(OverviewVm!.detail.Status, latest, utcNow);
         var vm = new EvaluationSectionVm(
             isPm: OverviewVm!.detail.IsPm,
             taskId: taskId,
             status: OverviewVm!.detail.Status,
-            evaluations: EvaluationHistoryVm);
+            evaluations: EvaluationHistoryVm,
+            canEditEvaluation: canEdit,
+            prefillScore: latest?.Score ?? 8,
+            prefillComment: latest?.Comment);
 
         return new PartialViewResult
         {
@@ -580,7 +592,7 @@ public sealed record AssigneeOptionVm(string UserId, string DisplayName);
 public sealed record TaskOverviewVm(
     TaskDetailVm detail,
     IReadOnlyList<AssigneeOptionVm> assigneeOptions,
-    Guid? WorkspaceId = null);
+    Guid? acceptRejectWorkspaceId = null);
 
 public sealed record AttachmentsVm(
     TaskDetailVm detail,
@@ -594,11 +606,14 @@ public sealed record CommentsVm(
 public sealed record ActivityLogVm(
     IReadOnlyList<HistoryEntryVm> items);
 
-public sealed record CommentNodeRenderVm(CommentNodeVm Node, string ActorUserId, bool CanManageComments, bool IsPm);
+public sealed record CommentNodeRenderVm(CommentNodeVm Node, string ActorUserId, bool CanManageComments);
 
 public sealed record EvaluationSectionVm(
     bool isPm,
     Guid taskId,
     TaskStatus status,
-    IReadOnlyList<TaskEvaluationVm> evaluations);
+    IReadOnlyList<TaskEvaluationVm> evaluations,
+    bool canEditEvaluation,
+    int prefillScore,
+    string? prefillComment);
 

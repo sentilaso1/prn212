@@ -22,6 +22,7 @@
                     <span class="badge bg-danger me-1">Mới</span>
                 }
                 <span class="small text-muted">@n.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                <span class="badge bg-secondary ms-1">@n.TypeLabel</span>
                 <div class="mt-1">
                     @if (href != "#")
                     {

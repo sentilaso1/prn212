@@ -113,6 +113,13 @@ public sealed class MemberProfileService : IMemberProfileService
         var canEditProfile = isSelf;
         var canEditLevelOrSubRole = isPm && !isSelf && targetMembership.Role == WorkspaceMemberRole.Member;
 
+        var hasPendingLevel = await _db.LevelAdjustmentRequests.AsNoTracking()
+            .AnyAsync(
+                r => r.WorkspaceId == workspaceId &&
+                     r.TargetUserId == targetUserId &&
+                     r.Status == LevelAdjustmentRequestStatus.Pending,
+                cancellationToken);
+
         return new MemberProfilePageVm
         {
             TargetUserId = targetUserId,
@@ -129,6 +136,8 @@ public sealed class MemberProfileService : IMemberProfileService
             IsPm = isPm,
             CanEditProfile = canEditProfile,
             CanEditLevelOrSubRole = canEditLevelOrSubRole,
+            HasPendingLevelAdjustment = hasPendingLevel,
+            IsStandalonePlatformAdmin = false,
             TaskHistory = history
         };
     }
@@ -148,7 +157,13 @@ public sealed class MemberProfileService : IMemberProfileService
             .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == actorUserId, cancellationToken);
 
         if (membership is null)
-            return new MemberProfileResult(false, "Bạn không thuộc workspace hiện tại.");
+        {
+            var isAdmin = await _db.Users.AsNoTracking()
+                .AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+            if (!isAdmin)
+                return new MemberProfileResult(false, "Bạn không thuộc workspace hiện tại.");
+            // UC-14: admin nền tảng chỉnh tên/avatar khi không có membership trong workspace đang chọn.
+        }
 
         fullName = fullName?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(fullName))
@@ -188,11 +203,10 @@ public sealed class MemberProfileService : IMemberProfileService
         return new MemberProfileResult(true);
     }
 
-    public async Task<MemberProfileResult> UpdateLevelAsync(
+    public async Task<MemberProfileResult> UpdateMemberSubRoleOnlyAsync(
         Guid workspaceId,
         string pmUserId,
         string targetUserId,
-        MemberLevel newLevel,
         string? subRole,
         CancellationToken cancellationToken = default)
     {
@@ -203,10 +217,10 @@ public sealed class MemberProfileService : IMemberProfileService
             cancellationToken);
 
         if (!isPm)
-            return new MemberProfileResult(false, "Chỉ PM mới được chỉnh Level/SubRole.");
+            return new MemberProfileResult(false, "Chỉ PM mới được chỉnh SubRole.");
 
         if (pmUserId == targetUserId)
-            return new MemberProfileResult(false, "Không thể chỉnh Level/SubRole cho chính mình qua form này.");
+            return new MemberProfileResult(false, "Không thể chỉnh SubRole cho chính mình qua form này.");
 
         var wm = await _db.WorkspaceMembers
             .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
@@ -221,33 +235,11 @@ public sealed class MemberProfileService : IMemberProfileService
         if (subRole is not null && subRole.Length > 100)
             return new MemberProfileResult(false, "SubRole tối đa 100 ký tự.");
 
-        var profile = await _db.MemberProfiles.FirstOrDefaultAsync(p => p.UserId == targetUserId, cancellationToken);
-        profile ??= new MemberProfile { UserId = targetUserId };
-        if (_db.Entry(profile).State == EntityState.Detached)
-            _db.MemberProfiles.Add(profile);
-
-        var oldLevel = profile.Level;
         var oldSub = wm.SubRole;
-        var levelChanged = oldLevel != newLevel;
-        var subRoleChanged = !string.Equals(oldSub, subRole, StringComparison.Ordinal);
-
-        if (!levelChanged && !subRoleChanged)
+        if (string.Equals(oldSub, subRole, StringComparison.Ordinal))
             return new MemberProfileResult(true);
 
-        profile.Level = newLevel;
         wm.SubRole = subRole;
-
-        if (levelChanged)
-        {
-            _db.LevelChangeLogs.Add(new LevelChangeLog
-            {
-                TargetUserId = targetUserId,
-                ChangedByPmId = pmUserId,
-                OldLevel = oldLevel,
-                NewLevel = newLevel,
-                ChangedAt = DateTime.UtcNow
-            });
-        }
 
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -261,31 +253,173 @@ public sealed class MemberProfileService : IMemberProfileService
             throw;
         }
 
-        // UC-11: sau khi commit DB — tránh gửi thông báo khi lưu thất bại.
-        if (levelChanged)
-        {
-            var msg = subRoleChanged
-                ? $"PM đã cập nhật Level: {oldLevel} → {newLevel}; SubRole: {(oldSub ?? "—")} → {(subRole ?? "—")}."
-                : $"PM đã đổi Level của bạn: {oldLevel} → {newLevel}.";
+        await _notifications.CreateAndPushAsync(
+            userId: targetUserId,
+            type: NotificationType.RoleChanged,
+            message: $"SubRole trong workspace đã cập nhật: {(oldSub ?? "—")} → {(subRole ?? "—")}.",
+            workspaceId: workspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
 
-            await _notifications.CreateAndPushAsync(
-                userId: targetUserId,
-                type: NotificationType.LevelChanged,
-                message: msg,
-                workspaceId: workspaceId,
-                redirectUrl: "/Profile",
-                cancellationToken: cancellationToken);
+        try
+        {
+            await _taskHub.Clients.Group(TaskHub.WorkspaceGroupName(workspaceId))
+                .SendAsync("memberProfileUpdated", targetUserId, cancellationToken);
         }
-        else if (subRoleChanged)
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SignalR memberProfileUpdated failed for workspace {Ws}", workspaceId);
+        }
+
+        return new MemberProfileResult(true);
+    }
+
+    public async Task<MemberProfileResult> SubmitLevelAdjustmentProposalAsync(
+        Guid workspaceId,
+        string pmUserId,
+        string targetUserId,
+        MemberLevel proposedLevel,
+        string justification,
+        CancellationToken cancellationToken = default)
+    {
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+                m.WorkspaceId == workspaceId &&
+                m.UserId == pmUserId &&
+                m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            return new MemberProfileResult(false, "Chỉ PM mới gửi được đề xuất Level.");
+
+        if (pmUserId == targetUserId)
+            return new MemberProfileResult(false, "Không áp dụng cho chính bạn.");
+
+        var wm = await _db.WorkspaceMembers
+            .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
+
+        if (wm is null || wm.Role != WorkspaceMemberRole.Member)
+            return new MemberProfileResult(false, "Chỉ đề xuất cho member trong đơn vị.");
+
+        justification = justification?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(justification))
+            return new MemberProfileResult(false, "Cần lý do / căn cứ khi đề xuất đổi Level.");
+        if (justification.Length > 2000)
+            return new MemberProfileResult(false, "Lý do tối đa 2000 ký tự.");
+
+        var profile = await _db.MemberProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == targetUserId, cancellationToken);
+        var fromLevel = profile?.Level ?? MemberLevel.Junior;
+
+        if (fromLevel == proposedLevel)
+            return new MemberProfileResult(false, "Level đề xuất trùng Level hiện tại — không cần gửi yêu cầu.");
+
+        var dup = await _db.LevelAdjustmentRequests.AnyAsync(r =>
+                r.WorkspaceId == workspaceId &&
+                r.TargetUserId == targetUserId &&
+                r.Status == LevelAdjustmentRequestStatus.Pending,
+            cancellationToken);
+
+        if (dup)
+            return new MemberProfileResult(false, "Đã có đề xuất đổi Level đang chờ Admin duyệt.");
+
+        _db.LevelAdjustmentRequests.Add(new LevelAdjustmentRequest
+        {
+            WorkspaceId = workspaceId,
+            TargetUserId = targetUserId,
+            ProposedByPmUserId = pmUserId,
+            FromLevel = fromLevel,
+            ToLevel = proposedLevel,
+            Justification = justification,
+            Status = LevelAdjustmentRequestStatus.Pending,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var wsName = await _db.Workspaces.AsNoTracking()
+            .Where(w => w.Id == workspaceId)
+            .Select(w => w.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var adminIds = await _db.Users.AsNoTracking()
+            .Where(u => u.IsPlatformAdmin)
+            .Select(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var aid in adminIds)
         {
             await _notifications.CreateAndPushAsync(
-                userId: targetUserId,
-                type: NotificationType.RoleChanged,
-                message: $"SubRole trong workspace đã cập nhật: {(oldSub ?? "—")} → {(subRole ?? "—")}.",
+                aid,
+                NotificationType.LevelAdjustmentProposal,
+                $"Có đề xuất đổi Level trong \"{wsName ?? ""}\" ({fromLevel} → {proposedLevel}).",
                 workspaceId: workspaceId,
-                redirectUrl: "/Profile",
+                redirectUrl: "/Admin",
                 cancellationToken: cancellationToken);
         }
+
+        await _notifications.CreateAndPushAsync(
+            targetUserId,
+            NotificationType.LevelChanged,
+            $"PM đã gửi đề xuất đổi Level của bạn: {fromLevel} → {proposedLevel} (chờ Admin duyệt).",
+            workspaceId: workspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
+
+        return new MemberProfileResult(true);
+    }
+
+    public async Task<MemberProfileResult> ApplyApprovedLevelAdjustmentAsync(
+        Guid workspaceId,
+        string targetUserId,
+        MemberLevel newLevel,
+        string proposedByPmUserIdForLog,
+        CancellationToken cancellationToken = default)
+    {
+        var wm = await _db.WorkspaceMembers
+            .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
+
+        if (wm is null || wm.Role != WorkspaceMemberRole.Member)
+            return new MemberProfileResult(false, "Member không hợp lệ trong đơn vị.");
+
+        var profile = await _db.MemberProfiles.FirstOrDefaultAsync(p => p.UserId == targetUserId, cancellationToken);
+        profile ??= new MemberProfile { UserId = targetUserId };
+        if (_db.Entry(profile).State == EntityState.Detached)
+            _db.MemberProfiles.Add(profile);
+
+        var oldLevel = profile.Level;
+        if (oldLevel == newLevel)
+            return new MemberProfileResult(true);
+
+        profile.Level = newLevel;
+
+        _db.LevelChangeLogs.Add(new LevelChangeLog
+        {
+            TargetUserId = targetUserId,
+            ChangedByPmId = proposedByPmUserIdForLog,
+            OldLevel = oldLevel,
+            NewLevel = newLevel,
+            ChangedAt = DateTime.UtcNow
+        });
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await tx.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        await _notifications.CreateAndPushAsync(
+            userId: targetUserId,
+            type: NotificationType.LevelChanged,
+            message: $"Admin đã duyệt: Level {oldLevel} → {newLevel}.",
+            workspaceId: workspaceId,
+            redirectUrl: "/Profile",
+            cancellationToken: cancellationToken);
 
         try
         {

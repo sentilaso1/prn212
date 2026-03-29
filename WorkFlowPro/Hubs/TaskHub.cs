@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
 using WorkFlowPro.Extensions;
 using WorkFlowPro.Services;
@@ -16,11 +18,16 @@ public sealed class TaskHub : Hub
 
     private readonly IKanbanService _kanbanService;
     private readonly WorkFlowProDbContext _db;
+    private readonly ICurrentWorkspaceService _currentWorkspace;
 
-    public TaskHub(IKanbanService kanbanService, WorkFlowProDbContext db)
+    public TaskHub(
+        IKanbanService kanbanService,
+        WorkFlowProDbContext db,
+        ICurrentWorkspaceService currentWorkspace)
     {
         _kanbanService = kanbanService;
         _db = db;
+        _currentWorkspace = currentWorkspace;
     }
 
     /// <summary>UC-14 / UC-04: nhận broadcast cập nhật MemberProfile (gợi ý phân công).</summary>
@@ -48,59 +55,70 @@ public sealed class TaskHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, projectId.ToString("D"));
     }
 
-    public async Task<MoveTaskHubResult> MoveTask(
-        string taskIdStr,
-        string targetStatus,
-        string? wsIdStr = null)
+    /// <summary>
+    /// Kanban kéo thả. Tham số string + Dictionary trả về — tránh lỗi bind Guid / serialize record trên SignalR.
+    /// Load session trước khi đọc workspace (WebSocket thường cần LoadAsync).
+    /// </summary>
+    public async Task<Dictionary<string, object?>> MoveTask(string taskId, string targetStatus)
     {
+        static Dictionary<string, object?> R(bool success, string? errorMessage = null) =>
+            new()
+            {
+                ["success"] = success,
+                ["errorMessage"] = errorMessage
+            };
+
         try
         {
+            var http = Context.GetHttpContext();
+            if (http?.Session is { } session)
+            {
+                try
+                {
+                    await session.LoadAsync(Context.ConnectionAborted);
+                }
+                catch
+                {
+                    /* một số cấu hình session không cần / không hỗ trợ Load trên WS */
+                }
+            }
+
             var principal = Context.User;
             if (principal is null)
-                return new MoveTaskHubResult(false, "Not authenticated.");
+                return R(false, "Not authenticated.");
 
             var actorUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(actorUserId))
-                return new MoveTaskHubResult(false, "Missing user id.");
+                return R(false, "Missing user id.");
 
-            if (!Guid.TryParse(taskIdStr, out var taskId))
-                return new MoveTaskHubResult(false, "Invalid taskId.");
+            if (!Guid.TryParse(taskId?.Trim(), out var tid) || tid == Guid.Empty)
+                return R(false, "taskId không hợp lệ.");
 
-            Guid workspaceId;
-            if (!string.IsNullOrWhiteSpace(wsIdStr) && Guid.TryParse(wsIdStr, out var parsed))
-            {
-                workspaceId = parsed;
-            }
-            else
-            {
-                var claimVal = principal.FindFirstValue("workspace_id")
-                               ?? principal.FindFirstValue("CurrentWorkspaceId");
-                if (!Guid.TryParse(claimVal, out workspaceId))
-                    return new MoveTaskHubResult(false, "Missing workspace id.");
-            }
+            Guid workspaceGuid;
+            var wsFromSession = _currentWorkspace.CurrentWorkspaceId;
+            if (wsFromSession is { } w && w != Guid.Empty)
+                workspaceGuid = w;
+            else if (!Guid.TryParse(
+                         principal.FindFirstValue("workspace_id") ?? principal.FindFirstValue("CurrentWorkspaceId"),
+                         out workspaceGuid))
+                return R(false, "Thiếu workspace hiện tại — hãy chọn lại đơn vị hoặc tải lại trang.");
 
-            if (!Enum.TryParse<TaskStatus>(targetStatus, ignoreCase: true, out var newStatus))
-                return new MoveTaskHubResult(false, "Invalid target status.");
-
-            var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
-                m.WorkspaceId == workspaceId && m.UserId == actorUserId);
-            if (!isMember)
-                return new MoveTaskHubResult(false, "Bạn không thuộc workspace này.");
+            if (string.IsNullOrWhiteSpace(targetStatus) ||
+                !Enum.TryParse<TaskStatus>(targetStatus.Trim(), ignoreCase: true, out var newStatus))
+                return R(false, "Trạng thái đích không hợp lệ.");
 
             var result = await _kanbanService.UpdateTaskStatusAsync(
-                taskId,
+                tid,
                 newStatus,
                 actorUserId,
-                workspaceId);
+                workspaceGuid,
+                Context.ConnectionAborted);
 
-            return new MoveTaskHubResult(result.Success, result.ErrorMessage);
+            return R(result.Success, result.ErrorMessage);
         }
         catch (Exception ex)
         {
-            return new MoveTaskHubResult(false, $"Server error: {ex.Message}");
+            return R(false, $"Lỗi server khi chuyển task: {ex.Message}");
         }
     }
 }
-
-public sealed record MoveTaskHubResult(bool Success, string? ErrorMessage = null);
-

@@ -10,6 +10,8 @@ using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Pages.Tasks;
 
+using TaskItemStatus = WorkFlowPro.Data.TaskStatus;
+
 // UC-05: Only Member (not PM) can Accept/Reject tasks assigned to them.
 [Authorize]
 public sealed class AcceptRejectModel : PageModel
@@ -37,81 +39,97 @@ public sealed class AcceptRejectModel : PageModel
 
     public TaskDetailsVm? Task { get; private set; }
 
-    public Guid? ResolvedWorkspaceId { get; private set; }
-
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
-    public async Task<IActionResult> OnGetAsync([FromRoute] Guid taskId, [FromQuery] Guid? workspaceId, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAsync([FromRoute] Guid taskId, CancellationToken cancellationToken)
     {
         Input.TaskId = taskId;
-        await LoadTaskAsync(taskId, cancellationToken);
 
-        if (ResolvedWorkspaceId is not null && workspaceId != ResolvedWorkspaceId)
+        var currentWs = _currentWorkspaceService.CurrentWorkspaceId;
+        if (currentWs is null)
         {
-            return RedirectToPage(null, new { taskId, workspaceId = ResolvedWorkspaceId.Value });
+            ErrorMessage = "Workspace không hợp lệ.";
+            return Page();
         }
 
-        return Page();
-    }
-
-    private async System.Threading.Tasks.Task LoadTaskAsync(Guid taskId, CancellationToken cancellationToken)
-    {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
         {
             ErrorMessage = "User không hợp lệ.";
-            return;
+            return Page();
         }
 
-        var assignment = await _db.TaskAssignments.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(a =>
-            a.TaskId == taskId &&
-            a.AssigneeUserId == userId &&
-            a.Status == TaskAssignmentStatus.Pending, cancellationToken);
-
-        if (assignment is null)
-        {
-            ErrorMessage = "Task không tồn tại hoặc không được giao cho bạn (Pending).";
-            return;
-        }
-
-        var task = await _db.Tasks.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        var task = await _db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
         if (task is null)
         {
-            ErrorMessage = "Task không tồn tại.";
-            return;
+            ErrorMessage = "Không tìm thấy task.";
+            return Page();
         }
 
-        var project = await _db.Projects.IgnoreQueryFilters()
+        var project = await _db.Projects.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
         if (project is null)
         {
-            ErrorMessage = "Project không hợp lệ.";
-            return;
+            ErrorMessage = "Không tìm thấy dự án của task.";
+            return Page();
         }
 
-        var workspaceId = project.WorkspaceId;
-        ResolvedWorkspaceId = workspaceId;
+        var inProjectWorkspace = await _db.WorkspaceMembers.AnyAsync(
+            m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId,
+            cancellationToken);
+        if (!inProjectWorkspace)
+        {
+            ErrorMessage = "Bạn không thuộc đơn vị chứa task này.";
+            return Page();
+        }
 
-        var isPm = await _db.WorkspaceMembers.IgnoreQueryFilters().AnyAsync(m =>
-            m.WorkspaceId == workspaceId &&
+        if (currentWs.Value != project.WorkspaceId)
+        {
+            ErrorMessage =
+                $"Task thuộc dự án \"{project.Name}\" ở đơn vị khác với đơn vị đang chọn. " +
+                "Hãy đổi đơn vị (menu góc phải) đúng workspace rồi mở lại link (thông báo / Accept).";
+            return Page();
+        }
+
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == currentWs.Value &&
             m.UserId == userId &&
             m.Role == WorkspaceMemberRole.PM, cancellationToken);
         if (isPm)
         {
             ErrorMessage = "Chỉ Member được Accept/Reject task.";
-            return;
+            return Page();
         }
 
-        var isMember = await _db.WorkspaceMembers.IgnoreQueryFilters().AnyAsync(m =>
-            m.WorkspaceId == workspaceId &&
-            m.UserId == userId, cancellationToken);
-        if (!isMember)
+        var assignment = await _db.TaskAssignments.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.TaskId == taskId && a.AssigneeUserId == userId, cancellationToken);
+
+        if (assignment is null)
         {
-            ErrorMessage = "Bạn không thuộc workspace này.";
-            return;
+            ErrorMessage = "Bạn không được giao task này.";
+            return Page();
+        }
+
+        if (assignment.Status == TaskAssignmentStatus.Accepted)
+            return LocalRedirect($"/Tasks/Details/{taskId:D}");
+
+        if (assignment.Status == TaskAssignmentStatus.Rejected)
+        {
+            ErrorMessage = "Bạn đã từ chối task này trước đó.";
+            return Page();
+        }
+
+        if (assignment.Status != TaskAssignmentStatus.Pending)
+        {
+            ErrorMessage = "Trạng thái giao việc không hợp lệ để Accept/Reject.";
+            return Page();
+        }
+
+        if (task.Status != TaskItemStatus.Pending)
+        {
+            ErrorMessage = "Task không còn ở trạng thái chờ bạn chấp nhận (có thể PM hoặc hệ thống đã đổi trạng thái).";
+            return Page();
         }
 
         Task = new TaskDetailsVm(
@@ -121,14 +139,7 @@ public sealed class AcceptRejectModel : PageModel
             projectName: project.Name,
             dueDateUtc: task.DueDateUtc,
             priority: task.Priority);
-    }
-
-    private async Task<Guid?> ResolveWorkspaceFromTask(Guid taskId, CancellationToken ct)
-    {
-        var task = await _db.Tasks.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, ct);
-        if (task is null) return null;
-        var project = await _db.Projects.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(p => p.Id == task.ProjectId, ct);
-        return project?.WorkspaceId;
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAcceptAsync(CancellationToken cancellationToken)
@@ -154,20 +165,17 @@ public sealed class AcceptRejectModel : PageModel
         if (!result.Success)
         {
             ErrorMessage = result.ErrorMessage ?? "Không thể Accept task.";
-            await LoadTaskAsync(Input.TaskId, cancellationToken);
-            return Page();
+            return await OnGetAsync(Input.TaskId, cancellationToken);
         }
 
-        SuccessToastMessage = "Accepted task thành công";
-
-        var wsId = await ResolveWorkspaceFromTask(Input.TaskId, cancellationToken);
-        var wsParam = wsId is not null ? $"&workspaceId={wsId.Value:D}" : "";
-
-        await LoadTaskAsync(Input.TaskId, cancellationToken);
-        if (Task is not null)
-            return LocalRedirect($"/board?projectId={Task.ProjectId}{wsParam}");
-
-        return RedirectToPage("/Workspaces/Index");
+        SuccessToastMessage = "Đã chấp nhận task.";
+        var projectId = await _db.Tasks.AsNoTracking()
+            .Where(t => t.Id == Input.TaskId)
+            .Select(t => t.ProjectId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (projectId == Guid.Empty)
+            return RedirectToPage("/Tasks/MyTasks/Pending");
+        return LocalRedirect($"/board?projectId={projectId:D}");
     }
 
     public async Task<IActionResult> OnPostRejectAsync(CancellationToken cancellationToken)
@@ -194,20 +202,17 @@ public sealed class AcceptRejectModel : PageModel
         if (!result.Success)
         {
             ErrorMessage = result.ErrorMessage ?? "Không thể Reject task.";
-            await LoadTaskAsync(Input.TaskId, cancellationToken);
-            return Page();
+            return await OnGetAsync(Input.TaskId, cancellationToken);
         }
 
-        SuccessToastMessage = "Rejected task thành công";
-
-        var wsId = await ResolveWorkspaceFromTask(Input.TaskId, cancellationToken);
-        var wsParam = wsId is not null ? $"&workspaceId={wsId.Value:D}" : "";
-
-        await LoadTaskAsync(Input.TaskId, cancellationToken);
-        if (Task is not null)
-            return LocalRedirect($"/board?projectId={Task.ProjectId}{wsParam}");
-
-        return RedirectToPage("/Workspaces/Index");
+        SuccessToastMessage = "Đã từ chối task.";
+        var projectId = await _db.Tasks.AsNoTracking()
+            .Where(t => t.Id == Input.TaskId)
+            .Select(t => t.ProjectId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (projectId == Guid.Empty)
+            return RedirectToPage("/Tasks/MyTasks/Pending");
+        return LocalRedirect($"/board?projectId={projectId:D}");
     }
 
     public sealed class TaskDetailsVm
@@ -244,4 +249,3 @@ public sealed class AcceptRejectModel : PageModel
         public string? RejectReason { get; set; }
     }
 }
-

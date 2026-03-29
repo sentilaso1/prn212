@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
@@ -20,20 +21,26 @@ public sealed class CurrentWorkspaceService : ICurrentWorkspaceService
             if (http is null)
                 return null;
 
-            try
+            var sessionVal = http.Session.GetString(WorkspaceSessionKeys.CurrentWorkspaceId);
+            if (!string.IsNullOrWhiteSpace(sessionVal) && Guid.TryParse(sessionVal, out var sessionGuid))
+                return sessionGuid;
+
+            // Ưu tiên giá trị mới nhất nếu có trùng claim (trước khi transformation dọn sạch).
+            var identity = http.User?.Identity as ClaimsIdentity;
+            if (identity is not null)
             {
-                var sessionVal = http.Session.GetString(WorkspaceSessionKeys.CurrentWorkspaceId);
-                if (!string.IsNullOrWhiteSpace(sessionVal) && Guid.TryParse(sessionVal, out var sessionGuid))
-                    return sessionGuid;
-            }
-            catch
-            {
-                // Session not available (e.g. SignalR WebSocket context)
+                var lastWs = identity.FindAll("workspace_id").Select(c => c.Value).LastOrDefault()
+                             ?? identity.FindAll("CurrentWorkspaceId").Select(c => c.Value).LastOrDefault();
+                if (!string.IsNullOrWhiteSpace(lastWs) && Guid.TryParse(lastWs, out var lastGuid))
+                    return lastGuid;
             }
 
+            if (http.User is not { } user)
+                return null;
+
             var claimVal =
-                http.User.FindFirstValue("CurrentWorkspaceId")
-                ?? http.User.FindFirstValue("workspace_id");
+                user.FindFirstValue("CurrentWorkspaceId")
+                ?? user.FindFirstValue("workspace_id");
 
             if (!string.IsNullOrWhiteSpace(claimVal) && Guid.TryParse(claimVal, out var claimGuid))
                 return claimGuid;

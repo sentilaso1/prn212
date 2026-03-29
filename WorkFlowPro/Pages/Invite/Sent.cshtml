@@ -1,4 +1,4 @@
-@page "/Invite/Sent"
+﻿@page "/Invite/Sent"
 @model WorkFlowPro.Pages.Invite.SentModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
@@ -8,7 +8,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Danh sach loi moi da gui</h1>
-    <a class="btn btn-primary" href="/Invite@(Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "")">+ Mời thành viên</a>
+    <a class="btn btn-primary" href="/Invite">+ Moi thanh vien</a>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
@@ -41,21 +41,17 @@ else
                     <td>@inv.Role</td>
                     <td>@(inv.SubRole ?? "-")</td>
                     <td>
-                        @if (inv.Status == WorkFlowPro.Data.InviteStatus.Pending)
+                        @switch (inv.Status)
                         {
-                            <span class="badge bg-warning text-dark">Pending</span>
-                        }
-                        else if (inv.Status == WorkFlowPro.Data.InviteStatus.Accepted)
-                        {
-                            <span class="badge bg-success">Accepted</span>
-                        }
-                        else if (inv.Status == WorkFlowPro.Data.InviteStatus.Rejected)
-                        {
-                            <span class="badge bg-danger">Rejected</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-secondary">@inv.Status</span>
+                            case WorkFlowPro.Data.InviteStatus.Pending:
+                                <span class="badge text-bg-warning">Pending</span>
+                                break;
+                            case WorkFlowPro.Data.InviteStatus.Accepted:
+                                <span class="badge text-bg-success">Accepted</span>
+                                break;
+                            case WorkFlowPro.Data.InviteStatus.Rejected:
+                                <span class="badge text-bg-danger">Rejected</span>
+                                break;
                         }
                     </td>
                     <td>@inv.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>

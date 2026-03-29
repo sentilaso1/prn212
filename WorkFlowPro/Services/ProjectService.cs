@@ -9,13 +9,14 @@ namespace WorkFlowPro.Services;
 
 public interface IProjectService
 {
+    /// <summary>Danh sách dự án trong workspace đang chọn — mọi thành viên workspace.</summary>
     Task<IReadOnlyList<Project>> ListForWorkspaceAsync(string userId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Project>> ListForPmAsync(string userId, CancellationToken cancellationToken = default);
     Task<Project> CreateAsync(string userId, CreateProjectInput input, CancellationToken cancellationToken = default);
     Task<Project> GetForPmAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task UpdateAsync(string userId, Guid projectId, UpdateProjectInput input, CancellationToken cancellationToken = default);
     Task ArchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
-    Task UnarchiveAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
     Task DeleteAsync(string userId, Guid projectId, CancellationToken cancellationToken = default);
 }
 
@@ -94,10 +95,10 @@ public sealed class ProjectService : IProjectService
             throw new InvalidOperationException("Missing active workspace.");
 
         var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
-            m.UserId == userId && m.WorkspaceId == workspaceId.Value,
+                m.UserId == userId && m.WorkspaceId == workspaceId.Value,
             cancellationToken);
         if (!isMember)
-            throw new UnauthorizedAccessException("User is not a member of this workspace.");
+            throw new UnauthorizedAccessException("Not a workspace member.");
 
         return await _db.Projects
             .Where(p => p.WorkspaceId == workspaceId.Value)
@@ -139,7 +140,7 @@ public sealed class ProjectService : IProjectService
 
         // Unique name in workspace (không phân biệt archived).
         var exists = await _db.Projects.AnyAsync(p =>
-            p.Name == name, cancellationToken);
+            p.WorkspaceId == workspaceId && p.Name == name, cancellationToken);
 
         if (exists)
             throw new InvalidOperationException("Project name already exists in this workspace.");
@@ -281,25 +282,6 @@ public sealed class ProjectService : IProjectService
             return;
 
         project.Status = ProjectStatus.Archived;
-        _db.Projects.Update(project);
-        await _db.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task UnarchiveAsync(
-        string userId,
-        Guid projectId,
-        CancellationToken cancellationToken = default)
-    {
-        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
-
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
-        if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
-
-        if (project.Status != ProjectStatus.Archived)
-            return;
-
-        project.Status = ProjectStatus.Active;
         _db.Projects.Update(project);
         await _db.SaveChangesAsync(cancellationToken);
     }

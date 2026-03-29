@@ -67,7 +67,19 @@ public sealed class ProfileModel : PageModel
             .AnyAsync(m => m.WorkspaceId == workspaceId.Value && m.UserId == targetUserId, cancellationToken);
 
         if (!targetInWorkspace)
-            return NotFound();
+        {
+            var standalone = await TryBuildStandalonePlatformAdminProfileAsync(actorUserId, targetUserId, cancellationToken);
+            if (standalone is null)
+                return NotFound();
+
+            Profile = standalone;
+            Input.TargetUserId = targetUserId;
+            Input.FullName = Profile.FullName;
+            PmInput.TargetUserId = targetUserId;
+            PmInput.Level = Profile.Level;
+            PmInput.SubRole = Profile.SubRole ?? string.Empty;
+            return Page();
+        }
 
         var isPm = await _db.WorkspaceMembers.AsNoTracking()
             .AnyAsync(m =>
@@ -148,13 +160,41 @@ public sealed class ProfileModel : PageModel
         if (!ModelState.IsValid)
             return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
 
-        var result = await _memberProfile.UpdateLevelAsync(
-            workspaceId.Value,
-            actorUserId,
-            pmInput.TargetUserId,
-            pmInput.Level,
-            string.IsNullOrWhiteSpace(pmInput.SubRole) ? null : pmInput.SubRole.Trim(),
-            cancellationToken);
+        var mpRow = await _db.MemberProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == pmInput.TargetUserId, cancellationToken);
+        var currentLevel = mpRow?.Level ?? MemberLevel.Junior;
+
+        MemberProfileResult result;
+        if (pmInput.Level == currentLevel)
+        {
+            result = await _memberProfile.UpdateMemberSubRoleOnlyAsync(
+                workspaceId.Value,
+                actorUserId,
+                pmInput.TargetUserId,
+                string.IsNullOrWhiteSpace(pmInput.SubRole) ? null : pmInput.SubRole.Trim(),
+                cancellationToken);
+            if (result.Success)
+                ToastMessage = "Đã cập nhật SubRole.";
+        }
+        else
+        {
+            var j = pmInput.LevelJustification?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(j))
+            {
+                ModelState.AddModelError("PmInput.LevelJustification", "Cần lý do / căn cứ khi đề xuất đổi Level (UC-10).");
+                return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
+            }
+
+            result = await _memberProfile.SubmitLevelAdjustmentProposalAsync(
+                workspaceId.Value,
+                actorUserId,
+                pmInput.TargetUserId,
+                pmInput.Level,
+                j,
+                cancellationToken);
+            if (result.Success)
+                ToastMessage = "Đã gửi đề xuất đổi Level — chờ Admin duyệt (UC-13).";
+        }
 
         if (!result.Success)
         {
@@ -162,8 +202,52 @@ public sealed class ProfileModel : PageModel
             return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
         }
 
-        ToastMessage = "Đã cập nhật Level / SubRole.";
         return RedirectToPage("/Profile", new { userId = pmInput.TargetUserId });
+    }
+
+    /// <summary>UC-14: Platform admin không có membership trong workspace đang chọn vẫn xem/sửa profile của chính mình.</summary>
+    private async Task<MemberProfilePageVm?> TryBuildStandalonePlatformAdminProfileAsync(
+        string actorUserId,
+        string targetUserId,
+        CancellationToken cancellationToken)
+    {
+        if (actorUserId != targetUserId)
+            return null;
+
+        var isPlatformAdmin = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+        if (!isPlatformAdmin)
+            return null;
+
+        var user = await _db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+        if (user is null)
+            return null;
+
+        var mp = await _db.MemberProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == targetUserId, cancellationToken);
+        mp ??= new MemberProfile { UserId = targetUserId };
+
+        return new MemberProfilePageVm
+        {
+            TargetUserId = targetUserId,
+            Email = user.Email ?? user.UserName ?? targetUserId,
+            FullName = user.DisplayName ?? user.Email ?? user.UserName ?? targetUserId,
+            AvatarUrl = user.AvatarUrl,
+            SubRole = null,
+            WorkspaceRole = WorkspaceMemberRole.Member,
+            Level = mp.Level,
+            CompletionRate = mp.CompletionRate,
+            AvgScore = mp.AvgScore,
+            CurrentWorkload = mp.CurrentWorkload,
+            IsSelf = true,
+            IsPm = false,
+            CanEditProfile = true,
+            CanEditLevelOrSubRole = false,
+            HasPendingLevelAdjustment = false,
+            IsStandalonePlatformAdmin = true,
+            TaskHistory = Array.Empty<ProfileTaskHistoryRowVm>()
+        };
     }
 
     private async Task<IActionResult> ReloadWithErrorAsync(
@@ -176,6 +260,8 @@ public sealed class ProfileModel : PageModel
     {
         WorkspaceId = workspaceId;
         var vm = await _memberProfile.GetProfilePageAsync(workspaceId, actorUserId, targetUserId, cancellationToken);
+        if (vm is null)
+            vm = await TryBuildStandalonePlatformAdminProfileAsync(actorUserId, targetUserId, cancellationToken);
         if (vm is null)
             return NotFound();
         Profile = vm;
@@ -195,6 +281,7 @@ public sealed class ProfileModel : PageModel
             PmInput.TargetUserId = pmInput.TargetUserId;
             PmInput.Level = pmInput.Level;
             PmInput.SubRole = pmInput.SubRole ?? string.Empty;
+            PmInput.LevelJustification = pmInput.LevelJustification;
         }
         else
         {
@@ -228,5 +315,9 @@ public sealed class ProfileModel : PageModel
 
         [StringLength(100)]
         public string? SubRole { get; set; }
+
+        /// <summary>Bắt buộc khi đổi Level so với hiện tại.</summary>
+        [StringLength(2000)]
+        public string? LevelJustification { get; set; }
     }
 }

@@ -6,8 +6,6 @@ public sealed class TaskFiltersVm
 {
     public Guid ProjectId { get; init; }
 
-    public Guid? WorkspaceId { get; init; }
-
     /// <summary>kanban | list — dùng cho data attributes JS.</summary>
     public string ViewContext { get; init; } = "kanban";
 

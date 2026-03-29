@@ -177,12 +177,14 @@ public sealed class CreateTaskModel : PageModel
                 workspaceId: workspaceId.Value,
                 projectId: project.Id,
                 taskId: task.Id,
+                // UC-05: Member nhận task qua notification -> mở trang accept/reject.
                 redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
+        // Redirect POST -> GET để tránh double-submit.
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}");
     }
 
     public async Task<IActionResult> OnPostCreateWithSuggestionAsync(CancellationToken cancellationToken)
@@ -274,12 +276,13 @@ public sealed class CreateTaskModel : PageModel
                 workspaceId: workspaceId.Value,
                 projectId: project.Id,
                 taskId: task.Id,
+                // UC-05: Member nhận task qua notification -> mở trang accept/reject.
                 redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}");
     }
 
     private bool TryValidateTitleAndDueDate()
@@ -288,11 +291,12 @@ public sealed class CreateTaskModel : PageModel
         if (string.IsNullOrWhiteSpace(Input.Title))
             ModelState.AddModelError(nameof(Input.Title), "Title là bắt buộc.");
 
-        if (Input.DueDateUtc is DateTime due)
+        if (Input.DueDateUtc is null)
+            ModelState.AddModelError(nameof(Input.DueDateUtc), "Hạn chót (due date) là bắt buộc.");
+        else if (Input.DueDateUtc is DateTime due)
         {
-            // DueDate phải sau hôm nay.
             if (due.Date <= DateTime.UtcNow.Date)
-                ModelState.AddModelError(nameof(Input.DueDateUtc), "DueDateUtc phải sau hôm nay.");
+                ModelState.AddModelError(nameof(Input.DueDateUtc), "Hạn chót phải từ ngày mai trở đi (theo UTC).");
         }
 
         // Trim here to avoid inconsistencies in later persistence.

@@ -3,68 +3,64 @@
     var d = Model.detail;
 }
 
-<div class="card shadow-sm">
-    <div class="card-header bg-light py-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-semibold">Tệp đính kèm</h5>
-            @if (Model.items.Count == 0)
-            {
-                <span class="text-muted small">Chưa có tệp</span>
-            }
-        </div>
-    </div>
-
-    <div class="card-body">
-        <div id="wfAttachmentsList">
-            @if (Model.items.Count == 0)
-            {
-                <div class="alert alert-info small text-center py-4">Chưa có file đính kèm.</div>
-            }
-            else
-            {
-                <div class="list-group">
-                    @foreach (var a in Model.items)
-                    {
-                        <div class="list-group-item d-flex justify-content-between align-items-start gap-3 py-3">
-                            <div class="flex-grow-1">
-                                <a href="@a.FileUrl" target="_blank" rel="noopener" class="fw-medium">@a.FileName</a>
-                                <div class="text-muted small mt-1">
-                                    Upload bởi @a.UploadedByDisplayName • @a.UploadedAtUtc.ToString("dd/MM/yyyy HH:mm")
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="text-muted small">@((a.FileSizeBytes / 1024d).ToString("0.0")) KB</div>
-                                @if (d.CanUploadAttachments)
-                                {
-                                    <form method="post" asp-page-handler="DeleteAttachment" data-wf-ajax="true" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="taskId" value="@d.TaskId" />
-                                        <input type="hidden" name="attachmentId" value="@a.Id" />
-                                        <button class="btn btn-sm btn-outline-danger mt-2" type="submit"
-                                                onclick="return confirm('Xóa file này?');">
-                                            Xóa
-                                        </button>
-                                    </form>
-                                }
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-
-        @if (d.CanUploadAttachments)
+<div class="card card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Attachments</h5>
+        @if (Model.items.Count == 0)
         {
-            <hr class="my-4" />
-            <form method="post" asp-page-handler="AddAttachment" enctype="multipart/form-data" data-wf-ajax="true">
-                @Html.AntiForgeryToken()
-                <div class="mb-3">
-                    <label class="form-label">Tải lên tệp mới</label>
-                    <input class="form-control" type="file" name="file" />
-                    <div class="form-text small">Dung lượng tối đa: 5MB</div>
-                </div>
-                <button class="btn btn-primary" type="submit">Tải lên</button>
-            </form>
+            <span class="text-muted small">No attachments</span>
         }
     </div>
+
+    <div id="wfAttachmentsList">
+        @if (Model.items.Count == 0)
+        {
+            <div class="alert alert-info small">Chưa có file đính kèm.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var a in Model.items)
+                {
+                    <div class="list-group-item d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <a href="@a.FileUrl" target="_blank" rel="noopener" class="fw-semibold">@a.FileName</a>
+                            <div class="text-muted small">
+                                Uploaded by @a.UploadedByDisplayName • @a.UploadedAtUtc.ToString("yyyy-MM-dd HH:mm")
+                            </div>
+                        </div>
+                        <div class="text-end small text-muted">
+                            <div>@((a.FileSizeBytes / 1024d).ToString("0.0")) KB</div>
+                            @if (d.CanUploadAttachments)
+                            {
+                                <form method="post" asp-page-handler="DeleteAttachment" data-wf-ajax="true" class="mt-2">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@d.TaskId" />
+                                    <input type="hidden" name="attachmentId" value="@a.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete attachment?');">
+                                        Delete
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (d.CanUploadAttachments)
+    {
+        <hr />
+        <form method="post" asp-page-handler="AddAttachment" enctype="multipart/form-data" data-wf-ajax="true">
+            @Html.AntiForgeryToken()
+            <div class="mb-2">
+                <label class="form-label">Upload file</label>
+                <input class="form-control" type="file" name="file" />
+                <div class="form-text">Max 5MB.</div>
+            </div>
+            <button class="btn btn-primary" type="submit">Upload</button>
+        </form>
+    }
 </div>
+

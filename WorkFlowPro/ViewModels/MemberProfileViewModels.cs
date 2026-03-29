@@ -18,6 +18,13 @@ public sealed class MemberProfilePageVm
     public bool IsPm { get; init; }
     public bool CanEditProfile { get; init; }
     public bool CanEditLevelOrSubRole { get; init; }
+
+    /// <summary>Đã có đề xuất đổi Level chờ Admin (UC-13 §2).</summary>
+    public bool HasPendingLevelAdjustment { get; init; }
+
+    /// <summary>Platform admin xem profile của chính mình nhưng không thuộc đơn vị đang chọn.</summary>
+    public bool IsStandalonePlatformAdmin { get; init; }
+
     public IReadOnlyList<ProfileTaskHistoryRowVm> TaskHistory { get; init; } = Array.Empty<ProfileTaskHistoryRowVm>();
 }
 

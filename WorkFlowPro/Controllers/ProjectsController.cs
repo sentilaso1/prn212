@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WorkFlowPro.Auth;
 using WorkFlowPro.Data;
 using WorkFlowPro.Extensions;
 
@@ -11,10 +12,35 @@ namespace WorkFlowPro.Controllers;
 public sealed class ProjectsController : ControllerBase
 {
     private readonly WorkFlowProDbContext _db;
+    private readonly ICurrentWorkspaceService _currentWorkspace;
 
-    public ProjectsController(WorkFlowProDbContext db)
+    public ProjectsController(WorkFlowProDbContext db, ICurrentWorkspaceService currentWorkspace)
     {
         _db = db;
+        _currentWorkspace = currentWorkspace;
+    }
+
+    private bool TryResolveWorkspaceId(out Guid workspaceId, out ActionResult? errorResult)
+    {
+        var c = User.TryGetWorkspaceIdFromClaims();
+        if (c is { } wc)
+        {
+            workspaceId = wc;
+            errorResult = null;
+            return true;
+        }
+
+        var s = _currentWorkspace.CurrentWorkspaceId;
+        if (s is { } ws)
+        {
+            workspaceId = ws;
+            errorResult = null;
+            return true;
+        }
+
+        workspaceId = default;
+        errorResult = BadRequest(new { error = "Thiếu workspace. Chọn đơn vị trên menu hoặc ?workspaceId=..." });
+        return false;
     }
 
     public sealed record CreateProjectRequest(
@@ -28,7 +54,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<object>>> List()
     {
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var projects = await _db.Projects
             .Where(p => p.WorkspaceId == workspaceId && p.Status == ProjectStatus.Active)
@@ -44,7 +70,7 @@ public sealed class ProjectsController : ControllerBase
     public async Task<ActionResult<object>> Create([FromBody] CreateProjectRequest request)
     {
         var userId = User.GetUserId();
-        var workspaceId = User.GetWorkspaceId();
+        if (!TryResolveWorkspaceId(out var workspaceId, out var wsErr)) return wsErr!;
 
         var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
             m.UserId == userId && m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM);

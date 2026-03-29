@@ -7,6 +7,7 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
 <h1 class="mb-3">Báo cáo &amp; Dashboard KPI</h1>
+<p class="text-muted small">UC-13 — Chỉ PM. Dữ liệu theo workspace hiện tại. Cohort task: <strong>CreatedAtUtc</strong> trong khoảng ngày chọn. CompletionRate / AvgScore / Level từ <strong>MemberProfile</strong> (UC-08). Điểm đánh giá trong kỳ/project từ <strong>TaskEvaluation</strong> (theo <strong>EvaluatedAtUtc</strong>).</p>
 
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
 {

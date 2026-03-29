@@ -73,9 +73,8 @@ public sealed class InviteModel : PageModel
         [Required]
         public WorkspaceMemberRole Role { get; set; } = WorkspaceMemberRole.Member;
 
-        [Required(ErrorMessage = "SubRole là bắt buộc.")]
         [StringLength(100)]
-        public string SubRole { get; set; } = default!;
+        public string? SubRole { get; set; }
     }
 }
 

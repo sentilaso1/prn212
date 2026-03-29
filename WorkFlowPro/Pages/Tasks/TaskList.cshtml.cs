@@ -34,7 +34,6 @@ public sealed class TaskListModel : PageModel
 
     public string CurrentUserId { get; private set; } = string.Empty;
     public bool IsPm { get; private set; }
-    public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public IReadOnlyList<TaskCardVm> Tasks { get; private set; } = Array.Empty<TaskCardVm>();
 
@@ -113,7 +112,6 @@ public sealed class TaskListModel : PageModel
         Filters = new TaskFiltersVm
         {
             ProjectId = projectId,
-            WorkspaceId = workspaceId,
             ViewContext = "list",
             Criteria = criteria,
             WorkspaceMembers = members,

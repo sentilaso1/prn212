@@ -45,8 +45,6 @@ public sealed class TaskAssignmentService : ITaskAssignmentService
 
         var now = DateTime.UtcNow;
 
-        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
-
         // Authorization: only member (not PM) and must be assignee.
         var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
             m.WorkspaceId == workspaceId.Value &&
@@ -67,15 +65,24 @@ public sealed class TaskAssignmentService : ITaskAssignmentService
         if (assignment.Status != TaskAssignmentStatus.Pending)
             return new AssignmentActionResult { Success = false, ErrorMessage = "Task assignment hiện không ở trạng thái Pending." };
 
-        // Ensure task belongs to current workspace + correct state machine precondition.
         var task = await _db.Tasks
             .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
 
         if (task is null)
-            return new AssignmentActionResult { Success = false, ErrorMessage = "Task không thuộc workspace hiện tại." };
+            return new AssignmentActionResult { Success = false, ErrorMessage = "Không tìm thấy task." };
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
+        if (project is null || project.WorkspaceId != workspaceId.Value)
+            return new AssignmentActionResult
+            {
+                Success = false,
+                ErrorMessage = "Task không thuộc đơn vị đang chọn. Hãy đổi đơn vị (menu góc phải) rồi thử lại."
+            };
 
         if (task.Status != TaskStatus.Pending)
             return new AssignmentActionResult { Success = false, ErrorMessage = "Task phải đang ở trạng thái Pending." };
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
 
         assignment.Status = TaskAssignmentStatus.Accepted;
         assignment.AcceptedAtUtc = now;
@@ -137,8 +144,6 @@ public sealed class TaskAssignmentService : ITaskAssignmentService
 
         var now = DateTime.UtcNow;
 
-        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
-
         // Authorization: only member (not PM) and must be assignee.
         var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
             m.WorkspaceId == workspaceId.Value &&
@@ -163,13 +168,23 @@ public sealed class TaskAssignmentService : ITaskAssignmentService
             .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
 
         if (task is null)
-            return new AssignmentActionResult { Success = false, ErrorMessage = "Task không thuộc workspace hiện tại." };
+            return new AssignmentActionResult { Success = false, ErrorMessage = "Không tìm thấy task." };
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
+        if (project is null || project.WorkspaceId != workspaceId.Value)
+            return new AssignmentActionResult
+            {
+                Success = false,
+                ErrorMessage = "Task không thuộc đơn vị đang chọn. Hãy đổi đơn vị (menu góc phải) rồi thử lại."
+            };
 
         // UC-05 state machine: Pending -> Unassigned
         var oldTaskStatus = task.Status;
 
         if (task.Status != TaskStatus.Pending)
             return new AssignmentActionResult { Success = false, ErrorMessage = "Task phải đang ở trạng thái Pending." };
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
 
         assignment.Status = TaskAssignmentStatus.Rejected;
         assignment.RejectedAtUtc = now;

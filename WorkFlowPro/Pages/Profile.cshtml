@@ -18,6 +18,23 @@ else if (Model.Profile is null)
 }
 else
 {
+    @if (Model.Profile.IsStandalonePlatformAdmin)
+    {
+        <div class="alert alert-info small">
+            Bạn là <strong>Platform Admin</strong> nhưng <strong>chưa là thành viên</strong> của đơn vị đang chọn — chỉ chỉnh được họ tên / avatar (UC-14).
+        </div>
+    }
+    <p class="text-muted small mb-4">
+        UC-14 — Workspace hiện tại: <strong>@Model.WorkspaceId</strong>.
+        @if (Model.Profile.IsSelf)
+        {
+            <span>Đang xem profile của bạn.</span>
+        }
+        else
+        {
+            <span>PM xem profile member (query <code>?userId=...</code>).</span>
+        }
+    </p>
 
     <div class="row g-4">
         <div class="col-lg-4">
@@ -70,18 +87,37 @@ else
             @if (Model.Profile.CanEditLevelOrSubRole)
             {
                 <div class="card shadow-sm mt-3 border-primary">
-                    <div class="card-header bg-primary text-white">PM — Level &amp; SubRole</div>
+                    <div class="card-header bg-primary text-white">PM — Level (chờ Admin) &amp; SubRole</div>
                     <div class="card-body">
+                        @if (Model.Profile.HasPendingLevelAdjustment)
+                        {
+                            <div class="alert alert-warning small mb-3">
+                                Đang có <strong>đề xuất đổi Level</strong> chờ Admin duyệt — không gửi thêm đề xuất Level mới cho member này.
+                            </div>
+                        }
                         <form method="post" asp-page-handler="UpdatePm"
-                              onsubmit="return confirm('Xác nhận cập nhật Level / SubRole cho member này? Thay đổi sẽ áp dụng ngay cho gợi ý phân công (UC-04).');">
+                              onsubmit="return confirm('Nếu đổi Level: gửi đề xuất cho Admin. SubRole vẫn cập nhật ngay. Tiếp tục?');">
                             <input type="hidden" asp-for="PmInput.TargetUserId" />
                             <div asp-validation-summary="ModelOnly" class="text-danger small" role="alert"></div>
                             <div class="mb-3">
-                                <label asp-for="PmInput.Level" class="form-label">Level</label>
-                                <select asp-for="PmInput.Level" class="form-select" asp-items="Html.GetEnumSelectList<WorkFlowPro.Data.MemberLevel>()"></select>
+                                <label asp-for="PmInput.Level" class="form-label">Level đề xuất</label>
+                                @if (Model.Profile.HasPendingLevelAdjustment)
+                                {
+                                    <input type="hidden" name="PmInput.Level" value="@((int)Model.Profile.Level)" />
+                                    <p class="form-control-plaintext mb-0"><strong>@Model.Profile.Level</strong> <span class="text-muted small">(đang chờ Admin)</span></p>
+                                }
+                                else
+                                {
+                                    <select asp-for="PmInput.Level" class="form-select" asp-items="Html.GetEnumSelectList<WorkFlowPro.Data.MemberLevel>()"></select>
+                                }
                             </div>
                             <div class="mb-3">
-                                <label asp-for="PmInput.SubRole" class="form-label">SubRole</label>
+                                <label asp-for="PmInput.LevelJustification" class="form-label">Lý do / căn cứ (bắt buộc nếu đổi Level)</label>
+                                <textarea asp-for="PmInput.LevelJustification" class="form-control" rows="3" maxlength="2000" placeholder="Ví dụ: hoàn thành tốt, điểm đánh giá, workload…"></textarea>
+                                <span asp-validation-for="PmInput.LevelJustification" class="text-danger small"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="PmInput.SubRole" class="form-label">SubRole (áp dụng ngay)</label>
                                 <input asp-for="PmInput.SubRole" class="form-control" list="subrole-list" placeholder="BA, DEV, Designer, QA..." maxlength="100" />
                                 <datalist id="subrole-list">
                                     <option value="BA"></option>
@@ -91,7 +127,7 @@ else
                                     <option value="Tester"></option>
                                 </datalist>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm">Lưu Level / SubRole</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Lưu SubRole / gửi đề xuất Level</button>
                         </form>
                     </div>
                 </div>

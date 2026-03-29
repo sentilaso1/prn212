@@ -2,11 +2,11 @@
 @model WorkFlowPro.Pages.Admin.IndexModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Admin — duyệt PM & yêu cầu role";
+    ViewData["Title"] = "Admin — UC-13";
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<h1 class="h3 mb-4">Quản trị nền tảng</h1>
+<h1 class="h3 mb-4">Quản trị nền tảng (UC-13)</h1>
 
 @if (Model.ShowToast)
 {
@@ -14,7 +14,7 @@
 }
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">Đăng ký PM chờ duyệt</div>
+    <div class="card-header fw-semibold">Đăng ký PM chờ duyệt (UC-13 §1)</div>
     <div class="card-body p-0">
         @if (Model.PendingRegistrations.Count == 0)
         {
@@ -46,7 +46,64 @@
                                 </form>
                                 <form method="post" asp-page-handler="RejectRegistration" class="d-inline ms-1">
                                     <input type="hidden" name="targetUserId" value="@r.UserId" />
+                                    <input type="text" name="reason" class="form-control form-control-sm d-inline-block" style="width:180px;" placeholder="Lý do (bắt buộc)" required maxlength="500" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Đề xuất điều chỉnh Level (UC-13 §2)</div>
+    <div class="card-body p-0">
+        @if (Model.PendingLevelAdjustments.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">Không có đề xuất nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Đơn vị</th>
+                        <th>Member</th>
+                        <th>PM gửi</th>
+                        <th>Level</th>
+                        <th>Chỉ số (profile)</th>
+                        <th>Lý do PM</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var a in Model.PendingLevelAdjustments)
+                    {
+                        <tr>
+                            <td>@a.Id</td>
+                            <td>@a.WorkspaceName</td>
+                            <td>@a.TargetDisplay</td>
+                            <td>@a.PmDisplay</td>
+                            <td>@a.FromLevel → @a.ToLevel</td>
+                            <td class="small">
+                                Hoàn thành: @a.CompletionRate.ToString("0.#")% · Điểm TB: @a.AvgScore.ToString("0.#") · Tải: @a.CurrentWorkload
+                            </td>
+                            <td class="small" style="max-width:220px;">@a.Justification</td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" asp-page-handler="ApproveLevelAdjustment" class="d-inline">
+                                    <input type="hidden" name="requestId" value="@a.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt</button>
+                                </form>
+                                <form method="post" asp-page-handler="RejectLevelAdjustment" class="d-inline ms-1">
+                                    <input type="hidden" name="requestId" value="@a.Id" />
+                                    <input type="text" name="adminNote" class="form-control form-control-sm d-inline-block" style="width:120px;" placeholder="Ghi chú" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Từ chối</button>
                                 </form>
                             </td>
                         </tr>
@@ -118,7 +175,7 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">Hạ PM trực tiếp (tối đa 3 PM / đơn vị; luôn giữ ≥1 PM)</div>
+    <div class="card-header fw-semibold">Hạ PM trực tiếp (UC-13 §3 — tối đa 3 PM / đơn vị; luôn giữ ≥1 PM)</div>
     <div class="card-body">
         @if (Model.AllWorkspaces.Count == 0)
         {
@@ -159,10 +216,11 @@
                     {
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>@p.DisplayName <span class="text-muted small">(@p.Email)</span></span>
-                            <form method="post" asp-page-handler="DemotePmDirect" class="d-inline"
+                            <form method="post" asp-page-handler="DemotePmDirect" class="d-inline-flex flex-wrap align-items-center gap-1"
                                   onsubmit="return confirm('Hạ PM này xuống Member?');">
                                 <input type="hidden" name="workspaceId" value="@Model.DemoteWorkspaceId" />
                                 <input type="hidden" name="targetUserId" value="@p.UserId" />
+                                <input type="text" name="reason" class="form-control form-control-sm" style="width:200px;" placeholder="Lý do (bắt buộc)" required maxlength="500" />
                                 <button type="submit" class="btn btn-sm btn-outline-warning">Hạ xuống Member</button>
                             </form>
                         </li>

@@ -43,8 +43,8 @@
             </select>
         </div>
         <div class="col-md-4">
-            <label asp-for="Input.DueDateUtc" class="form-label"></label>
-            <input asp-for="Input.DueDateUtc" class="form-control" type="date" />
+            <label asp-for="Input.DueDateUtc" class="form-label">Hạn chót (bắt buộc)</label>
+            <input asp-for="Input.DueDateUtc" class="form-control" type="date" required />
             <span asp-validation-for="Input.DueDateUtc" class="text-danger"></span>
         </div>
     </div>
@@ -111,16 +111,9 @@
     <hr />
 
     <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary"
-                asp-page-handler="Create"
-                asp-route-projectId="@Model.Input.ProjectId"
-                asp-route-workspaceId="@Model.CurrentWorkspaceId">Tạo task</button>
-        <button type="submit" class="btn btn-outline-primary"
-                asp-page-handler="CreateWithSuggestion"
-                asp-route-projectId="@Model.Input.ProjectId"
-                asp-route-workspaceId="@Model.CurrentWorkspaceId">Tạo + Gợi ý phân công</button>
-        <a class="btn btn-outline-secondary"
-           href="/Projects@(Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId}" : "")">Cancel</a>
+        <button type="submit" class="btn btn-primary" asp-page-handler="Create">Tạo task</button>
+        <button type="submit" class="btn btn-outline-primary" asp-page-handler="CreateWithSuggestion">Tạo + Gợi ý phân công</button>
+        <a class="btn btn-outline-secondary" href="/Projects">Cancel</a>
     </div>
 </form>
 </div>
@@ -128,13 +121,13 @@
 @if (Model.ShowSuccessToast)
 {
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="taskSuccessToast" class="toast align-items-center bg-success text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div id="taskSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
                     @Model.SuccessToastMessage
                     @if (Model.Input.ProjectId != Guid.Empty)
                     {
-                        <a class="ms-2 text-white" href="/board?projectId=@(Model.Input.ProjectId)@(Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId}" : "")">Xem Kanban</a>
+                        <a class="ms-2" href="/board?projectId=@Model.Input.ProjectId">Xem Kanban</a>
                     }
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>

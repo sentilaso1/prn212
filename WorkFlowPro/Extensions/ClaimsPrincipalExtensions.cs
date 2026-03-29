@@ -11,5 +11,12 @@ public static class ClaimsPrincipalExtensions
     public static Guid GetWorkspaceId(this ClaimsPrincipal user)
         => Guid.Parse(user.FindFirstValue("workspace_id")
                       ?? throw new InvalidOperationException("Missing workspace_id claim."));
+
+    /// <summary>Cookie auth: claim có thể chưa kịp có; API dùng kèm session/workspace service.</summary>
+    public static Guid? TryGetWorkspaceIdFromClaims(this ClaimsPrincipal user)
+    {
+        var v = user.FindFirstValue("workspace_id");
+        return Guid.TryParse(v, out var g) ? g : null;
+    }
 }
 

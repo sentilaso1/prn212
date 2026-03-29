@@ -26,8 +26,11 @@ public sealed class IndexModel : PageModel
     }
 
     public IReadOnlyList<Project> Projects { get; private set; } = Array.Empty<Project>();
+
     public string? ErrorMessage { get; private set; }
+
     public bool IsPm { get; private set; }
+
     public Guid? CurrentWorkspaceId => _currentWorkspaceService.CurrentWorkspaceId;
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
@@ -47,9 +50,9 @@ public sealed class IndexModel : PageModel
         }
 
         IsPm = await _db.WorkspaceMembers.AnyAsync(m =>
-            m.UserId == userId &&
-            m.WorkspaceId == workspaceId.Value &&
-            m.Role == WorkspaceMemberRole.PM,
+                m.UserId == userId &&
+                m.WorkspaceId == workspaceId.Value &&
+                m.Role == WorkspaceMemberRole.PM,
             cancellationToken);
 
         try

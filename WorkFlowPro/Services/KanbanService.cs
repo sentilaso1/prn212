@@ -43,27 +43,25 @@ public sealed class KanbanService : IKanbanService
         if (!Enum.IsDefined<TaskStatus>(newStatus))
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "newStatus không hợp lệ." };
 
-        var task = await _db.Tasks.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        // Load task (workspace filter is global, but we still verify workspace via project).
+        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
         if (task is null)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "Task không tồn tại." };
 
-        var project = await _db.Projects.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId, cancellationToken);
+        var project = await _db.Projects.FirstOrDefaultAsync(p =>
+            p.Id == task.ProjectId && p.WorkspaceId == workspaceId, cancellationToken);
 
         if (project is null)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "Task không thuộc workspace hiện tại." };
 
         var now = DateTime.UtcNow;
 
-        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
-
+        // Validate trước khi mở transaction — tránh dispose/rollback gây lỗi nội bộ trên một số provider.
         var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
             m.WorkspaceId == workspaceId && m.UserId == actorUserId && m.Role == WorkspaceMemberRole.PM,
             cancellationToken);
 
-        var memberAcceptedAssignment = await _db.TaskAssignments.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(a =>
+        var memberAcceptedAssignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
             a.TaskId == taskId &&
             a.AssigneeUserId == actorUserId &&
             a.Status == TaskAssignmentStatus.Accepted, cancellationToken);
@@ -73,29 +71,30 @@ public sealed class KanbanService : IKanbanService
 
         var oldStatus = task.Status;
 
-        if (oldStatus == newStatus)
-            return new MoveTaskServiceResult { Success = true };
-
         var allowed = oldStatus switch
         {
             TaskStatus.ToDo => newStatus is TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Done,
-            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done or TaskStatus.ToDo,
+            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done,
             TaskStatus.Review => newStatus is TaskStatus.Done or TaskStatus.InProgress,
-            TaskStatus.Done => newStatus is TaskStatus.ToDo or TaskStatus.InProgress or TaskStatus.Review,
             _ => newStatus is TaskStatus.Done
         };
 
         if (!allowed)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = $"Không thể chuyển {oldStatus} -> {newStatus}." };
 
+        if (oldStatus == newStatus)
+            return new MoveTaskServiceResult { Success = true };
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
         task.Status = newStatus;
         task.UpdatedAtUtc = now;
         _db.Tasks.Update(task);
 
+        // If moved to Done, decrement workload for the assignee.
         if (newStatus == TaskStatus.Done)
         {
-            var acceptedAssignment = await _db.TaskAssignments.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(a =>
+            var acceptedAssignment = await _db.TaskAssignments.FirstOrDefaultAsync(a =>
                 a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted, cancellationToken);
 
             if (acceptedAssignment is not null)
@@ -121,6 +120,35 @@ public sealed class KanbanService : IKanbanService
 
         await _db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
+
+        // UC-08: thông báo PM khi task vào Done (Kanban) — cần đánh giá.
+        if (newStatus == TaskStatus.Done)
+        {
+            try
+            {
+                var pmIds = await _db.WorkspaceMembers.AsNoTracking()
+                    .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM)
+                    .Select(m => m.UserId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+                foreach (var pmId in pmIds)
+                {
+                    await _notifications.CreateAndPushAsync(
+                        pmId,
+                        NotificationType.TaskDoneNeedsEvaluation,
+                        $"Cần đánh giá task \"{task.Title}\"",
+                        workspaceId: workspaceId,
+                        projectId: project.Id,
+                        taskId: task.Id,
+                        redirectUrl: $"/Tasks/Details/{task.Id}",
+                        cancellationToken: cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "UC-08: failed TaskDoneNeedsEvaluation notify for task {TaskId}", taskId);
+            }
+        }
 
         // Broadcast updated status to all clients in this project group.
         try
@@ -183,7 +211,6 @@ public sealed class KanbanService : IKanbanService
             }
 
             var assigneeId = await _db.TaskAssignments
-                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(a => a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted)
                 .Select(a => a.AssigneeUserId)
@@ -196,7 +223,7 @@ public sealed class KanbanService : IKanbanService
 
             var msg =
                 $"Task \"{task.Title}\" đã chuyển sang {newStatus} bởi {actorName}.";
-            var redirect = $"/Tasks/Details/{taskId}?workspaceId={workspaceId:D}";
+            var redirect = $"/Tasks/Details/{taskId}";
 
             foreach (var uid in recipientIds)
             {
@@ -234,9 +261,8 @@ public sealed class KanbanService : IKanbanService
         TaskCardPayload? card = null;
         if (displayStatuses.Contains(newStatus))
         {
-            var task = await _db.Tasks.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
-            var assignee = await _db.TaskAssignments.IgnoreQueryFilters()
+            var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+            var assignee = await _db.TaskAssignments
                 .Where(a => a.TaskId == taskId && a.Status == TaskAssignmentStatus.Accepted)
                 .Select(a => a.AssigneeUserId)
                 .FirstOrDefaultAsync(cancellationToken);

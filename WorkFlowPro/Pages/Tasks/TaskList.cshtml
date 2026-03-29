@@ -2,104 +2,94 @@
 @model WorkFlowPro.Pages.Tasks.TaskListModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Danh sách công việc";
-
-    var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
-    var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
+    ViewData["Title"] = "Task List";
 }
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 fw-semibold mb-1">Danh sách công việc</h1>
-        <div class="text-muted">
-            Dự án: <strong>@Model.ProjectName</strong>
-        </div>
-    </div>
-
-    <div>
-        <a href="/board?projectId=@(Model.ProjectId)@wsAmp" class="text-decoration-none small">
-            → Xem Kanban Board
-        </a>
-    </div>
-</div>
+<h1>Task List</h1>
 
 @if (Model.ErrorMessage is not null)
 {
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
 }
 else
 {
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <div class="text-muted">Project</div>
+            <div><strong>@Model.ProjectName</strong></div>
+            <div class="small mt-1">
+                <a href="/board?projectId=@Model.ProjectId">Kanban Board</a>
+            </div>
+        </div>
+        @if (Model.IsPm)
+        {
+            <a class="btn btn-primary" href="/Tasks/Create?projectId=@Model.ProjectId">+ Tạo task</a>
+        }
+        else
+        {
+            <span class="text-muted small align-self-center">Chỉ <strong>PM</strong> mới thấy nút tạo task.</span>
+        }
+    </div>
+
     <partial name="_TaskFilters" model="Model.Filters" />
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
                 <tr>
-                    <th style="width: 45%;">Tiêu đề</th>
+                    <th>Tiêu đề</th>
                     <th>Trạng thái</th>
                     <th>Ưu tiên</th>
-                    <th>Hạn chót</th>
-                    <th>Người thực hiện</th>
-                    <th class="text-end" style="width: 110px;">Thao tác</th>
+                    <th>Hạn</th>
+                    <th>Assignee</th>
                 </tr>
             </thead>
             <tbody id="wfTaskListBody">
                 @foreach (var t in Model.Tasks)
                 {
-                    var due = t.DueDateUtc?.ToString("dd/MM/yyyy") ?? "—";
+                    var due = t.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-";
                     <tr>
-                        <td>
-                            <a href="/Tasks/Details/@(t.TaskId)@wsQ" class="fw-medium text-decoration-none">
-                                @t.Title
-                            </a>
-                        </td>
-                        <td>
-                            <span class="badge bg-secondary">@t.Status</span>
-                        </td>
+                        <td><a href="/Tasks/Details/@t.TaskId">@t.Title</a></td>
+                        <td><span class="badge bg-secondary">@t.Status</span></td>
                         <td>@t.Priority</td>
-                        <td class="text-muted">@due</td>
-                        <td>@(string.IsNullOrEmpty(t.AssigneeDisplayName) ? "—" : t.AssigneeDisplayName)</td>
-                        <td class="text-end">
-                            <a href="/Tasks/Details/@(t.TaskId)@wsQ"
-                                   class="btn btn-sm btn-outline-primary">
-                                Chi tiết
-                            </a>
-                        </td>
+                        <td>@due</td>
+                        <td>@t.AssigneeDisplayName</td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
-
-    @if (Model.Tasks.Count == 0)
-    {
-        <div class="alert alert-info text-center py-4 mt-3">
-            Không tìm thấy công việc nào phù hợp với bộ lọc hiện tại.
-        </div>
-    }
 }
 
 @section Scripts {
-    @if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
-    {
-        <script src="~/js/task-filters.js" asp-append-version="true"></script>
-        <script>
-            (function () {
-                const projectId = "@Model.ProjectId.ToString("D")";
-                const myUserId = "@Model.CurrentUserId";
-                const isPm = @(Model.IsPm ? "true" : "false");
+@if (Model.ErrorMessage == null && Model.ProjectId != Guid.Empty)
+{
+    <script src="~/js/task-filters.js" asp-append-version="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        (function () {
+            const projectId = "@Model.ProjectId.ToString("D")";
+            const myUserId = "@Model.CurrentUserId";
+            const isPm = @(Model.IsPm ? "true" : "false");
+            const filterRoot = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"list\"]");
+            if (filterRoot && window.wfTaskFilters) {
+                window.wfTaskFilters.bindFilterCard(filterRoot, { myUserId: myUserId, isPm: isPm });
+            }
 
-                const filterRoot = document.querySelector("[data-project-id=\"" + projectId + "\"][data-view=\"list\"]");
-                if (filterRoot && window.wfTaskFilters) {
-                    window.wfTaskFilters.bindFilterCard(filterRoot, {
-                        myUserId: myUserId,
-                        isPm: isPm
-                    });
+            // Realtime: cùng group project với Kanban — kéo board / accept / PM đổi task → bảng list tự reload theo filter.
+            const connection = new signalR.HubConnectionBuilder().withUrl("/hubs/task").build();
+            function pullList() {
+                if (filterRoot && window.wfTaskFilters && window.wfTaskFilters.refreshTaskListForProject) {
+                    window.wfTaskFilters.refreshTaskListForProject(filterRoot, { myUserId: myUserId, isPm: isPm });
                 }
-            })();
-        </script>
-    }
+            }
+            connection.on("taskMoved", pullList);
+            connection.on("TaskUpdated", pullList);
+            connection.start()
+                .then(function () { return connection.invoke("JoinProject", projectId); })
+                .catch(function (e) { console.warn("SignalR list", e); });
+        })();
+    </script>
+}
 }
