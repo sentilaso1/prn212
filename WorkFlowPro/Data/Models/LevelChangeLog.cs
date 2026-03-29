@@ -7,5 +7,8 @@ public sealed class LevelChangeLog
     public string ChangedByPmId { get; set; } = default!;
     public MemberLevel OldLevel { get; set; }
     public MemberLevel NewLevel { get; set; }
+    public Guid WorkspaceId { get; set; }
     public DateTime ChangedAt { get; set; }
+
+    public Workspace? Workspace { get; set; }
 }

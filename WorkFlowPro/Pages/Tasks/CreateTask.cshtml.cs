@@ -52,14 +52,9 @@ public sealed class CreateTaskModel : PageModel
 
     public async Task OnGetAsync([FromQuery] Guid projectId, CancellationToken cancellationToken)
     {
-        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
-        if (workspaceId is null)
-        {
-            ErrorMessage = "Workspace hiện tại không hợp lệ.";
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
             return;
-        }
-
-        CurrentWorkspaceId = workspaceId.Value;
 
         if (projectId == Guid.Empty)
         {
@@ -67,13 +62,23 @@ public sealed class CreateTaskModel : PageModel
             return;
         }
 
-        // Requirement: ProjectId phải thuộc CurrentWorkspace và phải Active.
-        var project = await _db.Projects.FirstOrDefaultAsync(p =>
-            p.Id == projectId && p.WorkspaceId == workspaceId.Value, cancellationToken);
+        // 1. Tìm dự án không dùng filter (để biết nó thuộc workspace nào)
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
         if (project is null)
         {
-            ErrorMessage = "Project không tồn tại trong workspace hiện tại.";
+            ErrorMessage = "Dự án không tồn tại.";
+            return;
+        }
+
+        // 2. Kiểm tra xem user có phải PM của workspace đó không
+        var membership = await _db.WorkspaceMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId, cancellationToken);
+
+        if (membership is null || membership.Role != WorkspaceMemberRole.PM)
+        {
+            ErrorMessage = "Bạn không có quyền quản lý dự án này.";
             return;
         }
 
@@ -83,12 +88,13 @@ public sealed class CreateTaskModel : PageModel
             return;
         }
 
+        CurrentWorkspaceId = project.WorkspaceId;
         Input.ProjectId = projectId;
         Input.Priority = TaskPriority.Medium;
         Input.AssigneeUserId = null;
 
         SuggestedAssignees = (await _taskService.GetSuggestedAssigneesAsync(
-            workspaceId.Value,
+            project.WorkspaceId,
             Input.Priority,
             take: 5,
             cancellationToken: cancellationToken)).ToList();
@@ -96,35 +102,59 @@ public sealed class CreateTaskModel : PageModel
 
     public async Task<IActionResult> OnPostCreateAsync(CancellationToken cancellationToken)
     {
-        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
-        if (workspaceId is null)
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
             return Challenge();
 
-        var project = await ValidateAndLoadProjectOrAddErrorAsync(workspaceId.Value, cancellationToken);
-        if (project is null)
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == Input.ProjectId, cancellationToken);
 
-        if (!TryValidateTitleAndDueDate())
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken, project);
+        if (project is null)
+        {
+            ErrorMessage = "Dự án không tồn tại.";
+            return await ReRenderWithSuggestionsAsync(_currentWorkspaceService.CurrentWorkspaceId ?? Guid.Empty, cancellationToken);
+        }
+
+        // 2. Kiểm tra quyền PM
+        var membership = await _db.WorkspaceMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId, cancellationToken);
+
+        if (membership is null || membership.Role != WorkspaceMemberRole.PM)
+        {
+            ErrorMessage = "Bạn không có quyền quản lý dự án này.";
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken);
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            ErrorMessage = $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể tạo Task.";
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken);
+        }
+
+        if (!ModelState.IsValid)
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken, project);
+
+        var workspaceId = project.WorkspaceId;
 
         var assigneeUserId = NormalizeAssignee(Input.AssigneeUserId);
 
         if (assigneeUserId is not null)
         {
             var allowed = await _db.WorkspaceMembers.AnyAsync(m =>
-                m.WorkspaceId == workspaceId.Value &&
+                m.WorkspaceId == workspaceId &&
                 m.UserId == assigneeUserId &&
                 m.Role != WorkspaceMemberRole.PM, cancellationToken);
 
             if (!allowed)
             {
                 ModelState.AddModelError(nameof(Input.AssigneeUserId), "Assignee không hợp lệ.");
-                return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken, project);
+                return await ReRenderWithSuggestionsAsync(workspaceId, cancellationToken, project);
             }
         }
 
         if (!ModelState.IsValid)
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken, project);
+            return await ReRenderWithSuggestionsAsync(workspaceId, cancellationToken, project);
 
         // Create TaskItem (+ optional TaskAssignment) atomically.
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -180,33 +210,57 @@ public sealed class CreateTaskModel : PageModel
                 userId: assigneeUserId,
                 type: NotificationType.TaskAssignedPending,
                 message: $"Bạn được giao task \"{task.Title}\".",
-                workspaceId: workspaceId.Value,
+                workspaceId: workspaceId,
                 projectId: project.Id,
                 taskId: task.Id,
-                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId:D}");
     }
 
     public async Task<IActionResult> OnPostCreateWithSuggestionAsync(CancellationToken cancellationToken)
     {
-        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
-        if (workspaceId is null)
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
             return Challenge();
 
-        var project = await ValidateAndLoadProjectOrAddErrorAsync(workspaceId.Value, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == Input.ProjectId, cancellationToken);
+
         if (project is null)
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken);
+        {
+            ErrorMessage = "Dự án không tồn tại.";
+            return await ReRenderWithSuggestionsAsync(_currentWorkspaceService.CurrentWorkspaceId ?? Guid.Empty, cancellationToken);
+        }
+
+        // 2. Kiểm tra quyền PM
+        var membership = await _db.WorkspaceMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId, cancellationToken);
+
+        if (membership is null || membership.Role != WorkspaceMemberRole.PM)
+        {
+            ErrorMessage = "Bạn không có quyền quản lý dự án này.";
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken);
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            ErrorMessage = $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể tạo Task.";
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken);
+        }
 
         if (!TryValidateTitleAndDueDate())
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken, project);
+            return await ReRenderWithSuggestionsAsync(project.WorkspaceId, cancellationToken, project);
+
+        var workspaceId = project.WorkspaceId;
 
         // Compute suggestions based on current Priority.
         var suggestions = await _taskService.GetSuggestedAssigneesAsync(
-            workspaceId.Value,
+            workspaceId,
             Input.Priority,
             take: 5,
             cancellationToken: cancellationToken);
@@ -223,7 +277,7 @@ public sealed class CreateTaskModel : PageModel
         }
 
         if (!ModelState.IsValid)
-            return await ReRenderWithSuggestionsAsync(workspaceId.Value, cancellationToken, project, suggestions);
+            return await ReRenderWithSuggestionsAsync(workspaceId, cancellationToken, project, suggestions);
 
         var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(actorUserId))
@@ -277,15 +331,15 @@ public sealed class CreateTaskModel : PageModel
                 userId: assigneeUserId,
                 type: NotificationType.TaskAssignedPending,
                 message: $"Bạn được giao task \"{task.Title}\".",
-                workspaceId: workspaceId.Value,
+                workspaceId: workspaceId,
                 projectId: project.Id,
                 taskId: task.Id,
-                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId.Value:D}",
+                redirectUrl: $"/Tasks/AcceptReject/{task.Id}?workspaceId={workspaceId:D}",
                 cancellationToken: cancellationToken);
         }
 
         SuccessToastMessage = "Tạo task thành công";
-        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId.Value:D}");
+        return LocalRedirect($"/Tasks/Create?projectId={project.Id}&workspaceId={workspaceId:D}");
     }
 
     private bool TryValidateTitleAndDueDate()
@@ -318,13 +372,13 @@ public sealed class CreateTaskModel : PageModel
             return null;
         }
 
-        var project = await _db.Projects.FirstOrDefaultAsync(
+        var project = await _db.Projects.IgnoreQueryFilters().FirstOrDefaultAsync(
             p => p.Id == Input.ProjectId && p.WorkspaceId == workspaceId,
             cancellationToken);
 
         if (project is null)
         {
-            ModelState.AddModelError(nameof(Input.ProjectId), "Project không tồn tại trong workspace hiện tại.");
+            ModelState.AddModelError(nameof(Input.ProjectId), "Project không tồn tại.");
             return null;
         }
 
@@ -354,7 +408,7 @@ public sealed class CreateTaskModel : PageModel
 
         if (project is null)
         {
-            project = await _db.Projects.FirstOrDefaultAsync(
+            project = await _db.Projects.IgnoreQueryFilters().FirstOrDefaultAsync(
                 p => p.Id == Input.ProjectId && p.WorkspaceId == workspaceId,
                 cancellationToken);
         }

@@ -46,7 +46,7 @@
             <div class="d-flex flex-wrap gap-2 mb-3">
                 @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Active || Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
                 {
-                    <a class="btn btn-sm btn-outline-primary" href="/board?projectId=@Model.Project.Id">Kanban</a>
+                    <a class="btn btn-sm btn-outline-primary" href="/board?projectId=@Model.Project.Id&workspaceId=@Model.CurrentWorkspaceId">Kanban</a>
                     @if (Model.CurrentWorkspaceId is { } wid)
                     {
                         <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id&workspaceId=@wid">Danh sách task </a>
@@ -57,7 +57,7 @@
                     }
                     @if (Model.CanManage && Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Active)
                     {
-                        <a class="btn btn-sm btn-primary" href="/Tasks/Create?projectId=@Model.Project.Id">+ Tạo task</a>
+                        <a class="btn btn-sm btn-primary" href="/Tasks/Create?projectId=@Model.Project.Id&workspaceId=@Model.CurrentWorkspaceId">+ Tạo task</a>
                     }
                 }
                 else
@@ -88,8 +88,8 @@
             @if (Model.CanManage)
             {
                 <div class="d-flex gap-2 mt-3">
-                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
-                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id?workspaceId=@Model.CurrentWorkspaceId">Settings</a>
+                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id?workspaceId=@Model.CurrentWorkspaceId">Delete</a>
                 </div>
             }
             else

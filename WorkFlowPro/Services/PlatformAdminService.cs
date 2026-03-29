@@ -84,14 +84,40 @@ public sealed class PlatformAdminService : IPlatformAdminService
         bool isNewlyCreated = false;
         try
         {
-            // Kiểm tra xem Đơn vị đã tồn tại chưa
-            var existingWorkspace = await _db.Workspaces
-                .FirstOrDefaultAsync(w => w.Name == workspaceName, cancellationToken);
+            // UC-01: Kiểm tra xem Đơn vị đã tồn tại chưa (không phân biệt hoa thường).
+            // Tìm các đơn vị có tên giống nhau (có hoặc không có tiền tố "Đơn vị — ") để chuẩn bị gộp.
+            var matchedWorkspaces = await _db.Workspaces
+                .Where(w => w.Name.ToLower() == workspaceName.ToLower() || w.Name.ToLower() == baseName.ToLower())
+                .OrderBy(w => w.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
 
-            if (existingWorkspace != null)
+            Workspace? targetWorkspace = null;
+
+            if (matchedWorkspaces.Count > 0)
             {
-                // Nếu đã tồn tại, kiểm tra giới hạn PM
-                var pmCount = await WorkspacePolicies.CountPmsAsync(_db, existingWorkspace.Id, cancellationToken);
+                // Lấy đơn vị cũ nhất làm đơn vị chính.
+                targetWorkspace = matchedWorkspaces[0];
+
+                // Đảm bảo đơn vị chính có tên theo đúng chuẩn "Đơn vị — {Name}".
+                if (targetWorkspace.Name != workspaceName)
+                {
+                    targetWorkspace.Name = workspaceName;
+                }
+
+                // Nếu có nhiều hơn 1 đơn vị cùng tên, tiến hành gộp dữ liệu.
+                if (matchedWorkspaces.Count > 1)
+                {
+                    for (int i = 1; i < matchedWorkspaces.Count; i++)
+                    {
+                        var duplicate = matchedWorkspaces[i];
+                        await MergeWorkspacesInternalAsync(duplicate.Id, targetWorkspace.Id, cancellationToken);
+                        _db.Workspaces.Remove(duplicate);
+                    }
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+
+                // Kiểm tra giới hạn PM trên đơn vị chính.
+                var pmCount = await WorkspacePolicies.CountPmsAsync(_db, targetWorkspace.Id, cancellationToken);
                 if (pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
                 {
                     return new AdminActionResult(false,
@@ -99,16 +125,16 @@ public sealed class PlatformAdminService : IPlatformAdminService
                         "Vui lòng từ chối hoặc yêu cầu PM khác gỡ bớt.");
                 }
 
-                // Gán vào đơn vị hiện có
+                // Gán vào đơn vị hiện có.
                 await _workspaceOnboarding.JoinExistingWorkspaceAsPmAsync(
                     user.Id,
-                    existingWorkspace.Id,
+                    targetWorkspace.Id,
                     cancellationToken);
             }
             else
             {
-                // Nếu chưa tồn tại, tạo mới
-                await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
+                // Nếu chưa tồn tại, tạo mới.
+                targetWorkspace = await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
                     user.Id,
                     workspaceName,
                     cancellationToken);
@@ -640,7 +666,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
     public async Task<IReadOnlyList<PendingProjectVm>> GetPendingProjectsAsync(
         CancellationToken cancellationToken = default)
     { 
-        return await _db.Projects.AsNoTracking()
+        return await _db.Projects.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.Status == ProjectStatus.PendingApproval)
             .OrderBy(p => p.CreatedAtUtc)
             .Select(p => new PendingProjectVm(
@@ -663,7 +689,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
             return new AdminActionResult(false, "Không tìm thấy dự án.");
 
@@ -721,7 +748,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
             return new AdminActionResult(false, "Không tìm thấy dự án.");
 
@@ -752,6 +780,92 @@ public sealed class PlatformAdminService : IPlatformAdminService
     {
         var user = await _userManager.FindByIdAsync(userId);
         return user?.IsPlatformAdmin == true;
+    }
+
+    /// <summary>
+    /// Di chuyển tất cả các dữ liệu liên quan từ workspace cũ sang workspace mới trước khi xóa workspace cũ.
+    /// </summary>
+    private async Task MergeWorkspacesInternalAsync(Guid sourceId, Guid targetId, CancellationToken cancellationToken)
+    {
+        // 1. Chuyển thành viên (tránh trùng lặp)
+        var sourceMembers = await _db.WorkspaceMembers
+            .Where(m => m.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var m in sourceMembers)
+        {
+            var exists = await _db.WorkspaceMembers.AnyAsync(
+                x => x.WorkspaceId == targetId && x.UserId == m.UserId, cancellationToken);
+            if (!exists)
+            {
+                _db.WorkspaceMembers.Add(new WorkspaceMember
+                {
+                    WorkspaceId = targetId,
+                    UserId = m.UserId,
+                    Role = m.Role,
+                    SubRole = m.SubRole,
+                    JoinedAtUtc = m.JoinedAtUtc
+                });
+            }
+            _db.WorkspaceMembers.Remove(m);
+        }
+
+        // 2. Chuyển Project
+        var projects = await _db.Projects.IgnoreQueryFilters()
+            .Where(p => p.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
+        foreach (var p in projects)
+        {
+            p.WorkspaceId = targetId;
+        }
+
+        // 3. Chuyển Lời mời
+        var invites = await _db.WorkspaceInviteTokens.Where(i => i.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        foreach (var i in invites)
+        {
+            i.WorkspaceId = targetId;
+        }
+
+        // 4. Chuyển Yêu cầu đổi Role
+        var roleRequests = await _db.WorkspaceRoleChangeRequests.Where(r => r.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        foreach (var r in roleRequests)
+        {
+            r.WorkspaceId = targetId;
+        }
+
+        // 5. Chuyển Yêu cầu đổi Level (UC-10)
+        var levelRequests = await _db.LevelAdjustmentRequests.Where(l => l.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        foreach (var l in levelRequests)
+        {
+            l.WorkspaceId = targetId;
+        }
+
+        // 6. Chuyển Log đổi Level
+        var levelLogs = await _db.LevelChangeLogs.IgnoreQueryFilters()
+            .Where(l => l.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
+        foreach (var l in levelLogs)
+        {
+            l.WorkspaceId = targetId;
+        }
+
+        // 7. Chuyển Log đổi Role
+        var roleLogs = await _db.RoleChangeLogs.IgnoreQueryFilters()
+            .Where(r => r.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
+        foreach (var r in roleLogs)
+        {
+            r.WorkspaceId = targetId;
+        }
+
+        // 8. Chuyển Notification
+        var notifications = await _db.UserNotifications.IgnoreQueryFilters()
+            .Where(n => n.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
+        foreach (var n in notifications)
+        {
+            n.WorkspaceId = targetId;
+        }
     }
 
     private async Task NotifyAdminsOfNewRequestAsync(

@@ -42,10 +42,10 @@ public sealed class KanbanModel : PageModel
 
     public async Task OnGetAsync([FromQuery] Guid projectId, CancellationToken cancellationToken)
     {
-        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
-        if (workspaceId is null)
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
         {
-            ErrorMessage = "Workspace không hợp lệ.";
+            ErrorMessage = "User không hợp lệ.";
             return;
         }
 
@@ -55,26 +55,23 @@ public sealed class KanbanModel : PageModel
             return;
         }
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            ErrorMessage = "User không hợp lệ.";
-            return;
-        }
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters().FirstOrDefaultAsync(p =>
+            p.Id == projectId, cancellationToken);
 
-        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
-            m.WorkspaceId == workspaceId.Value && m.UserId == userId, cancellationToken);
-        if (!isMember)
-        {
-            ErrorMessage = "Bạn không có quyền xem Kanban của workspace này.";
-            return;
-        }
-
-        var project = await _db.Projects.FirstOrDefaultAsync(p =>
-            p.Id == projectId && p.WorkspaceId == workspaceId.Value, cancellationToken);
         if (project is null)
         {
-            ErrorMessage = "Project không tồn tại trong workspace hiện tại.";
+            ErrorMessage = "Dự án không tồn tại.";
+            return;
+        }
+
+        // 2. Kiểm tra xem user có thuộc workspace của dự án không
+        var membership = await _db.WorkspaceMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId, cancellationToken);
+
+        if (membership is null)
+        {
+            ErrorMessage = "Bạn không có quyền truy cập dự án này.";
             return;
         }
 
@@ -87,41 +84,35 @@ public sealed class KanbanModel : PageModel
         ProjectId = project.Id;
         ProjectName = project.Name;
         CurrentUserId = userId;
-
-        IsPm = await _db.WorkspaceMembers.AnyAsync(m =>
-            m.WorkspaceId == workspaceId.Value &&
-            m.UserId == userId &&
-            m.Role == WorkspaceMemberRole.PM,
-            cancellationToken);
+        IsPm = membership.Role == WorkspaceMemberRole.PM;
 
         var sessionJson = HttpContext.Session.GetString(TaskFilterSession.KeyForProject(projectId));
         var criteria = TaskFilterSession.Deserialize(sessionJson);
 
-        var members = await _taskService.GetWorkspaceMemberFilterOptionsAsync(workspaceId.Value, cancellationToken);
+        var members = await _taskService.GetWorkspaceMemberFilterOptionsAsync(project.WorkspaceId, cancellationToken);
 
         try
-        {
-            Board = await _taskService.GetFilteredKanbanTasksAsync(
-                projectId,
-                workspaceId.Value,
-                userId,
-                criteria,
-                cancellationToken);
-        }
-        catch (InvalidOperationException ex)
-        {
-            ErrorMessage = ex.Message;
-            return;
-        }
+         {
+             Board = await _taskService.GetFilteredKanbanTasksAsync(
+                 projectId,
+                 project.WorkspaceId,
+                 userId,
+                 criteria,
+                 cancellationToken);
+         }
+         catch (Exception ex)
+         {
+             ErrorMessage = ex.Message;
+         }
 
         Filters = new TaskFiltersVm
-        {
-            ProjectId = projectId,
-            WorkspaceId = workspaceId,
-            ViewContext = "kanban",
-            Criteria = criteria,
-            WorkspaceMembers = members,
-            IsPm = IsPm
-        };
-    }
-}
+         {
+             ProjectId = project.Id,
+             WorkspaceId = project.WorkspaceId,
+             ViewContext = "kanban",
+             Criteria = criteria,
+             WorkspaceMembers = members,
+             IsPm = IsPm
+         };
+     }
+ }
