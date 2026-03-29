@@ -76,6 +76,9 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
         b.Entity<RoleChangeLog>().HasQueryFilter(r =>
             r.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId);
 
+        b.Entity<LevelChangeLog>().HasQueryFilter(l =>
+            l.WorkspaceId == _currentWorkspaceService.CurrentWorkspaceId);
+
         // UC-11: thông báo của user hiện tại + (nếu có workspace active) lọc theo workspace hoặc thông báo chung (WorkspaceId null).
         b.Entity<UserNotification>().HasQueryFilter(n =>
             _currentUserAccessor.UserId != null &&
@@ -351,6 +354,12 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.Property(x => x.ChangedAt).HasDefaultValueSql("GETUTCDATE()");
 
             e.HasIndex(x => x.TargetUserId);
+            e.HasIndex(x => x.WorkspaceId);
+
+            e.HasOne<Workspace>(x => x.Workspace)
+             .WithMany()
+             .HasForeignKey(x => x.WorkspaceId)
+             .OnDelete(DeleteBehavior.Cascade);
 
             e.HasOne<ApplicationUser>()
              .WithMany()

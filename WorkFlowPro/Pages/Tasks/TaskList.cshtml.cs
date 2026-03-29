@@ -78,12 +78,6 @@ public sealed class TaskListModel : PageModel
             return;
         }
 
-        if (project.Status != ProjectStatus.Active && project.Status != ProjectStatus.Archived)
-        {
-            ErrorMessage = $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể xem danh sách Task.";
-            return;
-        }
-
         ProjectId = project.Id;
         ProjectName = project.Name;
         CurrentUserId = userId;

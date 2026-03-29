@@ -196,11 +196,22 @@ public sealed class ProjectService : IProjectService
         Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        await RequirePmWorkspaceAsync(userId, cancellationToken);
+        // 1. Tìm dự án mà không dùng filter (để biết nó thuộc workspace nào)
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
+            throw new KeyNotFoundException("Project not found.");
+
+        // 2. Kiểm tra xem user có phải PM của workspace đó không
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == project.WorkspaceId &&
+            m.UserId == userId &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            throw new UnauthorizedAccessException("You are not a PM of this project's workspace.");
 
         return project;
     }
@@ -211,11 +222,22 @@ public sealed class ProjectService : IProjectService
         UpdateProjectInput input,
         CancellationToken cancellationToken = default)
     {
-        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
+            throw new KeyNotFoundException("Project not found.");
+
+        // 2. Kiểm tra quyền PM của workspace đó
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == project.WorkspaceId &&
+            m.UserId == userId &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            throw new UnauthorizedAccessException("You are not a PM of this project's workspace.");
 
         if (project.Status == ProjectStatus.Archived)
             throw new InvalidOperationException("Archived project is read-only.");
@@ -277,11 +299,22 @@ public sealed class ProjectService : IProjectService
         Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
+            throw new KeyNotFoundException("Project not found.");
+
+        // 2. Kiểm tra quyền PM của workspace đó
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == project.WorkspaceId &&
+            m.UserId == userId &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            throw new UnauthorizedAccessException("You are not a PM of this project's workspace.");
 
         if (project.Status == ProjectStatus.Archived)
             return;
@@ -296,11 +329,22 @@ public sealed class ProjectService : IProjectService
         Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
+            throw new KeyNotFoundException("Project not found.");
+
+        // 2. Kiểm tra quyền PM của workspace đó
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == project.WorkspaceId &&
+            m.UserId == userId &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            throw new UnauthorizedAccessException("You are not a PM of this project's workspace.");
 
         if (project.Status != ProjectStatus.Archived)
             return;
@@ -315,11 +359,22 @@ public sealed class ProjectService : IProjectService
         Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        _ = await RequirePmWorkspaceAsync(userId, cancellationToken);
+        // 1. Tìm dự án không dùng filter
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
-            throw new KeyNotFoundException("Project not found in current workspace.");
+            throw new KeyNotFoundException("Project not found.");
+
+        // 2. Kiểm tra quyền PM của workspace đó
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+            m.WorkspaceId == project.WorkspaceId &&
+            m.UserId == userId &&
+            m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            throw new UnauthorizedAccessException("You are not a PM of this project's workspace.");
 
         // UC-12: cảnh báo nếu còn Task In Progress.
         var hasInProgress = await _db.Tasks.AnyAsync(t =>
