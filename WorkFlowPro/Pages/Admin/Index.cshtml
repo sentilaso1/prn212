@@ -59,7 +59,7 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">Yêu cầu nâng / hạ PM trong đơn vị</div>
+    <div class="card-header fw-semibold">Yêu cầu nâng / hạ / xóa PM trong đơn vị</div>
     <div class="card-body p-0">
         @if (Model.PendingRoleRequests.Count == 0)
         {
@@ -83,10 +83,17 @@
                     <tbody>
                     @foreach (var r in Model.PendingRoleRequests)
                     {
+                        var kindLabel = r.Kind switch
+                        {
+                            WorkFlowPro.Data.WorkspaceRoleRequestKind.PromoteMemberToPm => "Nâng → PM",
+                            WorkFlowPro.Data.WorkspaceRoleRequestKind.DemotePmToMember => "Hạ PM → Member",
+                            WorkFlowPro.Data.WorkspaceRoleRequestKind.RemovePmFromWorkspace => "Xóa PM khỏi đơn vị",
+                            _ => r.Kind.ToString()
+                        };
                         <tr>
                             <td>@r.Id</td>
                             <td>@r.WorkspaceName</td>
-                            <td>@r.Kind</td>
+                            <td>@kindLabel</td>
                             <td>@r.TargetDisplay</td>
                             <td>@r.RequesterDisplay</td>
                             <td class="small">@(r.Reason ?? "—")</td>

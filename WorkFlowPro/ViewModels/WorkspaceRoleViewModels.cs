@@ -12,9 +12,14 @@ public sealed record WorkspaceMemberRoleRowVm(
     bool CanChangeWorkspaceRole,
     bool IsActorPlatformAdmin,
     bool ShowAdminRoleChangeForm,
-    bool ShowPmPromoteRequestForm,
-    bool ShowPmDemoteRequestForm,
+    /// <summary>PM gửi yêu cầu đổi PM↔Member — luôn qua Admin duyệt.</summary>
+    bool ShowPmRoleRequestForm,
     bool HasPendingPromoteRequest,
-    bool HasPendingDemoteRequest);
+    bool HasPendingDemoteRequest,
+    bool HasPendingRemovePmRequest,
+    /// <summary>Xóa Member ngay (PM/Admin), có lý do.</summary>
+    bool ShowRemoveMemberFromWorkspace,
+    /// <summary>PM gửi yêu cầu xóa PM khác — chờ Admin.</summary>
+    bool ShowRequestRemovePmFromWorkspace);
 
 public sealed record RoleManagementResult(bool Success, string? ErrorMessage = null);

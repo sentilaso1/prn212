@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Data;
 using WorkFlowPro.Hubs;
 using WorkFlowPro.ViewModels;
+using TaskStatus = WorkFlowPro.Data.TaskStatus;
 
 namespace WorkFlowPro.Services;
 
@@ -58,6 +59,14 @@ public sealed class RoleManagementService : IRoleManagementService
             .Select(r => r.TargetUserId)
             .ToListAsync(cancellationToken)).ToHashSet();
 
+        var pendingRemovePm = (await _db.WorkspaceRoleChangeRequests.AsNoTracking()
+            .Where(r =>
+                r.WorkspaceId == workspaceId &&
+                r.Status == WorkspaceRoleRequestStatus.Pending &&
+                r.Kind == WorkspaceRoleRequestKind.RemovePmFromWorkspace)
+            .Select(r => r.TargetUserId)
+            .ToListAsync(cancellationToken)).ToHashSet();
+
         var rows = await (
             from wm in _db.WorkspaceMembers.AsNoTracking()
             where wm.WorkspaceId == workspaceId
@@ -83,6 +92,17 @@ public sealed class RoleManagementService : IRoleManagementService
                                 pmCount > 1 &&
                                 !pendingDemote.Contains(x.wm.UserId);
 
+            var showRemoveMember = canTouchOthers &&
+                                   x.wm.Role == WorkspaceMemberRole.Member &&
+                                   (isActorPm || isActorPlatformAdmin);
+
+            var showRequestRemovePm = canTouchOthers &&
+                                      x.wm.Role == WorkspaceMemberRole.PM &&
+                                      isActorPm &&
+                                      !isActorPlatformAdmin &&
+                                      pmCount > 1 &&
+                                      !pendingRemovePm.Contains(x.wm.UserId);
+
             return new WorkspaceMemberRoleRowVm(
                 x.wm.UserId,
                 x.u.DisplayName ?? x.u.Email ?? x.u.UserName ?? x.wm.UserId,
@@ -93,10 +113,12 @@ public sealed class RoleManagementService : IRoleManagementService
                 CanChangeWorkspaceRole: canTouchOthers && (isActorPlatformAdmin || isActorPm),
                 IsActorPlatformAdmin: isActorPlatformAdmin,
                 ShowAdminRoleChangeForm: showAdminRoleChange,
-                ShowPmPromoteRequestForm: showPromote,
-                ShowPmDemoteRequestForm: showDemoteReq,
+                ShowPmRoleRequestForm: showPromote || showDemoteReq,
                 HasPendingPromoteRequest: pendingPromote.Contains(x.wm.UserId),
-                HasPendingDemoteRequest: pendingDemote.Contains(x.wm.UserId));
+                HasPendingDemoteRequest: pendingDemote.Contains(x.wm.UserId),
+                HasPendingRemovePmRequest: pendingRemovePm.Contains(x.wm.UserId),
+                ShowRemoveMemberFromWorkspace: showRemoveMember,
+                ShowRequestRemovePmFromWorkspace: showRequestRemovePm);
         }).ToList();
     }
 
@@ -234,6 +256,171 @@ public sealed class RoleManagementService : IRoleManagementService
             workspaceId: workspaceId,
             redirectUrl: "/Roles",
             cancellationToken: cancellationToken);
+
+        await BroadcastWorkspaceDataChangedAsync(workspaceId, targetUserId, cancellationToken);
+
+        return new RoleManagementResult(true);
+    }
+
+    public async Task<RoleManagementResult> RemoveMemberFromWorkspaceAsync(
+        Guid workspaceId,
+        string actorUserId,
+        string targetUserId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await CanActorManageAsync(workspaceId, actorUserId, cancellationToken))
+            return new RoleManagementResult(false, "Bạn không có quyền xóa thành viên trong đơn vị này.");
+
+        if (actorUserId == targetUserId)
+            return new RoleManagementResult(false, "Không thể xóa chính bạn khỏi đơn vị từ đây.");
+
+        var member = await _db.WorkspaceMembers
+            .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
+
+        if (member is null)
+            return new RoleManagementResult(false, "Thành viên không tồn tại trong đơn vị.");
+
+        if (member.Role != WorkspaceMemberRole.Member)
+            return new RoleManagementResult(false,
+                "Chỉ xóa trực tiếp được thành viên Member. Để gỡ PM khác, dùng «Yêu cầu xóa PM» (chờ Admin duyệt).");
+
+        return await ExecuteRemoveUserFromWorkspaceAsync(
+            workspaceId,
+            targetUserId,
+            reason,
+            actorUserId,
+            excludeWorkspaceRoleRequestId: null,
+            cancellationToken);
+    }
+
+    public async Task<RoleManagementResult> ExecuteRemoveUserFromWorkspaceAsync(
+        Guid workspaceId,
+        string targetUserId,
+        string reason,
+        string actionRecordedAsUserId,
+        int? excludeWorkspaceRoleRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        reason = reason?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(reason))
+            return new RoleManagementResult(false, "Lý do là bắt buộc.");
+        if (reason.Length > 2000)
+            return new RoleManagementResult(false, "Lý do tối đa 2000 ký tự.");
+
+        var workspace = await _db.Workspaces.AsNoTracking()
+            .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
+        var workspaceDisplayName = workspace?.Name ?? workspaceId.ToString();
+
+        var member = await _db.WorkspaceMembers
+            .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
+
+        if (member is null)
+            return new RoleManagementResult(false, "Thành viên không tồn tại trong đơn vị.");
+
+        var rows = await (
+            from a in _db.TaskAssignments
+            join t in _db.Tasks on a.TaskId equals t.Id
+            join p in _db.Projects on t.ProjectId equals p.Id
+            where p.WorkspaceId == workspaceId
+                  && a.AssigneeUserId == targetUserId
+                  && (a.Status == TaskAssignmentStatus.Pending || a.Status == TaskAssignmentStatus.Accepted)
+                  && t.Status != TaskStatus.Done
+                  && t.Status != TaskStatus.Cancelled
+            select new { a, t }
+        ).ToListAsync(cancellationToken);
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+
+        var pendingRoleReqs = await _db.WorkspaceRoleChangeRequests
+            .Where(r =>
+                r.WorkspaceId == workspaceId &&
+                r.Status == WorkspaceRoleRequestStatus.Pending &&
+                (excludeWorkspaceRoleRequestId == null || r.Id != excludeWorkspaceRoleRequestId.Value) &&
+                (r.TargetUserId == targetUserId || r.RequestedByUserId == targetUserId))
+            .ToListAsync(cancellationToken);
+        if (pendingRoleReqs.Count > 0)
+            _db.WorkspaceRoleChangeRequests.RemoveRange(pendingRoleReqs);
+
+        var workloadDecrement = 0;
+        var reasonForHistory = reason.Length > 500 ? reason[..500] : reason;
+
+        foreach (var g in rows.GroupBy(x => x.t.Id))
+        {
+            var task = g.First().t;
+
+            if (g.Any(x => x.a.Status == TaskAssignmentStatus.Accepted))
+                workloadDecrement++;
+
+            foreach (var x in g)
+                _db.TaskAssignments.Remove(x.a);
+
+            task.Status = TaskStatus.Unassigned;
+            task.UpdatedAtUtc = now;
+            _db.Tasks.Update(task);
+
+            _db.TaskHistoryEntries.Add(new TaskHistoryEntry
+            {
+                TaskId = task.Id,
+                ActorUserId = actionRecordedAsUserId,
+                Action = "Removed from workspace — task unassigned",
+                OldValue = targetUserId,
+                NewValue = reasonForHistory,
+                TimestampUtc = now
+            });
+        }
+
+        if (workloadDecrement > 0)
+        {
+            var profile = await _db.MemberProfiles.FirstOrDefaultAsync(p => p.UserId == targetUserId, cancellationToken);
+            if (profile is not null)
+                profile.CurrentWorkload = Math.Max(0, profile.CurrentWorkload - workloadDecrement);
+        }
+
+        _db.WorkspaceMembers.Remove(member);
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await tx.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        var reasonInMessage = reason.Length > 800 ? reason[..800] + "…" : reason;
+        var message =
+            $"Bạn đã bị xóa khỏi đơn vị «{workspaceDisplayName}». Lý do: {reasonInMessage}.";
+        if (message.Length > 2000)
+            message = message[..2000];
+
+        await _notifications.CreateAndPushAsync(
+            userId: targetUserId,
+            type: NotificationType.RemovedFromWorkspace,
+            message: message,
+            workspaceId: null,
+            redirectUrl: "/Workspaces",
+            cancellationToken: cancellationToken);
+
+        foreach (var g in rows.GroupBy(x => x.t.Id))
+        {
+            var task = g.First().t;
+            try
+            {
+                await _taskHub.Clients.Group(task.ProjectId.ToString("D"))
+                    .SendAsync(
+                        "TaskUpdated",
+                        new { taskId = task.Id, newStatus = TaskStatus.Unassigned.ToString() },
+                        cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SignalR TaskUpdated after remove member task {TaskId}", task.Id);
+            }
+        }
 
         await BroadcastWorkspaceDataChangedAsync(workspaceId, targetUserId, cancellationToken);
 

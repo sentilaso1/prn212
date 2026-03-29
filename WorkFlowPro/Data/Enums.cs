@@ -11,7 +11,10 @@ public enum AccountStatus
 public enum WorkspaceRoleRequestKind
 {
     PromoteMemberToPm = 1,
-    DemotePmToMember = 2
+    DemotePmToMember = 2,
+
+    /// <summary>PM yêu cầu xóa PM khác — Admin duyệt mới gỡ khỏi đơn vị.</summary>
+    RemovePmFromWorkspace = 3
 }
 
 public enum WorkspaceRoleRequestStatus
@@ -99,7 +102,10 @@ public enum NotificationType
     RegistrationPendingPm = 17,
 
     /// <summary>Yêu cầu nâng/hạ PM trong workspace chờ Admin.</summary>
-    WorkspacePmRoleRequest = 18
+    WorkspacePmRoleRequest = 18,
+
+    /// <summary>UC-03 Path C: thành viên bị PM xóa khỏi workspace.</summary>
+    RemovedFromWorkspace = 19
 }
 
 public enum InviteStatus
