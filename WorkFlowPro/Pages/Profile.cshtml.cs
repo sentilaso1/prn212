@@ -38,6 +38,8 @@ public sealed class ProfileModel : PageModel
 
     public MemberProfilePageVm? Profile { get; private set; }
 
+    public BasicProfileVm? BasicProfile { get; private set; }
+
     public string? ErrorMessage { get; private set; }
 
     public Guid? WorkspaceId { get; private set; }
@@ -49,15 +51,6 @@ public sealed class ProfileModel : PageModel
 
     public async Task<IActionResult> OnGetAsync([FromQuery] string? userId, CancellationToken cancellationToken)
     {
-        var workspaceId = _currentWorkspace.CurrentWorkspaceId;
-        if (workspaceId is null)
-        {
-            ErrorMessage = "Chỉ xem profile khi đã chọn workspace.";
-            return Page();
-        }
-
-        WorkspaceId = workspaceId;
-
         var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(actorUserId))
             return Challenge();
@@ -65,6 +58,31 @@ public sealed class ProfileModel : PageModel
         var targetUserId = string.IsNullOrWhiteSpace(userId)
             ? actorUserId
             : userId.Trim();
+
+        var workspaceId = _currentWorkspace.CurrentWorkspaceId;
+        WorkspaceId = workspaceId;
+
+        if (workspaceId is null)
+        {
+            if (targetUserId != actorUserId)
+                return Forbid();
+
+            var user = await _db.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+
+            if (user is null)
+                return NotFound();
+
+            BasicProfile = new BasicProfileVm
+            {
+                UserId = targetUserId,
+                Email = user.Email ?? user.UserName ?? targetUserId,
+                FullName = user.DisplayName ?? user.Email ?? user.UserName ?? targetUserId,
+                AvatarUrl = user.AvatarUrl
+            };
+
+            return Page();
+        }
 
         var targetInWorkspace = await _db.WorkspaceMembers.AsNoTracking()
             .AnyAsync(m => m.WorkspaceId == workspaceId.Value && m.UserId == targetUserId, cancellationToken);
@@ -267,5 +285,13 @@ public sealed class ProfileModel : PageModel
 
         [MaxLength(500)]
         public string? LevelChangeReason { get; set; }
+    }
+
+    public sealed class BasicProfileVm
+    {
+        public required string UserId { get; init; }
+        public required string Email { get; init; }
+        public required string FullName { get; init; }
+        public string? AvatarUrl { get; init; }
     }
 }
