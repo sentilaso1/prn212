@@ -50,7 +50,9 @@ public sealed record WorkspaceOverviewRowVm(
     int TotalTasks,
     int CompletedTasks,
     /// <summary>Trung bình CompletionRate (0–1) của member trong workspace.</summary>
-    decimal AvgMemberCompletionRate);
+    decimal AvgMemberCompletionRate,
+    /// <summary>Trung bình AvgScore (MemberProfile) của member trong workspace.</summary>
+    decimal AvgMemberScore);
 
 public sealed record ProjectListItemVm(Guid Id, string Name);
 
@@ -178,7 +180,7 @@ public sealed class KpiDashboardService : IKpiDashboardService
                 Completed = g.Count(x => x.Status == TaskStatus.Done)
             }).ToDictionaryAsync(x => x.WorkspaceId, x => (x.Total, x.Completed), cancellationToken);
 
-        var avgCompletion = await (
+        var memberAgg = await (
             from m in _db.WorkspaceMembers.AsNoTracking()
             where m.Role == WorkspaceMemberRole.Member && wsIds.Contains(m.WorkspaceId)
             join mp in _db.MemberProfiles.AsNoTracking() on m.UserId equals mp.UserId
@@ -187,13 +189,18 @@ public sealed class KpiDashboardService : IKpiDashboardService
             select new
             {
                 WorkspaceId = g.Key,
-                Avg = g.Average(x => x.CompletionRate)
-            }).ToDictionaryAsync(x => x.WorkspaceId, x => x.Avg, cancellationToken);
+                AvgCompletion = g.Average(x => x.CompletionRate),
+                AvgScore = g.Average(x => x.AvgScore)
+            }).ToDictionaryAsync(
+            x => x.WorkspaceId,
+            x => (x.AvgCompletion, x.AvgScore),
+            cancellationToken);
 
         return workspaces
             .Select(w =>
             {
                 var ts = taskStats.GetValueOrDefault(w.Id);
+                var agg = memberAgg.GetValueOrDefault(w.Id);
                 return new WorkspaceOverviewRowVm(
                     w.Id,
                     w.Name,
@@ -201,7 +208,8 @@ public sealed class KpiDashboardService : IKpiDashboardService
                     projectCounts.GetValueOrDefault(w.Id),
                     ts.Total,
                     ts.Completed,
-                    avgCompletion.GetValueOrDefault(w.Id));
+                    agg.AvgCompletion,
+                    agg.AvgScore);
             })
             .ToList();
     }

@@ -120,7 +120,7 @@ builder.Services.AddAuthorization(options =>
         .Build();
 
     options.AddPolicy("PlatformAdmin", policy =>
-        policy.RequireClaim("platform_role", "admin"));
+        policy.Requirements.Add(new PlatformAdminRequirement()));
 
     // UC-12: Only PM in current workspace can CRUD Projects.
     options.AddPolicy("IsPM", policy =>
@@ -164,6 +164,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 // UC-15/UC-02: bơm claim CurrentWorkspaceId/workspace_id theo request/user.
 builder.Services.AddScoped<IClaimsTransformation, WorkspaceClaimsTransformation>();
 
+builder.Services.AddScoped<IAuthorizationHandler, PlatformAdminHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, IsPmAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, PmOrPlatformAdminForReportsHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, CanManageWorkspaceRolesHandler>();

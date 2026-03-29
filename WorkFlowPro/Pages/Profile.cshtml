@@ -53,6 +53,16 @@ else if (Model.Profile is null)
 }
 else
 {
+    @if (Model.Profile.IsPlatformAdminReadOnlyView)
+    {
+        <div class="alert alert-secondary py-2 small mb-3">
+            Bạn đang xem hồ sơ thành viên ở chế độ quản trị — chỉ xem, không chỉnh sửa.
+            @if (Model.WorkspaceId.HasValue)
+            {
+                <span>· <a href="/Reports/Dashboard?workspaceId=@Model.WorkspaceId.Value.ToString("D")">← Báo cáo KPI đơn vị</a></span>
+            }
+        </div>
+    }
 
     <div class="row g-4">
         <div class="col-lg-4">

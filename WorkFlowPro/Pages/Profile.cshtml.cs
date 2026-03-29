@@ -199,6 +199,17 @@ public sealed class ProfileModel : PageModel
         if (!ModelState.IsValid)
             return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
 
+        var isPmForPost = await _db.WorkspaceMembers.AsNoTracking()
+            .AnyAsync(m =>
+                    m.WorkspaceId == workspaceId.Value &&
+                    m.UserId == actorUserId &&
+                    m.Role == WorkspaceMemberRole.PM,
+                cancellationToken);
+        var actorIsPlatformAdmin = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+        if (actorIsPlatformAdmin && !isPmForPost)
+            return Forbid();
+
         // UC-10: Nếu level thay đổi thì tạo đề xuất chờ Admin duyệt.
         // SubRole vẫn được PM cập nhật trực tiếp.
         var currentProfile = await _db.MemberProfiles.AsNoTracking()
