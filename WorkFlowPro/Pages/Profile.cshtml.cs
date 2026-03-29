@@ -79,7 +79,10 @@ public sealed class ProfileModel : PageModel
                     m.Role == WorkspaceMemberRole.PM,
                 cancellationToken);
 
-        if (actorUserId != targetUserId && !isPm)
+        var isPlatformAdmin = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+
+        if (actorUserId != targetUserId && !isPm && !isPlatformAdmin)
             return Forbid();
 
         var vm = await _memberProfile.GetProfilePageAsync(

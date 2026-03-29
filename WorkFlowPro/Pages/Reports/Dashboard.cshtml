@@ -8,6 +8,15 @@
 
 <h1 class="mb-3">Báo cáo &amp; Dashboard KPI</h1>
 
+@if (Model.IsPlatformAdminViewer && !string.IsNullOrWhiteSpace(Model.WorkspaceNameHint) && Model.ReportWorkspaceId.HasValue)
+{
+    <div class="alert alert-secondary py-2 small mb-3">
+        Đang xem đơn vị: <strong>@Model.WorkspaceNameHint</strong>
+        (<code class="small">@Model.ReportWorkspaceId.Value.ToString("D")</code>)
+        · <a href="/Admin/system-reports">← Tổng quan hệ thống</a>
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
 {
     <div class="alert alert-warning">@Model.ErrorMessage</div>
@@ -15,6 +24,10 @@
 else if (Model.Dashboard is not null)
 {
     <form method="get" class="row g-2 align-items-end mb-4">
+        @if (Model.IsPlatformAdminViewer && Model.ReportWorkspaceId.HasValue)
+        {
+            <input type="hidden" name="workspaceId" value="@Model.ReportWorkspaceId.Value" />
+        }
         <div class="col-md-4">
             <label class="form-label">Project</label>
             <select name="projectId" class="form-select" asp-for="ProjectId">
@@ -103,8 +116,8 @@ else if (Model.Dashboard is not null)
                     <tr>
                         <th>Tên</th>
                         <th>Level</th>
-                        <th>Completion rate (UC-08)</th>
-                        <th>Avg score (UC-08)</th>
+                        <th>Completion rate</th>
+                        <th>Avg score</th>
                         <th>Điểm TB đánh giá (kỳ / project)</th>
                         <th>Task giao (kỳ / project)</th>
                         <th>Hoàn thành (kỳ / project)</th>
@@ -115,7 +128,7 @@ else if (Model.Dashboard is not null)
                     {
                         <tr>
                             <td>
-                                <a href="/Profile?userId=@m.UserId" class="text-decoration-none fw-medium">
+                                <a href="/Profile?userId=@m.UserId@(Model.ReportWorkspaceId.HasValue ? $"&workspaceId={Model.ReportWorkspaceId.Value:D}" : "")" class="text-decoration-none fw-medium">
                                     @m.DisplayName
                                 </a>
                             </td>

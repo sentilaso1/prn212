@@ -52,24 +52,30 @@ public sealed class WorkspaceClaimsTransformation : IClaimsTransformation
         if (!string.IsNullOrWhiteSpace(claimVal) && Guid.TryParse(claimVal, out var cid))
             workspaceIdFromClaim = cid;
 
-        static async Task<Guid?> ValidateCandidateAsync(
-            WorkFlowProDbContext db,
-            string userId,
-            Guid? candidate,
-            CancellationToken cancellationToken)
+        var isPlatformAdmin = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == userId && u.IsPlatformAdmin, CancellationToken.None);
+
+        async Task<Guid?> ValidateWorkspaceContextAsync(Guid? candidate, CancellationToken cancellationToken)
         {
             if (candidate is null)
                 return null;
 
-            var isMember = await db.WorkspaceMembers.AnyAsync(m =>
+            var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
                 m.UserId == userId && m.WorkspaceId == candidate.Value, cancellationToken);
+            if (isMember)
+                return candidate;
 
-            return isMember ? candidate : null;
+            // UC-09 Path C: Platform Admin drill-down workspace không cần là member.
+            if (isPlatformAdmin &&
+                await _db.Workspaces.AsNoTracking().AnyAsync(w => w.Id == candidate.Value, cancellationToken))
+                return candidate;
+
+            return null;
         }
 
-        var queryValid = await ValidateCandidateAsync(_db, userId, workspaceIdFromQuery, CancellationToken.None);
-        var sessionValid = await ValidateCandidateAsync(_db, userId, workspaceIdFromSession, CancellationToken.None);
-        var claimValid = await ValidateCandidateAsync(_db, userId, workspaceIdFromClaim, CancellationToken.None);
+        var queryValid = await ValidateWorkspaceContextAsync(workspaceIdFromQuery, CancellationToken.None);
+        var sessionValid = await ValidateWorkspaceContextAsync(workspaceIdFromSession, CancellationToken.None);
+        var claimValid = await ValidateWorkspaceContextAsync(workspaceIdFromClaim, CancellationToken.None);
 
         // Chỉ ghi cảnh báo khi nguồn đó thực sự được dùng để chọn workspace.
         // Nếu URL có ?workspaceId=... hợp lệ (vd. sau AcceptInvite), không báo lỗi chỉ vì

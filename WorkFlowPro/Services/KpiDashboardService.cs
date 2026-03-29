@@ -23,7 +23,34 @@ public interface IKpiDashboardService
         string pmUserId,
         Guid workspaceId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>UC-09 Path C: Tổng quan tất cả workspace (Platform Admin).</summary>
+    Task<IReadOnlyList<WorkspaceOverviewRowVm>> ListWorkspacesOverviewAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>UC-09 Path C: Project trong workspace — không kiểm tra PM.</summary>
+    Task<IReadOnlyList<ProjectListItemVm>> ListProjectsInWorkspaceAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>UC-09 Path C: KPI project — không kiểm tra PM (caller đã authorize).</summary>
+    Task<ProjectDashboardVm?> GetProjectDashboardForWorkspaceAsync(
+        Guid workspaceId,
+        Guid projectId,
+        DateTime fromUtcInclusive,
+        DateTime toUtcInclusive,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record WorkspaceOverviewRowVm(
+    Guid WorkspaceId,
+    string WorkspaceName,
+    int MemberCount,
+    int ProjectCount,
+    int TotalTasks,
+    int CompletedTasks,
+    /// <summary>Trung bình CompletionRate (0–1) của member trong workspace.</summary>
+    decimal AvgMemberCompletionRate);
 
 public sealed record ProjectListItemVm(Guid Id, string Name);
 
@@ -96,6 +123,97 @@ public sealed class KpiDashboardService : IKpiDashboardService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ProjectListItemVm>> ListProjectsInWorkspaceAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await _db.Workspaces.AsNoTracking().AnyAsync(w => w.Id == workspaceId, cancellationToken);
+        if (!exists)
+            return Array.Empty<ProjectListItemVm>();
+
+        return await _db.Projects
+            .AsNoTracking()
+            .Where(p => p.WorkspaceId == workspaceId && (p.Status == ProjectStatus.Active || p.Status == ProjectStatus.Archived))
+            .OrderBy(p => p.Name)
+            .Select(p => new ProjectListItemVm(p.Id, p.Name))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkspaceOverviewRowVm>> ListWorkspacesOverviewAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var workspaces = await _db.Workspaces.AsNoTracking()
+            .OrderBy(w => w.Name)
+            .Select(w => new { w.Id, w.Name })
+            .ToListAsync(cancellationToken);
+
+        if (workspaces.Count == 0)
+            return Array.Empty<WorkspaceOverviewRowVm>();
+
+        var wsIds = workspaces.Select(w => w.Id).ToList();
+
+        var memberCounts = await _db.WorkspaceMembers.AsNoTracking()
+            .Where(m => wsIds.Contains(m.WorkspaceId))
+            .GroupBy(m => m.WorkspaceId)
+            .Select(g => new { WorkspaceId = g.Key, Cnt = g.Count() })
+            .ToDictionaryAsync(x => x.WorkspaceId, x => x.Cnt, cancellationToken);
+
+        var projectCounts = await _db.Projects.AsNoTracking()
+            .Where(p => wsIds.Contains(p.WorkspaceId) &&
+                        (p.Status == ProjectStatus.Active || p.Status == ProjectStatus.Archived))
+            .GroupBy(p => p.WorkspaceId)
+            .Select(g => new { WorkspaceId = g.Key, Cnt = g.Count() })
+            .ToDictionaryAsync(x => x.WorkspaceId, x => x.Cnt, cancellationToken);
+
+        var taskStats = await (
+            from t in _db.Tasks.AsNoTracking()
+            join p in _db.Projects.AsNoTracking() on t.ProjectId equals p.Id
+            where wsIds.Contains(p.WorkspaceId)
+            group t by p.WorkspaceId
+            into g
+            select new
+            {
+                WorkspaceId = g.Key,
+                Total = g.Count(),
+                Completed = g.Count(x => x.Status == TaskStatus.Done)
+            }).ToDictionaryAsync(x => x.WorkspaceId, x => (x.Total, x.Completed), cancellationToken);
+
+        var avgCompletion = await (
+            from m in _db.WorkspaceMembers.AsNoTracking()
+            where m.Role == WorkspaceMemberRole.Member && wsIds.Contains(m.WorkspaceId)
+            join mp in _db.MemberProfiles.AsNoTracking() on m.UserId equals mp.UserId
+            group mp by m.WorkspaceId
+            into g
+            select new
+            {
+                WorkspaceId = g.Key,
+                Avg = g.Average(x => x.CompletionRate)
+            }).ToDictionaryAsync(x => x.WorkspaceId, x => x.Avg, cancellationToken);
+
+        return workspaces
+            .Select(w =>
+            {
+                var ts = taskStats.GetValueOrDefault(w.Id);
+                return new WorkspaceOverviewRowVm(
+                    w.Id,
+                    w.Name,
+                    memberCounts.GetValueOrDefault(w.Id),
+                    projectCounts.GetValueOrDefault(w.Id),
+                    ts.Total,
+                    ts.Completed,
+                    avgCompletion.GetValueOrDefault(w.Id));
+            })
+            .ToList();
+    }
+
+    public Task<ProjectDashboardVm?> GetProjectDashboardForWorkspaceAsync(
+        Guid workspaceId,
+        Guid projectId,
+        DateTime fromUtcInclusive,
+        DateTime toUtcInclusive,
+        CancellationToken cancellationToken = default) =>
+        BuildProjectDashboardAsync(workspaceId, projectId, fromUtcInclusive, toUtcInclusive, cancellationToken);
+
     public async Task<ProjectDashboardVm?> GetProjectDashboardAsync(
         string pmUserId,
         Guid workspaceId,
@@ -112,6 +230,17 @@ public sealed class KpiDashboardService : IKpiDashboardService
         if (!isPm)
             return null;
 
+        return await BuildProjectDashboardAsync(
+            workspaceId, projectId, fromUtcInclusive, toUtcInclusive, cancellationToken);
+    }
+
+    private async Task<ProjectDashboardVm?> BuildProjectDashboardAsync(
+        Guid workspaceId,
+        Guid projectId,
+        DateTime fromUtcInclusive,
+        DateTime toUtcInclusive,
+        CancellationToken cancellationToken)
+    {
         var project = await _db.Projects.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == projectId && p.WorkspaceId == workspaceId, cancellationToken);
         if (project is null)
