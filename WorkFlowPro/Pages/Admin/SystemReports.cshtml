@@ -21,6 +21,7 @@
             <th class="text-end">Tổng task</th>
             <th class="text-end">Task Done</th>
             <th class="text-end">TB Completion rate (member)</th>
+            <th class="text-end">TB Avg score (member)</th>
             <th></th>
         </tr>
         </thead>
@@ -28,7 +29,7 @@
         @if (Model.Workspaces.Count == 0)
         {
             <tr>
-                <td colspan="7" class="text-muted p-4">Chưa có workspace.</td>
+                <td colspan="8" class="text-muted p-4">Chưa có workspace.</td>
             </tr>
         }
         else
@@ -42,6 +43,7 @@
                     <td class="text-end">@w.TotalTasks</td>
                     <td class="text-end">@w.CompletedTasks</td>
                     <td class="text-end">@((w.AvgMemberCompletionRate * 100).ToString("0.##")) %</td>
+                    <td class="text-end">@w.AvgMemberScore.ToString("0.##")</td>
                     <td class="text-end text-nowrap">
                         <a class="btn btn-sm btn-outline-primary"
                            href="/Reports/Dashboard?workspaceId=@w.WorkspaceId.ToString("D")">Xem KPI</a>

@@ -18,6 +18,10 @@ public sealed class MemberProfilePageVm
     public bool IsPm { get; init; }
     public bool CanEditProfile { get; init; }
     public bool CanEditLevelOrSubRole { get; init; }
+
+    /// <summary>Platform Admin xem hồ sơ thành viên khác — chỉ đọc.</summary>
+    public bool IsPlatformAdminReadOnlyView { get; init; }
+
     public IReadOnlyList<ProfileTaskHistoryRowVm> TaskHistory { get; init; } = Array.Empty<ProfileTaskHistoryRowVm>();
 }
 

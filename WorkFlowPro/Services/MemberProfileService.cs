@@ -132,6 +132,7 @@ public sealed class MemberProfileService : IMemberProfileService
             IsPm = isPm,
             CanEditProfile = canEditProfile,
             CanEditLevelOrSubRole = canEditLevelOrSubRole,
+            IsPlatformAdminReadOnlyView = isPlatformAdmin && !isSelf,
             TaskHistory = history
         };
     }
