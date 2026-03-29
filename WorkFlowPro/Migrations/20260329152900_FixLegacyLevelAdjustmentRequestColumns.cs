@@ -44,7 +44,7 @@ namespace WorkFlowPro.Migrations
                     EXEC sp_rename N'LevelAdjustmentRequests.ReviewedByAdminUserId', N'ReviewedByAdminId', N'COLUMN';
                 """);
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(@"
                 IF EXISTS (
                     SELECT 1 FROM sys.columns c
                     INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
@@ -53,15 +53,12 @@ namespace WorkFlowPro.Migrations
                 BEGIN
                     ALTER TABLE dbo.LevelAdjustmentRequests ADD StatusNew nvarchar(20) NULL;
                 END
-                """);
+                ");
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(@"
                 IF COL_LENGTH('dbo.LevelAdjustmentRequests', 'StatusNew') IS NOT NULL
-                BEGIN
-                    UPDATE dbo.LevelAdjustmentRequests SET StatusNew = CASE [Status]
-                        WHEN 0 THEN N'Pending' WHEN 1 THEN N'Approved' WHEN 2 THEN N'Rejected' ELSE N'Pending' END;
-                END
-                """);
+                    EXEC sp_executesql N'UPDATE dbo.LevelAdjustmentRequests SET StatusNew = CASE [Status] WHEN 0 THEN N''Pending'' WHEN 1 THEN N''Approved'' WHEN 2 THEN N''Rejected'' ELSE N''Pending'' END';
+                ");
 
             migrationBuilder.Sql("""
                 DECLARE @dc sysname;
@@ -71,14 +68,14 @@ namespace WorkFlowPro.Migrations
                 IF @dc IS NOT NULL EXEC(N'ALTER TABLE dbo.LevelAdjustmentRequests DROP CONSTRAINT [' + @dc + N']');
                 """);
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(@"
                 IF COL_LENGTH('dbo.LevelAdjustmentRequests', 'StatusNew') IS NOT NULL
                 BEGIN
                     ALTER TABLE dbo.LevelAdjustmentRequests DROP COLUMN Status;
                     EXEC sp_rename N'LevelAdjustmentRequests.StatusNew', N'Status', N'COLUMN';
                     ALTER TABLE dbo.LevelAdjustmentRequests ALTER COLUMN Status nvarchar(20) NOT NULL;
                 END
-                """);
+                ");
 
             migrationBuilder.Sql("""
                 IF COL_LENGTH('dbo.LevelAdjustmentRequests', 'Reason') IS NOT NULL
