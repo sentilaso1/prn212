@@ -84,6 +84,33 @@ public sealed class ProfileModel : PageModel
             return Page();
         }
 
+        var actorInWorkspace = await _db.WorkspaceMembers.AsNoTracking()
+            .AnyAsync(m => m.WorkspaceId == workspaceId.Value && m.UserId == actorUserId, cancellationToken);
+
+        if (!actorInWorkspace)
+        {
+            WorkspaceId = null;
+
+            if (targetUserId != actorUserId)
+                return Forbid();
+
+            var user = await _db.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+
+            if (user is null)
+                return NotFound();
+
+            BasicProfile = new BasicProfileVm
+            {
+                UserId = targetUserId,
+                Email = user.Email ?? user.UserName ?? targetUserId,
+                FullName = user.DisplayName ?? user.Email ?? user.UserName ?? targetUserId,
+                AvatarUrl = user.AvatarUrl
+            };
+
+            return Page();
+        }
+
         var targetInWorkspace = await _db.WorkspaceMembers.AsNoTracking()
             .AnyAsync(m => m.WorkspaceId == workspaceId.Value && m.UserId == targetUserId, cancellationToken);
 
