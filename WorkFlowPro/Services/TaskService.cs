@@ -334,6 +334,11 @@ public sealed class TaskService : ITaskService
             TaskStatus.Review,
             TaskStatus.Done
         };
+        if (isPm)
+        {
+            draggable.Add(TaskStatus.Unassigned);
+            draggable.Add(TaskStatus.Pending);
+        }
 
         var list = new List<TaskCardVm>(tasks.Count);
         foreach (var t in tasks)
@@ -343,6 +348,16 @@ public sealed class TaskService : ITaskService
             userById.TryGetValue(assigneeUserId ?? string.Empty, out var assigneeUser);
 
             var canDrag = draggable.Contains(t.Status);
+
+            // Member can only drag their own accepted tasks.
+            if (!isPm && t.Status == TaskStatus.ToDo)
+            {
+                var isAcceptedByMe = assignments.Any(a =>
+                    a.TaskId == t.Id &&
+                    a.AssigneeUserId == actorUserId &&
+                    a.Status == TaskAssignmentStatus.Accepted);
+                if (!isAcceptedByMe) canDrag = false;
+            }
 
             var isOverdue = t.DueDateUtc.HasValue
                             && t.DueDateUtc.Value < utcNow

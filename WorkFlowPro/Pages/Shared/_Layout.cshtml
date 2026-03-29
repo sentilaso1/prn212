@@ -43,7 +43,12 @@
                                 <a class="nav-link" href="/tasks">Danh sách task</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="/Profile">Hồ sơ</a>
+                                @using Microsoft.AspNetCore.Http
+                                @{
+                                    var wsId = ViewContext.HttpContext.Session.GetString("CurrentWorkspaceId");
+                                    var profileUrl = string.IsNullOrEmpty(wsId) ? "/Profile" : $"/Profile?workspaceId={wsId}";
+                                }
+                                <a class="nav-link" href="@profileUrl">Hồ sơ của tôi</a>
                             </li>
                         }
                     </ul>
@@ -52,6 +57,9 @@
                     <ul class="navbar-nav align-items-lg-center gap-2">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
+                            var currentWorkspaceId = (ViewContext.ViewData["CurrentWorkspaceId"] as Guid?) 
+                                ?? (ViewContext.HttpContext.Items["CurrentWorkspaceId"] as Guid?);
+                            
                             <!-- Notification -->
                             <partial name="_NotificationBell" />
 

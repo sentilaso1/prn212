@@ -11,7 +11,10 @@ public enum AccountStatus
 public enum WorkspaceRoleRequestKind
 {
     PromoteMemberToPm = 1,
-    DemotePmToMember = 2
+    DemotePmToMember = 2,
+
+    /// <summary>PM yêu cầu xóa PM khác — Admin duyệt mới gỡ khỏi đơn vị.</summary>
+    RemovePmFromWorkspace = 3
 }
 
 public enum WorkspaceRoleRequestStatus
@@ -36,8 +39,10 @@ public enum MemberLevel
 
 public enum ProjectStatus
 {
+    PendingApproval = 0,
     Active = 1,
-    Archived = 2
+    Archived = 2,
+    Rejected = 3
 }
 
 public enum TaskPriority
@@ -99,7 +104,20 @@ public enum NotificationType
     RegistrationPendingPm = 17,
 
     /// <summary>Yêu cầu nâng/hạ PM trong workspace chờ Admin.</summary>
-    WorkspacePmRoleRequest = 18
+    WorkspacePmRoleRequest = 18,
+
+    /// <summary>UC-03 Path C: thành viên bị PM xóa khỏi workspace.</summary>
+    RemovedFromWorkspace = 19,
+
+    /// <summary>UC-10: Đề xuất thay đổi Level.</summary>
+    LevelAdjustmentRequest = 20
+}
+
+public enum LevelAdjustmentRequestStatus
+{
+    Pending = 0,
+    Approved = 1,
+    Rejected = 2
 }
 
 public enum InviteStatus

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Data;
 
 namespace WorkFlowPro.Services;
@@ -10,6 +11,14 @@ public interface IWorkspaceOnboardingService
     Task<Workspace> CreateWorkspaceAndBootstrapUserAsync(
         string userId,
         string workspaceName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gán user vào một Workspace đã có sẵn với vai trò PM.
+    /// </summary>
+    Task JoinExistingWorkspaceAsPmAsync(
+        string userId,
+        Guid workspaceId,
         CancellationToken cancellationToken = default);
 }
 
@@ -63,6 +72,41 @@ public sealed class WorkspaceOnboardingService : IWorkspaceOnboardingService
 
         await _db.SaveChangesAsync(cancellationToken);
         return workspace;
+    }
+
+    public async Task JoinExistingWorkspaceAsPmAsync(
+        string userId,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Gán user vào WorkspaceMember(PM)
+        var membership = new WorkspaceMember
+        {
+            WorkspaceId = workspaceId,
+            UserId = userId,
+            Role = WorkspaceMemberRole.PM,
+            SubRole = WorkspaceMemberRole.PM.ToString()
+        };
+
+        // 2. Tạo MemberProfile(Level=Junior) nếu chưa có
+        var existingProfile = await _db.MemberProfiles
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+        if (existingProfile == null)
+        {
+            var profile = new MemberProfile
+            {
+                UserId = userId,
+                Level = MemberLevel.Junior,
+                CompletionRate = 0m,
+                AvgScore = 0m,
+                CurrentWorkload = 0
+            };
+            _db.MemberProfiles.Add(profile);
+        }
+
+        _db.WorkspaceMembers.Add(membership);
+        await _db.SaveChangesAsync(cancellationToken);
     }
 }
 

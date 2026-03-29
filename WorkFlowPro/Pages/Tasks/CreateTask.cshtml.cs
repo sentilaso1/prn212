@@ -67,13 +67,19 @@ public sealed class CreateTaskModel : PageModel
             return;
         }
 
-        // Requirement: ProjectId phải thuộc CurrentWorkspace.
-        var projectOk = await _db.Projects.AnyAsync(p =>
+        // Requirement: ProjectId phải thuộc CurrentWorkspace và phải Active.
+        var project = await _db.Projects.FirstOrDefaultAsync(p =>
             p.Id == projectId && p.WorkspaceId == workspaceId.Value, cancellationToken);
 
-        if (!projectOk)
+        if (project is null)
         {
-            Forbid();
+            ErrorMessage = "Project không tồn tại trong workspace hiện tại.";
+            return;
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            ErrorMessage = $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể tạo Task.";
             return;
         }
 
@@ -317,7 +323,16 @@ public sealed class CreateTaskModel : PageModel
             cancellationToken);
 
         if (project is null)
+        {
             ModelState.AddModelError(nameof(Input.ProjectId), "Project không tồn tại trong workspace hiện tại.");
+            return null;
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            ModelState.AddModelError(string.Empty, $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể tạo Task.");
+            return null;
+        }
 
         return project;
     }

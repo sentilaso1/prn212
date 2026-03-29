@@ -32,6 +32,7 @@ public sealed class KanbanService : IKanbanService
         TaskStatus newStatus,
         string actorUserId,
         Guid workspaceId,
+        string? reason = null,
         CancellationToken cancellationToken = default)
     {
         if (taskId == Guid.Empty)
@@ -53,6 +54,9 @@ public sealed class KanbanService : IKanbanService
 
         if (project is null)
             return new MoveTaskServiceResult { Success = false, ErrorMessage = "Task không thuộc workspace hiện tại." };
+
+        if (project.Status == ProjectStatus.Archived)
+            return new MoveTaskServiceResult { Success = false, ErrorMessage = "Dự án đã đóng (Archived), không thể di chuyển task." };
 
         var now = DateTime.UtcNow;
 
@@ -76,12 +80,19 @@ public sealed class KanbanService : IKanbanService
         if (oldStatus == newStatus)
             return new MoveTaskServiceResult { Success = true };
 
+        // UC-06: Check backward move.
+        bool isBackward = (int)newStatus < (int)oldStatus;
+        if (isBackward && isPm && string.IsNullOrWhiteSpace(reason))
+            return new MoveTaskServiceResult { Success = false, ErrorMessage = "Vui lòng nhập lý do khi chuyển lùi task." };
+
         var allowed = oldStatus switch
         {
-            TaskStatus.ToDo => newStatus is TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Done,
-            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done or TaskStatus.ToDo,
-            TaskStatus.Review => newStatus is TaskStatus.Done or TaskStatus.InProgress,
-            TaskStatus.Done => newStatus is TaskStatus.ToDo or TaskStatus.InProgress or TaskStatus.Review,
+            TaskStatus.Unassigned => newStatus is TaskStatus.Pending or TaskStatus.Cancelled,
+            TaskStatus.Pending => newStatus is TaskStatus.ToDo or TaskStatus.Unassigned or TaskStatus.Cancelled,
+            TaskStatus.ToDo => newStatus is TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Done or TaskStatus.Cancelled,
+            TaskStatus.InProgress => newStatus is TaskStatus.Review or TaskStatus.Done or TaskStatus.ToDo or TaskStatus.Cancelled,
+            TaskStatus.Review => newStatus is TaskStatus.Done or TaskStatus.InProgress or TaskStatus.ToDo or TaskStatus.Cancelled,
+            TaskStatus.Done => newStatus is TaskStatus.ToDo or TaskStatus.InProgress or TaskStatus.Review or TaskStatus.Cancelled,
             _ => newStatus is TaskStatus.Done
         };
 
@@ -109,6 +120,19 @@ public sealed class KanbanService : IKanbanService
             }
         }
 
+        // Save reason as a comment if provided.
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            _db.TaskComments.Add(new TaskComment
+            {
+                Id = Guid.NewGuid(),
+                TaskId = taskId,
+                UserId = actorUserId,
+                Content = $"[Hệ thống] Chuyển lùi task sang {newStatus}. Lý do: {reason}",
+                CreatedAtUtc = now
+            });
+        }
+
         _db.TaskHistoryEntries.Add(new TaskHistoryEntry
         {
             TaskId = taskId,
@@ -118,6 +142,19 @@ public sealed class KanbanService : IKanbanService
             NewValue = newStatus.ToString(),
             TimestampUtc = now
         });
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            _db.TaskHistoryEntries.Add(new TaskHistoryEntry
+            {
+                TaskId = taskId,
+                ActorUserId = actorUserId,
+                Action = "Move backward reason",
+                OldValue = null,
+                NewValue = reason.Length > 500 ? reason[..500] : reason,
+                TimestampUtc = now
+            });
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
@@ -149,6 +186,7 @@ public sealed class KanbanService : IKanbanService
             newStatus,
             actorUserId,
             workspaceId,
+            reason, // Pass reason to notification.
             cancellationToken);
 
         return new MoveTaskServiceResult { Success = true };
@@ -161,6 +199,7 @@ public sealed class KanbanService : IKanbanService
         TaskStatus newStatus,
         string actorUserId,
         Guid workspaceId,
+        string? reason,
         CancellationToken cancellationToken)
     {
         try
@@ -194,8 +233,10 @@ public sealed class KanbanService : IKanbanService
             if (task.CreatedByUserId != actorUserId)
                 recipientIds.Add(task.CreatedByUserId);
 
-            var msg =
-                $"Task \"{task.Title}\" đã chuyển sang {newStatus} bởi {actorName}.";
+            var msg = !string.IsNullOrWhiteSpace(reason)
+                ? $"Task \"{task.Title}\" đã bị lùi về {newStatus} bởi {actorName}. Lý do: {reason}"
+                : $"Task \"{task.Title}\" đã chuyển sang {newStatus} bởi {actorName}.";
+            
             var redirect = $"/Tasks/Details/{taskId}?workspaceId={workspaceId:D}";
 
             foreach (var uid in recipientIds)
@@ -223,8 +264,11 @@ public sealed class KanbanService : IKanbanService
         CancellationToken cancellationToken)
     {
         // We include card data only for statuses displayed on board.
+        // UC-06: Display all 6 columns.
         var displayStatuses = new[]
         {
+            TaskStatus.Unassigned,
+            TaskStatus.Pending,
             TaskStatus.ToDo,
             TaskStatus.InProgress,
             TaskStatus.Review,

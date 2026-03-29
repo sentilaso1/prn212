@@ -18,7 +18,11 @@ public class IndexModel : PageModel
         _db = db;
     }
 
-    public sealed record WorkspaceVm(Guid Id, string Name, WorkspaceMemberRole Role);
+    public sealed record WorkspaceVm(Guid Id, string Name, WorkspaceMemberRole Role)
+    {
+        /// <summary>PM trong đơn vị này — được vào /Projects (UC-12).</summary>
+        public bool IsWorkspacePm => Role == WorkspaceMemberRole.PM;
+    }
 
     public IReadOnlyList<WorkspaceVm> Workspaces { get; private set; } = Array.Empty<WorkspaceVm>();
 

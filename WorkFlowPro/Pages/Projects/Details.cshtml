@@ -3,124 +3,147 @@
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     ViewData["Title"] = "Chi tiết dự án";
-
-    var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
-    var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<div class="d-flex justify-content-between align-items-start mb-4">
-    <div>
-        <h1 class="h3 fw-semibold mb-1">Chi tiết dự án</h1>
-        @if (Model.Project is not null)
-        {
-            <p class="text-muted mb-0">@Model.Project.Name</p>
-        }
-    </div>
-    
-    @if (Model.CanManage)
-    {
-        <div class="btn-group">
-            <a class="btn btn-outline-primary btn-sm" href="/Projects/Settings/@(Model.Project?.Id)@wsQ">
-                Cài đặt
-            </a>
-            <a class="btn btn-outline-danger btn-sm"
-                   href="/Projects/Delete/@(Model.Project?.Id)@wsQ"
-                   onclick="return confirm('Bạn có chắc muốn xóa dự án này không?');">
-                Xóa dự án
-            </a>
-        </div>
-    }
-</div>
+<h1 class="h3 mb-1">Chi tiết dự án</h1>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
 }
 
 @if (Model.Project is not null)
 {
-    <div class="card shadow-sm">
+    <div class="card">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex justify-content-between">
                 <div>
-                    <h4 class="card-title mb-2">@Model.Project.Name</h4>
-                    @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                    <h4 class="card-title">@Model.Project.Name</h4>
+                    @switch (Model.Project.Status)
                     {
-                        <span class="badge bg-secondary">Đã lưu trữ</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-success">Đang hoạt động</span>
+                        case WorkFlowPro.Data.ProjectStatus.PendingApproval:
+                            <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                            break;
+                        case WorkFlowPro.Data.ProjectStatus.Active:
+                            <span class="badge bg-success">Đang hoạt động</span>
+                            break;
+                        case WorkFlowPro.Data.ProjectStatus.Archived:
+                            <span class="badge bg-secondary">Đã lưu trữ</span>
+                            break;
+                        case WorkFlowPro.Data.ProjectStatus.Rejected:
+                            <span class="badge bg-danger">Bị từ chối</span>
+                            break;
                     }
                 </div>
-
-                @if (!string.IsNullOrEmpty(Model.Project.Color))
-                {
-                    <span class="badge px-3 py-2"
-                          style="background-color: @Model.Project.Color; color: white; font-size: 0.95rem;">
-                        Màu: @Model.Project.Color
+                <div>
+                    <span class="badge text-bg-light border" style="background:@(Model.Project.Color ?? "#FFFFFF"); border-color:#ddd;">
+                        Color: @Model.Project.Color
                     </span>
-                }
+                </div>
             </div>
 
-            <hr />
-
-            <dl class="row">
-                <dt class="col-sm-3 fw-normal text-muted">Mô tả</dt>
-                <dd class="col-sm-9">
-                    @if (string.IsNullOrWhiteSpace(Model.Project.Description))
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                @if (Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Active || Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                {
+                    <a class="btn btn-sm btn-outline-primary" href="/board?projectId=@Model.Project.Id">Kanban</a>
+                    @if (Model.CurrentWorkspaceId is { } wid)
                     {
-                        <span class="text-muted fst-italic">Chưa có mô tả</span>
+                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id&workspaceId=@wid">Danh sách task (lọc)</a>
                     }
                     else
                     {
-                        @Model.Project.Description
+                        <a class="btn btn-sm btn-outline-primary" href="/tasks/list?projectId=@Model.Project.Id">Danh sách task (lọc)</a>
                     }
-                </dd>
-
-                <dt class="col-sm-3 fw-normal text-muted">Ngày bắt đầu</dt>
-                <dd class="col-sm-9">
-                    @(Model.Project.StartDateUtc?.ToString("dd/MM/yyyy") ?? "—")
-                </dd>
-
-                <dt class="col-sm-3 fw-normal text-muted">Ngày kết thúc</dt>
-                <dd class="col-sm-9">
-                    @(Model.Project.EndDateUtc?.ToString("dd/MM/yyyy") ?? "—")
-                </dd>
-
-                <dt class="col-sm-3 fw-normal text-muted">Ngày tạo</dt>
-                <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("dd/MM/yyyy")</dd>
-            </dl>
-
-            <hr />
-
-            <h5 class="mb-3">Quản lý công việc</h5>
-            <div class="d-flex flex-wrap gap-2">
-                <a class="btn btn-primary" href="/board?projectId=@(Model.Project.Id)@wsAmp">
-                    Mở Kanban Board
-                </a>
-                <a class="btn btn-outline-primary" href="/tasks/list?projectId=@(Model.Project.Id)@wsAmp">
-                    Danh sách Task
-                </a>
-                
-                @if (Model.CanManage)
+                    @if (Model.CanManage && Model.Project.Status == WorkFlowPro.Data.ProjectStatus.Active)
+                    {
+                        <a class="btn btn-sm btn-primary" href="/Tasks/Create?projectId=@Model.Project.Id">+ Tạo task</a>
+                    }
+                }
+                else
                 {
-                    <a class="btn btn-success" href="/Tasks/Create?projectId=@(Model.Project.Id)@wsAmp">
-                        + Tạo task mới
-                    </a>
+                    <button class="btn btn-sm btn-outline-primary" disabled title="Chờ Admin duyệt">Kanban</button>
+                    <button class="btn btn-sm btn-outline-primary" disabled title="Chờ Admin duyệt">Danh sách task</button>
+                    @if (Model.CanManage)
+                    {
+                        <button class="btn btn-sm btn-primary" disabled title="Chờ Admin duyệt">+ Tạo task</button>
+                    }
                 }
             </div>
 
-            @if (!Model.CanManage)
+            <dl class="row mt-3">
+                <dt class="col-sm-3">Description</dt>
+                <dd class="col-sm-9">@Model.Project.Description</dd>
+
+                <dt class="col-sm-3">Start</dt>
+                <dd class="col-sm-9">@Model.Project.StartDateUtc?.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">End</dt>
+                <dd class="col-sm-9">@Model.Project.EndDateUtc?.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">Created</dt>
+                <dd class="col-sm-9">@Model.Project.CreatedAtUtc.ToString("yyyy-MM-dd")</dd>
+            </dl>
+
+            @if (Model.CanManage)
             {
-                <div class="alert alert-info mt-4 mb-0">
-                    <i class="fa-solid fa-info-circle me-2"></i>
-                    Bạn đang xem ở chế độ chỉ đọc. Chỉ người quản lý dự án (PM) mới có quyền chỉnh sửa hoặc xóa dự án.
+                <div class="d-flex gap-2 mt-3">
+                    <a class="btn btn-sm btn-outline-primary" href="/Projects/Settings/@Model.Project.Id">Settings</a>
+                    <a class="btn btn-sm btn-outline-danger" href="/Projects/Delete/@Model.Project.Id">Delete</a>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info mt-3" role="alert">
+                    Bạn đang có quyền xem dự án (read-only). Chỉ PM mới có quyền Settings/Delete.
                 </div>
             }
         </div>
     </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div>
+                    <h2 class="h5 card-title mb-1">Thành viên đơn vị (workspace)</h2>
+                    <p class="card-text small text-muted mb-0">
+                        Lời mời (<strong>Mời thành viên</strong>) gắn với <strong>cả đơn vị</strong>, không gắn từng dự án.
+                        Mọi dự án trong đơn vị dùng chung một danh sách người; <strong>vai trò (PM/Member) và SubRole (BA, DEV…)</strong> lưu theo người trong đơn vị — đổi một lần ở <a href="/Roles">/Roles</a> thì hiển thị giống nhau trên mọi dự án.
+                        Xóa khỏi đơn vị cũng thực hiện từ đó.
+                    </p>
+                </div>
+                @if (Model.CanManage)
+                {
+                    <a class="btn btn-sm btn-outline-primary" href="/Roles" title="Quản lý thành viên và vai trò trong đơn vị">
+                        Quản lý thành viên &amp; role
+                    </a>
+                }
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Tên hiển thị</th>
+                        <th>Email</th>
+                        <th>Vai trò</th>
+                        <th>Sub-role</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var m in Model.WorkspaceMembers)
+                    {
+                        <tr>
+                            <td class="fw-medium">@m.DisplayName</td>
+                            <td class="small">@(m.Email ?? "—")</td>
+                            <td><span class="badge bg-secondary bg-opacity-25 text-dark">@m.Role</span></td>
+                            <td class="small">@(string.IsNullOrWhiteSpace(m.SubRole) ? "—" : m.SubRole)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 }
+

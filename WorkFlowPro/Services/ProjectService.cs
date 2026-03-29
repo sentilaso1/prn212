@@ -93,14 +93,23 @@ public sealed class ProjectService : IProjectService
         if (workspaceId is null)
             throw new InvalidOperationException("Missing active workspace.");
 
-        var isMember = await _db.WorkspaceMembers.AnyAsync(m =>
+        var membership = await _db.WorkspaceMembers.FirstOrDefaultAsync(m =>
             m.UserId == userId && m.WorkspaceId == workspaceId.Value,
             cancellationToken);
-        if (!isMember)
+
+        if (membership is null)
             throw new UnauthorizedAccessException("User is not a member of this workspace.");
 
-        return await _db.Projects
-            .Where(p => p.WorkspaceId == workspaceId.Value)
+        var query = _db.Projects.Where(p => p.WorkspaceId == workspaceId.Value);
+
+        // Members only see Active or Archived projects.
+        // PMs see all projects in their workspace (including PendingApproval/Rejected).
+        if (membership.Role != WorkspaceMemberRole.PM)
+        {
+            query = query.Where(p => p.Status == ProjectStatus.Active || p.Status == ProjectStatus.Archived);
+        }
+
+        return await query
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToListAsync(cancellationToken);
     }
@@ -137,12 +146,13 @@ public sealed class ProjectService : IProjectService
 
         var normalizedColor = NormalizeColor(input.Color);
 
-        // Unique name in workspace (không phân biệt archived).
+        // Unique name in workspace (không phân biệt status).
         var exists = await _db.Projects.AnyAsync(p =>
+            p.WorkspaceId == workspaceId &&
             p.Name == name, cancellationToken);
 
         if (exists)
-            throw new InvalidOperationException("Project name already exists in this workspace.");
+            throw new InvalidOperationException("Project with this name already exists in your Workspace.");
 
         var project = new Project
         {
@@ -153,38 +163,30 @@ public sealed class ProjectService : IProjectService
             StartDateUtc = input.StartDateUtc,
             EndDateUtc = input.EndDateUtc,
             OwnerUserId = userId,
-            Status = ProjectStatus.Active,
+            Status = ProjectStatus.PendingApproval,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         _db.Projects.Add(project);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // UC-11: thông báo cho thành viên workspace (trừ người tạo).
-        var memberIds = await _db.WorkspaceMembers
-            .AsNoTracking()
-            .Where(m => m.WorkspaceId == workspaceId && m.UserId != userId)
-            .Select(m => m.UserId)
+        // UC-11: Notify Admin for approval (UC-14).
+        var admins = await _db.Users
+            .Where(u => u.UserName == "admin@workflowpro.com") // Demo/Default admin
+            .Select(u => u.Id)
             .ToListAsync(cancellationToken);
-        foreach (var uid in memberIds)
+
+        foreach (var adminId in admins)
         {
             await _notifications.CreateAndPushAsync(
-                uid,
+                adminId,
                 NotificationType.ProjectCreated,
-                $"Project \"{project.Name}\" vừa được tạo trong workspace.",
+                $"Đơn vị vừa có đề xuất tạo dự án mới: \"{project.Name}\".",
                 workspaceId: workspaceId,
                 projectId: project.Id,
-                redirectUrl: $"/Projects/Details/{project.Id}?workspaceId={workspaceId}",
+                redirectUrl: "/Admin",
                 cancellationToken: cancellationToken);
         }
-
-        // UC-12: broadcast PROJECT_CREATED (tối thiểu).
-        await _hub.Clients.All.SendAsync("PROJECT_CREATED", new
-        {
-            projectId = project.Id,
-            workspaceId = project.WorkspaceId,
-            name = project.Name
-        }, cancellationToken);
 
         return project;
     }
@@ -218,6 +220,9 @@ public sealed class ProjectService : IProjectService
         if (project.Status == ProjectStatus.Archived)
             throw new InvalidOperationException("Archived project is read-only.");
 
+        if (project.Status == ProjectStatus.Rejected)
+            throw new InvalidOperationException("Cannot update a rejected project.");
+
         var name = input.Name.Trim();
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Project name is required.", nameof(input));
@@ -231,13 +236,14 @@ public sealed class ProjectService : IProjectService
 
         var normalizedColor = NormalizeColor(input.Color);
 
-        // Unique name (ignore current project; không phân biệt archived).
+        // Unique name (ignore current project; không phân biệt status).
         var exists = await _db.Projects.AnyAsync(p =>
+            p.WorkspaceId == project.WorkspaceId &&
             p.Id != projectId &&
             p.Name == name, cancellationToken);
 
         if (exists)
-            throw new InvalidOperationException("Project name already exists in this workspace.");
+            throw new InvalidOperationException("Another project with this name already exists in your Workspace.");
 
         project.Name = name;
         project.Description = input.Description;

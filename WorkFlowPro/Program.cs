@@ -144,6 +144,7 @@ builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskAssignmentService, TaskAssignmentService>();
 builder.Services.AddScoped<IKanbanService, KanbanService>();
+builder.Services.AddScoped<ILevelAdjustmentService, LevelAdjustmentService>();
 builder.Services.AddScoped<IKpiDashboardService, KpiDashboardService>();
 builder.Services.AddScoped<IMemberProfileService, MemberProfileService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();

@@ -15,15 +15,18 @@ namespace WorkFlowPro.Pages;
 public sealed class ProfileModel : PageModel
 {
     private readonly IMemberProfileService _memberProfile;
+    private readonly ILevelAdjustmentService _levelAdjustment;
     private readonly ICurrentWorkspaceService _currentWorkspace;
     private readonly WorkFlowProDbContext _db;
 
     public ProfileModel(
         IMemberProfileService memberProfile,
+        ILevelAdjustmentService levelAdjustment,
         ICurrentWorkspaceService currentWorkspace,
         WorkFlowProDbContext db)
     {
         _memberProfile = memberProfile;
+        _levelAdjustment = levelAdjustment;
         _currentWorkspace = currentWorkspace;
         _db = db;
     }
@@ -148,21 +151,51 @@ public sealed class ProfileModel : PageModel
         if (!ModelState.IsValid)
             return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
 
+        // UC-10: Nếu level thay đổi thì tạo đề xuất chờ Admin duyệt.
+        // SubRole vẫn được PM cập nhật trực tiếp.
+        var currentProfile = await _db.MemberProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == pmInput.TargetUserId, cancellationToken);
+        var currentLevel = currentProfile?.Level ?? MemberLevel.Junior;
+
+        bool levelChanged = pmInput.Level != currentLevel;
+        if (levelChanged)
+        {
+            var propRes = await _levelAdjustment.ProposeLevelChangeAsync(
+                workspaceId.Value,
+                pmInput.TargetUserId,
+                actorUserId,
+                pmInput.Level,
+                pmInput.LevelChangeReason ?? string.Empty,
+                cancellationToken);
+
+            if (!propRes.Success)
+            {
+                ModelState.AddModelError(string.Empty, propRes.ErrorMessage ?? "Đề xuất Level thất bại.");
+                return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
+            }
+            ToastMessage = "Đã gửi đề xuất thay đổi Level tới Admin.";
+        }
+
+        // Cập nhật SubRole (và giữ nguyên Level hiện tại trong DB)
         var result = await _memberProfile.UpdateLevelAsync(
             workspaceId.Value,
             actorUserId,
             pmInput.TargetUserId,
-            pmInput.Level,
+            currentLevel, // Giữ level cũ, chỉ cập nhật SubRole nếu có đổi
             string.IsNullOrWhiteSpace(pmInput.SubRole) ? null : pmInput.SubRole.Trim(),
             cancellationToken);
 
         if (!result.Success)
         {
-            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Cập nhật thất bại.");
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Cập nhật SubRole thất bại.");
             return await ReloadWithErrorAsync(workspaceId.Value, actorUserId, pmInput.TargetUserId, cancellationToken, pmInput: pmInput);
         }
 
-        ToastMessage = "Đã cập nhật Level / SubRole.";
+        if (!levelChanged)
+        {
+            ToastMessage = "Đã cập nhật SubRole.";
+        }
+
         return RedirectToPage("/Profile", new { userId = pmInput.TargetUserId });
     }
 
@@ -228,5 +261,8 @@ public sealed class ProfileModel : PageModel
 
         [StringLength(100)]
         public string? SubRole { get; set; }
+
+        [MaxLength(500)]
+        public string? LevelChangeReason { get; set; }
     }
 }

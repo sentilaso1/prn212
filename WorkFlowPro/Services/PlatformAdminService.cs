@@ -14,6 +14,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
     private readonly IWorkspaceOnboardingService _workspaceOnboarding;
     private readonly INotificationService _notifications;
     private readonly IHubContext<TaskHub> _taskHub;
+    private readonly IHubContext<KanbanHub> _kanbanHub;
+    private readonly IRoleManagementService _roleManagement;
     private readonly ILogger<PlatformAdminService> _logger;
 
     public PlatformAdminService(
@@ -22,6 +24,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         IWorkspaceOnboardingService workspaceOnboarding,
         INotificationService notifications,
         IHubContext<TaskHub> taskHub,
+        IHubContext<KanbanHub> kanbanHub,
+        IRoleManagementService roleManagement,
         ILogger<PlatformAdminService> logger)
     {
         _db = db;
@@ -29,6 +33,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         _workspaceOnboarding = workspaceOnboarding;
         _notifications = notifications;
         _taskHub = taskHub;
+        _kanbanHub = kanbanHub;
+        _roleManagement = roleManagement;
         _logger = logger;
     }
 
@@ -75,12 +81,39 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (workspaceName.Length > 200)
             workspaceName = workspaceName[..200];
 
+        bool isNewlyCreated = false;
         try
         {
-            await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
-                user.Id,
-                workspaceName,
-                cancellationToken);
+            // Kiểm tra xem Đơn vị đã tồn tại chưa
+            var existingWorkspace = await _db.Workspaces
+                .FirstOrDefaultAsync(w => w.Name == workspaceName, cancellationToken);
+
+            if (existingWorkspace != null)
+            {
+                // Nếu đã tồn tại, kiểm tra giới hạn PM
+                var pmCount = await WorkspacePolicies.CountPmsAsync(_db, existingWorkspace.Id, cancellationToken);
+                if (pmCount >= WorkspacePolicies.MaxPmsPerWorkspace)
+                {
+                    return new AdminActionResult(false,
+                        $"Đơn vị \"{workspaceName}\" đã đủ {WorkspacePolicies.MaxPmsPerWorkspace} PM. " +
+                        "Vui lòng từ chối hoặc yêu cầu PM khác gỡ bớt.");
+                }
+
+                // Gán vào đơn vị hiện có
+                await _workspaceOnboarding.JoinExistingWorkspaceAsPmAsync(
+                    user.Id,
+                    existingWorkspace.Id,
+                    cancellationToken);
+            }
+            else
+            {
+                // Nếu chưa tồn tại, tạo mới
+                await _workspaceOnboarding.CreateWorkspaceAndBootstrapUserAsync(
+                    user.Id,
+                    workspaceName,
+                    cancellationToken);
+                isNewlyCreated = true;
+            }
 
             user.AccountStatus = AccountStatus.Approved;
             user.AwaitingPmWorkspaceApproval = false;
@@ -100,10 +133,14 @@ public sealed class PlatformAdminService : IPlatformAdminService
             return new AdminActionResult(false, "Không tạo được đơn vị. Thử lại sau.");
         }
 
+        var message = isNewlyCreated
+            ? $"Admin đã duyệt. Đơn vị \"{workspaceName}\" đã được tạo — bạn là PM."
+            : $"Admin đã duyệt. Bạn đã được gán làm PM cho đơn vị \"{workspaceName}\".";
+
         await _notifications.CreateAndPushAsync(
             targetUserId,
             NotificationType.RegistrationPendingPm,
-            $"Admin đã duyệt. Đơn vị \"{workspaceName}\" đã được tạo — bạn là PM.",
+            message,
             workspaceId: null,
             redirectUrl: "/Workspaces",
             cancellationToken: cancellationToken);
@@ -191,6 +228,49 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (member is null)
             return new AdminActionResult(false, "Thành viên không thuộc đơn vị.");
 
+        if (req.Kind == WorkspaceRoleRequestKind.RemovePmFromWorkspace)
+        {
+            if (member.Role != WorkspaceMemberRole.PM)
+                return new AdminActionResult(false, "Mục tiêu không còn là PM trong đơn vị.");
+
+            var pmCountRm = await WorkspacePolicies.CountPmsAsync(_db, req.WorkspaceId, cancellationToken);
+            if (pmCountRm <= 1)
+                return new AdminActionResult(false, "Phải còn ít nhất một PM trong đơn vị.");
+
+            var reasonRm = string.IsNullOrWhiteSpace(req.Reason)
+                ? "Theo yêu cầu PM, đã được Admin duyệt."
+                : req.Reason.Trim();
+
+            var removeRes = await _roleManagement.ExecuteRemoveUserFromWorkspaceAsync(
+                req.WorkspaceId,
+                req.TargetUserId,
+                reasonRm,
+                adminUserId,
+                excludeWorkspaceRoleRequestId: requestId,
+                cancellationToken);
+
+            if (!removeRes.Success)
+                return new AdminActionResult(false, removeRes.ErrorMessage);
+
+            var reqRow = await _db.WorkspaceRoleChangeRequests
+                .FirstAsync(r => r.Id == requestId, cancellationToken);
+            reqRow.Status = WorkspaceRoleRequestStatus.Approved;
+            reqRow.ReviewedAtUtc = DateTime.UtcNow;
+            reqRow.ReviewedByAdminId = adminUserId;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            await _notifications.CreateAndPushAsync(
+                reqRow.RequestedByUserId,
+                NotificationType.WorkspacePmRoleRequest,
+                $"Yêu cầu xóa PM #{reqRow.Id} đã được Admin duyệt — người đó đã bị gỡ khỏi đơn vị.",
+                workspaceId: reqRow.WorkspaceId,
+                redirectUrl: "/Roles",
+                cancellationToken: cancellationToken);
+
+            await BroadcastWorkspaceAsync(reqRow.WorkspaceId, reqRow.TargetUserId, cancellationToken);
+            return new AdminActionResult(true);
+        }
+
         WorkspaceMemberRole oldRole;
         if (req.Kind == WorkspaceRoleRequestKind.PromoteMemberToPm)
         {
@@ -203,7 +283,12 @@ public sealed class PlatformAdminService : IPlatformAdminService
 
             oldRole = member.Role;
             member.Role = WorkspaceMemberRole.PM;
-            member.SubRole = WorkspaceMemberRole.PM.ToString();
+            if (RoleRequestReasonEncoding.TryDecodeProposedSubRole(req.Reason, out var proposedPmSub))
+                member.SubRole = proposedPmSub;
+            else if (WorkspacePolicies.IsAllowedMemberSubRole(member.SubRole))
+                member.SubRole = member.SubRole!.Trim();
+            else
+                member.SubRole = WorkspaceMemberRole.PM.ToString();
         }
         else if (req.Kind == WorkspaceRoleRequestKind.DemotePmToMember)
         {
@@ -216,7 +301,14 @@ public sealed class PlatformAdminService : IPlatformAdminService
 
             oldRole = member.Role;
             member.Role = WorkspaceMemberRole.Member;
-            if (string.IsNullOrWhiteSpace(member.SubRole))
+            if (RoleRequestReasonEncoding.TryDecodeProposedSubRole(req.Reason, out var proposedMemSub))
+                member.SubRole = proposedMemSub;
+            else if (WorkspacePolicies.IsAllowedMemberSubRole(member.SubRole))
+                member.SubRole = member.SubRole!.Trim();
+            else if (string.IsNullOrWhiteSpace(member.SubRole) ||
+                     string.Equals(member.SubRole, WorkspaceMemberRole.PM.ToString(), StringComparison.OrdinalIgnoreCase))
+                member.SubRole = "Member";
+            else
                 member.SubRole = "Member";
         }
         else
@@ -456,6 +548,69 @@ public sealed class PlatformAdminService : IPlatformAdminService
         return new AdminActionResult(true);
     }
 
+    public async Task<AdminActionResult> SubmitRemovePmFromWorkspaceRequestAsync(
+        string pmUserId,
+        Guid workspaceId,
+        string targetUserId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        reason = reason?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(reason))
+            return new AdminActionResult(false, "Lý do là bắt buộc để Admin duyệt.");
+        if (reason.Length > 500)
+            return new AdminActionResult(false, "Lý do tối đa 500 ký tự.");
+
+        var isPm = await _db.WorkspaceMembers.AnyAsync(m =>
+                m.WorkspaceId == workspaceId &&
+                m.UserId == pmUserId &&
+                m.Role == WorkspaceMemberRole.PM,
+            cancellationToken);
+
+        if (!isPm)
+            return new AdminActionResult(false, "Chỉ PM mới gửi được yêu cầu này.");
+
+        if (pmUserId == targetUserId)
+            return new AdminActionResult(false, "Không áp dụng cho chính bạn.");
+
+        var member = await _db.WorkspaceMembers
+            .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == targetUserId, cancellationToken);
+
+        if (member is null || member.Role != WorkspaceMemberRole.PM)
+            return new AdminActionResult(false, "Chỉ có thể yêu cầu xóa một PM khác.");
+
+        var pmCount = await WorkspacePolicies.CountPmsAsync(_db, workspaceId, cancellationToken);
+        if (pmCount <= 1)
+            return new AdminActionResult(false, "Không thể xóa PM cuối cùng trong đơn vị.");
+
+        var dup = await _db.WorkspaceRoleChangeRequests.AnyAsync(r =>
+                r.WorkspaceId == workspaceId &&
+                r.TargetUserId == targetUserId &&
+                r.Kind == WorkspaceRoleRequestKind.RemovePmFromWorkspace &&
+                r.Status == WorkspaceRoleRequestStatus.Pending,
+            cancellationToken);
+
+        if (dup)
+            return new AdminActionResult(false, "Đã có yêu cầu xóa PM này đang chờ duyệt.");
+
+        _db.WorkspaceRoleChangeRequests.Add(new WorkspaceRoleChangeRequest
+        {
+            WorkspaceId = workspaceId,
+            TargetUserId = targetUserId,
+            RequestedByUserId = pmUserId,
+            Kind = WorkspaceRoleRequestKind.RemovePmFromWorkspace,
+            Status = WorkspaceRoleRequestStatus.Pending,
+            Reason = reason,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyAdminsOfNewRequestAsync(workspaceId, "xóa PM khỏi đơn vị", cancellationToken);
+
+        return new AdminActionResult(true);
+    }
+
     public async Task<IReadOnlyList<AdminWorkspaceListItemVm>> ListAllWorkspacesAsync(
         CancellationToken cancellationToken = default)
     {
@@ -481,9 +636,123 @@ public sealed class PlatformAdminService : IPlatformAdminService
         ).ToListAsync(cancellationToken);
     }
 
-    private async Task<bool> IsPlatformAdminAsync(string userId, CancellationToken cancellationToken) =>
-        await _db.Users.AsNoTracking()
-            .AnyAsync(u => u.Id == userId && u.IsPlatformAdmin, cancellationToken);
+    // UC-11 & UC-14: Project Approval
+    public async Task<IReadOnlyList<PendingProjectVm>> GetPendingProjectsAsync(
+        CancellationToken cancellationToken = default)
+    { 
+        return await _db.Projects.AsNoTracking()
+            .Where(p => p.Status == ProjectStatus.PendingApproval)
+            .OrderBy(p => p.CreatedAtUtc)
+            .Select(p => new PendingProjectVm(
+                p.Id,
+                p.WorkspaceId,
+                _db.Workspaces.Where(w => w.Id == p.WorkspaceId).Select(w => w.Name).FirstOrDefault() ?? "Unknown",
+                p.Name,
+                p.Description,
+                p.OwnerUserId,
+                _db.Users.Where(u => u.Id == p.OwnerUserId).Select(u => u.DisplayName ?? u.UserName ?? u.Id).FirstOrDefault() ?? "Unknown",
+                p.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AdminActionResult> ApproveProjectAsync(
+        string adminUserId,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
+            return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null)
+            return new AdminActionResult(false, "Không tìm thấy dự án.");
+
+        if (project.Status != ProjectStatus.PendingApproval)
+            return new AdminActionResult(false, "Dự án không nằm trong hàng đợi duyệt.");
+
+        project.Status = ProjectStatus.Active;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Notify PM (Owner)
+        await _notifications.CreateAndPushAsync(
+            project.OwnerUserId,
+            NotificationType.ProjectCreated,
+            $"Dự án \"{project.Name}\" đã được Admin duyệt và kích hoạt.",
+            workspaceId: project.WorkspaceId,
+            projectId: project.Id,
+            redirectUrl: $"/board?projectId={project.Id}",
+            cancellationToken: cancellationToken);
+
+        // Notify all Workspace members
+        var members = await _db.WorkspaceMembers
+            .Where(m => m.WorkspaceId == project.WorkspaceId && m.UserId != project.OwnerUserId)
+            .Select(m => m.UserId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var memberId in members)
+        {
+            await _notifications.CreateAndPushAsync(
+                memberId,
+                NotificationType.ProjectCreated,
+                $"Dự án mới \"{project.Name}\" vừa được kích hoạt trong đơn vị.",
+                workspaceId: project.WorkspaceId,
+                projectId: project.Id,
+                redirectUrl: $"/board?projectId={project.Id}",
+                cancellationToken: cancellationToken);
+        }
+
+        // SignalR broadcast PROJECT_CREATED
+        await _kanbanHub.Clients.All.SendAsync("PROJECT_CREATED", new
+        {
+            projectId = project.Id,
+            workspaceId = project.WorkspaceId,
+            name = project.Name
+        }, cancellationToken);
+
+        return new AdminActionResult(true);
+    }
+
+    public async Task<AdminActionResult> RejectProjectAsync(
+        string adminUserId,
+        Guid projectId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
+            return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null)
+            return new AdminActionResult(false, "Không tìm thấy dự án.");
+
+        if (project.Status != ProjectStatus.PendingApproval)
+            return new AdminActionResult(false, "Dự án không nằm trong hàng đợi duyệt.");
+
+        project.Status = ProjectStatus.Rejected;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Notify PM (Owner) with reason
+        var message = $"Yêu cầu tạo dự án \"{project.Name}\" đã bị từ chối.";
+        if (!string.IsNullOrWhiteSpace(reason))
+            message += $" Lý do: {reason.Trim()}";
+
+        await _notifications.CreateAndPushAsync(
+            project.OwnerUserId,
+            NotificationType.ProjectCreated, // Reuse type or create new if needed
+            message,
+            workspaceId: project.WorkspaceId,
+            projectId: project.Id,
+            redirectUrl: "/Projects",
+            cancellationToken: cancellationToken);
+
+        return new AdminActionResult(true);
+    }
+
+    private async Task<bool> IsPlatformAdminAsync(string userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        return user?.IsPlatformAdmin == true;
+    }
 
     private async Task NotifyAdminsOfNewRequestAsync(
         Guid workspaceId,

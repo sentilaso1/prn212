@@ -51,7 +51,8 @@ public sealed class TaskHub : Hub
     public async Task<MoveTaskHubResult> MoveTask(
         string taskIdStr,
         string targetStatus,
-        string? wsIdStr = null)
+        string? wsIdStr = null,
+        string? reason = null)
     {
         try
         {
@@ -91,7 +92,8 @@ public sealed class TaskHub : Hub
                 taskId,
                 newStatus,
                 actorUserId,
-                workspaceId);
+                workspaceId,
+                reason);
 
             return new MoveTaskHubResult(result.Success, result.ErrorMessage);
         }

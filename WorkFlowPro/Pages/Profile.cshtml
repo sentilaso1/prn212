@@ -2,7 +2,8 @@
 @model WorkFlowPro.Pages.ProfileModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Member profile";
+    ViewData["Title"] = "Hồ sơ cá nhân";
+    var hasEvaluationData = Model.Profile?.AvgScore > 0 || (Model.Profile?.TaskHistory.Any(t => t.Score.HasValue) ?? false);
 }
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
@@ -70,18 +71,22 @@ else
             @if (Model.Profile.CanEditLevelOrSubRole)
             {
                 <div class="card shadow-sm mt-3 border-primary">
-                    <div class="card-header bg-primary text-white">PM — Level &amp; SubRole</div>
+                    <div class="card-header bg-primary text-white">PM — Propose Level / SubRole Change</div>
                     <div class="card-body">
-                        <form method="post" asp-page-handler="UpdatePm"
-                              onsubmit="return confirm('Xác nhận cập nhật Level / SubRole cho member này? Thay đổi sẽ áp dụng ngay cho gợi ý phân công (UC-04).');">
+                        <form method="post" asp-page-handler="UpdatePm" id="pmUpdateForm">
                             <input type="hidden" asp-for="PmInput.TargetUserId" />
                             <div asp-validation-summary="ModelOnly" class="text-danger small" role="alert"></div>
                             <div class="mb-3">
-                                <label asp-for="PmInput.Level" class="form-label">Level</label>
+                                <label asp-for="PmInput.Level" class="form-label">Proposed Level</label>
                                 <select asp-for="PmInput.Level" class="form-select" asp-items="Html.GetEnumSelectList<WorkFlowPro.Data.MemberLevel>()"></select>
                             </div>
+                            <div class="mb-3" id="levelReasonContainer" style="display: none;">
+                                <label asp-for="PmInput.LevelChangeReason" class="form-label">Reason <span class="text-danger">*</span></label>
+                                <textarea asp-for="PmInput.LevelChangeReason" class="form-control" rows="2" maxlength="500" placeholder="Vui lòng nhập lý do đề xuất thay đổi Level..."></textarea>
+                                <span asp-validation-for="PmInput.LevelChangeReason" class="text-danger small"></span>
+                            </div>
                             <div class="mb-3">
-                                <label asp-for="PmInput.SubRole" class="form-label">SubRole</label>
+                                <label asp-for="PmInput.SubRole" class="form-label">Proposed SubRole</label>
                                 <input asp-for="PmInput.SubRole" class="form-control" list="subrole-list" placeholder="BA, DEV, Designer, QA..." maxlength="100" />
                                 <datalist id="subrole-list">
                                     <option value="BA"></option>
@@ -91,7 +96,7 @@ else
                                     <option value="Tester"></option>
                                 </datalist>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm">Lưu Level / SubRole</button>
+                            <button type="submit" class="btn btn-primary btn-sm w-100">Propose Change</button>
                         </form>
                     </div>
                 </div>
@@ -123,9 +128,61 @@ else
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const el = document.getElementById('profileSuccessToast');
-                if (!el || typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
-                const toast = new bootstrap.Toast(el, { delay: 4000 });
-                toast.show();
+                if (el && typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                    const toast = new bootstrap.Toast(el, { delay: 4000 });
+                    toast.show();
+                }
+
+                const levelSelect = document.getElementById('PmInput_Level');
+                const reasonContainer = document.getElementById('levelReasonContainer');
+                const reasonInput = document.getElementById('PmInput_LevelChangeReason');
+                const originalLevelValue = '@((int)(Model.Profile?.Level ?? WorkFlowPro.Data.MemberLevel.Junior))';
+                const hasEvaluationData = @(hasEvaluationData ? "true" : "false");
+                const pmForm = document.getElementById('pmUpdateForm');
+
+                function updateReasonVisibility() {
+                    if (levelSelect.value !== originalLevelValue) {
+                        reasonContainer.style.display = 'block';
+                        reasonInput.required = true;
+                    } else {
+                        reasonContainer.style.display = 'none';
+                        reasonInput.required = false;
+                    }
+                }
+
+                if (levelSelect && reasonContainer && reasonInput) {
+                    levelSelect.addEventListener('change', updateReasonVisibility);
+                    updateReasonVisibility();
+                }
+
+                if (pmForm) {
+                    pmForm.addEventListener('submit', function (e) {
+                        const isLevelChange = levelSelect.value !== originalLevelValue;
+                        if (isLevelChange) {
+                            if (!reasonInput.value.trim()) {
+                                alert('Vui lòng nhập lý do đề xuất thay đổi Level.');
+                                e.preventDefault();
+                                return;
+                            }
+                            if (!hasEvaluationData) {
+                                if (!confirm('Thành viên này chưa có dữ liệu đánh giá task. Bạn có chắc chắn muốn gửi đề xuất thay đổi Level không?')) {
+                                    e.preventDefault();
+                                    return;
+                                }
+                            } else {
+                                if (!confirm('Xác nhận gửi đề xuất thay đổi Level cho thành viên này tới Admin?')) {
+                                    e.preventDefault();
+                                    return;
+                                }
+                            }
+                        } else {
+                            if (!confirm('Xác nhận cập nhật SubRole cho thành viên này?')) {
+                                e.preventDefault();
+                                return;
+                            }
+                        }
+                    });
+                }
             });
         </script>
     }

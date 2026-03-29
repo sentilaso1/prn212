@@ -52,13 +52,46 @@ public interface IPlatformAdminService
         string? reason,
         CancellationToken cancellationToken = default);
 
+    /// <summary>PM yêu cầu xóa PM khác khỏi đơn vị — lý do bắt buộc, chờ Admin duyệt.</summary>
+    Task<AdminActionResult> SubmitRemovePmFromWorkspaceRequestAsync(
+        string pmUserId,
+        Guid workspaceId,
+        string targetUserId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AdminWorkspaceListItemVm>> ListAllWorkspacesAsync(
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AdminPmRowVm>> ListPmsInWorkspaceAsync(
         Guid workspaceId,
         CancellationToken cancellationToken = default);
+
+    // UC-11 & UC-14: Project Approval
+    Task<IReadOnlyList<PendingProjectVm>> GetPendingProjectsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<AdminActionResult> ApproveProjectAsync(
+        string adminUserId,
+        Guid projectId,
+        CancellationToken cancellationToken = default);
+
+    Task<AdminActionResult> RejectProjectAsync(
+        string adminUserId,
+        Guid projectId,
+        string? reason,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record PendingProjectVm(
+    Guid Id,
+    Guid WorkspaceId,
+    string WorkspaceName,
+    string ProjectName,
+    string? Description,
+    string OwnerUserId,
+    string OwnerDisplayName,
+    DateTime CreatedAtUtc);
 
 public sealed record PendingPmRegistrationVm(
     string UserId,

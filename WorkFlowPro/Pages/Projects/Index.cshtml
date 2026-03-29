@@ -2,21 +2,21 @@
 @model WorkFlowPro.Pages.Projects.IndexModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Dự án";
-
+    ViewData["Title"] = "Projects";
     var wsQ = Model.CurrentWorkspaceId is not null ? $"?workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
     var wsAmp = Model.CurrentWorkspaceId is not null ? $"&workspaceId={Model.CurrentWorkspaceId.Value:D}" : "";
 }
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 fw-semibold mb-1">Dự án</h1>
-        <p class="text-muted mb-0">Quản lý các dự án trong workspace hiện tại</p>
+<h1>Projects</h1>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted">
+        Workspace Projects
     </div>
-
     @if (Model.IsPm)
     {
-        <a class="btn btn-primary" href="/Projects/Create@wsQ">
+        <a class="btn btn-primary" href="/Projects/Create@(wsQ)">
             + Tạo dự án mới
         </a>
     }
@@ -24,10 +24,7 @@
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
 }
 
 @if (Model.Projects.Count == 0)
@@ -36,7 +33,7 @@
         <p class="mb-0">Chưa có dự án nào trong workspace hiện tại.</p>
         @if (Model.IsPm)
         {
-            <a href="/Projects/Create@wsQ" class="btn btn-primary mt-3">
+            <a href="/Projects/Create@(wsQ)" class="btn btn-primary mt-3">
                 Tạo dự án đầu tiên
             </a>
         }
@@ -61,13 +58,20 @@ else
                     <tr>
                         <td class="fw-medium">@p.Name</td>
                         <td>
-                            @if (p.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                            @switch (p.Status)
                             {
-                                <span class="badge bg-secondary">Đã lưu trữ</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-success">Đang hoạt động</span>
+                                case WorkFlowPro.Data.ProjectStatus.PendingApproval:
+                                    <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                                    break;
+                                case WorkFlowPro.Data.ProjectStatus.Active:
+                                    <span class="badge bg-success">Đang hoạt động</span>
+                                    break;
+                                case WorkFlowPro.Data.ProjectStatus.Archived:
+                                    <span class="badge bg-secondary">Đã lưu trữ</span>
+                                    break;
+                                case WorkFlowPro.Data.ProjectStatus.Rejected:
+                                    <span class="badge bg-danger">Bị từ chối</span>
+                                    break;
                             }
                         </td>
                         <td>
@@ -86,21 +90,29 @@ else
                         <td class="text-end">
                             <div class="btn-group btn-group-sm" role="group">
                                 <a class="btn btn-outline-secondary"
-                                   href="/Projects/Details/@(p.Id)@wsQ">Chi tiết</a>
+                                   href="/Projects/Details/@(p.Id)@(wsQ)">Chi tiết</a>
                                 
-                                <a class="btn btn-primary"
-                                   href="/board?projectId=@(p.Id)@wsAmp">Board</a>
-                                
-                                <a class="btn btn-outline-info"
-                                   href="/tasks/list?projectId=@(p.Id)@wsAmp">Tasks</a>
+                                @if (p.Status == WorkFlowPro.Data.ProjectStatus.Active || p.Status == WorkFlowPro.Data.ProjectStatus.Archived)
+                                {
+                                    <a class="btn btn-primary"
+                                       href="/board?projectId=@(p.Id)@(wsAmp)">Board</a>
+                                    
+                                    <a class="btn btn-outline-info"
+                                       href="/tasks/list?projectId=@(p.Id)@(wsAmp)">Tasks</a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-primary" disabled title="Chờ Admin duyệt">Board</button>
+                                    <button class="btn btn-outline-info" disabled title="Chờ Admin duyệt">Tasks</button>
+                                }
 
                                 @if (Model.IsPm)
                                 {
                                     <a class="btn btn-outline-primary"
-                                       href="/Projects/Settings/@(p.Id)@wsQ">Cài đặt</a>
+                                       href="/Projects/Settings/@(p.Id)@(wsQ)">Cài đặt</a>
                                     
                                     <a class="btn btn-outline-danger"
-                                           href="/Projects/Delete/@(p.Id)@wsQ"
+                                           href="/Projects/Delete/@(p.Id)@(wsQ)"
                                            onclick="return confirm('Bạn có chắc muốn xóa dự án này?');">
                                         Xóa
                                     </a>
