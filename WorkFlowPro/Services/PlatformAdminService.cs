@@ -666,7 +666,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
     public async Task<IReadOnlyList<PendingProjectVm>> GetPendingProjectsAsync(
         CancellationToken cancellationToken = default)
     { 
-        return await _db.Projects.AsNoTracking()
+        return await _db.Projects.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.Status == ProjectStatus.PendingApproval)
             .OrderBy(p => p.CreatedAtUtc)
             .Select(p => new PendingProjectVm(
@@ -689,7 +689,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
             return new AdminActionResult(false, "Không tìm thấy dự án.");
 
@@ -747,7 +748,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         if (!await IsPlatformAdminAsync(adminUserId, cancellationToken))
             return new AdminActionResult(false, "Chỉ Platform Admin mới được duyệt.");
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        var project = await _db.Projects.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
             return new AdminActionResult(false, "Không tìm thấy dự án.");
 
@@ -809,7 +811,9 @@ public sealed class PlatformAdminService : IPlatformAdminService
         }
 
         // 2. Chuyển Project
-        var projects = await _db.Projects.Where(p => p.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        var projects = await _db.Projects.IgnoreQueryFilters()
+            .Where(p => p.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
         foreach (var p in projects)
         {
             p.WorkspaceId = targetId;
@@ -837,21 +841,27 @@ public sealed class PlatformAdminService : IPlatformAdminService
         }
 
         // 6. Chuyển Log đổi Level
-        var levelLogs = await _db.LevelChangeLogs.Where(l => l.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        var levelLogs = await _db.LevelChangeLogs.IgnoreQueryFilters()
+            .Where(l => l.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
         foreach (var l in levelLogs)
         {
             l.WorkspaceId = targetId;
         }
 
         // 7. Chuyển Log đổi Role
-        var roleLogs = await _db.RoleChangeLogs.Where(r => r.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        var roleLogs = await _db.RoleChangeLogs.IgnoreQueryFilters()
+            .Where(r => r.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
         foreach (var r in roleLogs)
         {
             r.WorkspaceId = targetId;
         }
 
         // 8. Chuyển Notification
-        var notifications = await _db.UserNotifications.Where(n => n.WorkspaceId == sourceId).ToListAsync(cancellationToken);
+        var notifications = await _db.UserNotifications.IgnoreQueryFilters()
+            .Where(n => n.WorkspaceId == sourceId)
+            .ToListAsync(cancellationToken);
         foreach (var n in notifications)
         {
             n.WorkspaceId = targetId;
