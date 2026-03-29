@@ -42,12 +42,81 @@
                             <td class="text-end text-nowrap">
                                 <form method="post" asp-page-handler="ApproveRegistration" class="d-inline">
                                     <input type="hidden" name="targetUserId" value="@r.UserId" />
-                                    <button type="submit" class="btn btn-sm btn-success">Duyệt + tạo đơn vị</button>
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt & Gán đơn vị</button>
                                 </form>
                                 <form method="post" asp-page-handler="RejectRegistration" class="d-inline ms-1">
                                     <input type="hidden" name="targetUserId" value="@r.UserId" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
                                 </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Dự án chờ duyệt (UC-11)</div>
+    <div class="card-body p-0">
+        @if (Model.PendingProjects.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">Không có dự án nào chờ duyệt.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr>
+                        <th>Tên dự án</th>
+                        <th>Đơn vị</th>
+                        <th>Người tạo</th>
+                        <th>Mô tả</th>
+                        <th>Ngày tạo</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var p in Model.PendingProjects)
+                    {
+                        <tr>
+                            <td>@p.ProjectName</td>
+                            <td>@p.WorkspaceName</td>
+                            <td>@p.OwnerDisplayName</td>
+                            <td class="small">@(p.Description ?? "—")</td>
+                            <td>@p.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" asp-page-handler="ApproveProject" class="d-inline">
+                                    <input type="hidden" name="projectId" value="@p.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt</button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                        data-bs-toggle="modal" data-bs-target="#modalRejectProject_@p.Id">Từ chối</button>
+
+                                <div class="modal fade" id="modalRejectProject_@p.Id" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content text-start">
+                                            <form method="post" asp-page-handler="RejectProject">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title">Từ chối dự án: @p.ProjectName</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="projectId" value="@p.Id" />
+                                                    <label class="form-label small">Lý do từ chối (tùy chọn)</label>
+                                                    <textarea name="reason" class="form-control" rows="3" maxlength="500"></textarea>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                    <button type="submit" class="btn btn-sm btn-danger">Xác nhận từ chối</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     }

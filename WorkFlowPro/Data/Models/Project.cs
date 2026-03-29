@@ -18,7 +18,7 @@ public sealed class Project
     public DateTime? StartDateUtc { get; set; }
     public DateTime? EndDateUtc { get; set; }
 
-    public ProjectStatus Status { get; set; } = ProjectStatus.Active;
+    public ProjectStatus Status { get; set; } = ProjectStatus.PendingApproval;
 
     public string OwnerUserId { get; set; } = default!;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

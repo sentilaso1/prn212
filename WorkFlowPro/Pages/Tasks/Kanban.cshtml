@@ -53,7 +53,7 @@ else
                 <h6 class="mb-0 fw-semibold">Chưa phân công</h6>
                 <span class="badge bg-secondary" id="wf-count-unassigned">@Model.Board.Unassigned.Count</span>
             </div>
-            <div class="kanban-stack wf-kanban-stack" id="wf-stack-unassigned">
+            <div class="kanban-dropzone" data-target-status="Unassigned" id="wf-drop-unassigned">
                 @foreach (var t in Model.Board.Unassigned)
                 {
                     <partial name="_TaskCard" model="t" />
@@ -67,7 +67,7 @@ else
                 <h6 class="mb-0 fw-semibold">Đang chờ</h6>
                 <span class="badge bg-secondary" id="wf-count-pending">@Model.Board.Pending.Count</span>
             </div>
-            <div class="kanban-stack wf-kanban-stack" id="wf-stack-pending">
+            <div class="kanban-dropzone" data-target-status="Pending" id="wf-drop-pending">
                 @foreach (var t in Model.Board.Pending)
                 {
                     <partial name="_TaskCard" model="t" />
@@ -147,7 +147,31 @@ else
 
             const connection = new signalR.HubConnectionBuilder()
                 .withUrl("/hubs/task")
+                .withAutomaticReconnect()
                 .build();
+
+            const statusOrder = {
+                "Unassigned": 1,
+                "Pending": 2,
+                "ToDo": 3,
+                "InProgress": 4,
+                "Review": 5,
+                "Done": 6
+            };
+
+            function isBackwardMove(oldStatus, newStatus) {
+                return statusOrder[newStatus] < statusOrder[oldStatus];
+            }
+
+            connection.onreconnecting(error => {
+                showToast("Mất kết nối SignalR. Đang thử kết nối lại...", "danger");
+                document.querySelectorAll(".kanban-dropzone").forEach(dz => dz.style.opacity = "0.5");
+            });
+
+            connection.onreconnected(connectionId => {
+                showToast("Đã kết nối lại SignalR.", "success");
+                document.querySelectorAll(".kanban-dropzone").forEach(dz => dz.style.opacity = "1");
+            });
 
             function applySearchToCard(cardEl) {
                 if (!cardEl) return;
@@ -231,11 +255,26 @@ else
                 dz.addEventListener("drop", async function (e) {
                     e.preventDefault();
                     if (!draggedTaskId) return;
+                    if (connection.state !== "Connected") {
+                        showToast("SignalR đang mất kết nối, không thể kéo thả lúc này.", "danger");
+                        return;
+                    }
                     const targetStatus = dz.getAttribute("data-target-status");
                     if (!targetStatus) return;
 
                     const cardEl = document.querySelector(`.wf-task-card[data-task-id="${draggedTaskId}"]`);
                     const originalParent = cardEl ? cardEl.parentElement : null;
+                    const oldStatus = originalParent ? originalParent.getAttribute("data-target-status") : null;
+
+                    let reason = null;
+                    if (isPm && oldStatus && isBackwardMove(oldStatus, targetStatus)) {
+                        reason = prompt("Bạn đang chuyển lùi task. Vui lòng nhập lý do (bắt buộc):");
+                        if (reason === null) return; // Hủy bỏ kéo thả
+                        if (!reason.trim()) {
+                            alert("Bạn phải nhập lý do khi chuyển lùi task.");
+                            return;
+                        }
+                    }
 
                     if (cardEl && dz !== originalParent) {
                         dz.appendChild(cardEl);
@@ -243,7 +282,7 @@ else
                     }
 
                     try {
-                        var result = await connection.invoke("MoveTask", draggedTaskId, targetStatus, workspaceId || null);
+                        var result = await connection.invoke("MoveTask", draggedTaskId, targetStatus, workspaceId || null, reason);
                         if (result && result.success === false) {
                             if (cardEl && originalParent && dz !== originalParent) {
                                 originalParent.appendChild(cardEl);

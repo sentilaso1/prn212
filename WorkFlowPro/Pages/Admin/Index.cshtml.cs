@@ -27,6 +27,9 @@ public sealed class IndexModel : PageModel
     public IReadOnlyList<WorkspaceRoleRequestListVm> PendingRoleRequests { get; private set; } =
         Array.Empty<WorkspaceRoleRequestListVm>();
 
+    public IReadOnlyList<PendingProjectVm> PendingProjects { get; private set; } =
+        Array.Empty<PendingProjectVm>();
+
     public IReadOnlyList<AdminWorkspaceListItemVm> AllWorkspaces { get; private set; } =
         Array.Empty<AdminWorkspaceListItemVm>();
 
@@ -40,6 +43,7 @@ public sealed class IndexModel : PageModel
     {
         PendingRegistrations = await _admin.GetPendingPmRegistrationsAsync(cancellationToken);
         PendingRoleRequests = await _admin.GetPendingWorkspaceRoleRequestsAsync(cancellationToken);
+        PendingProjects = await _admin.GetPendingProjectsAsync(cancellationToken);
         AllWorkspaces = await _admin.ListAllWorkspacesAsync(cancellationToken);
 
         Guid? selected =
@@ -102,7 +106,28 @@ public sealed class IndexModel : PageModel
     {
         var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var r = await _admin.DemotePmDirectAsync(adminId, workspaceId, targetUserId, cancellationToken);
-        ToastMessage = r.Success ? "Đã hạ PM xuống Member." : r.ErrorMessage;
-        return RedirectToPage(new { DemoteWorkspaceId = workspaceId });
+        ToastMessage = r.Success ? "Đã hạ PM trực tiếp." : r.ErrorMessage;
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostApproveProjectAsync(
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var r = await _admin.ApproveProjectAsync(adminId, projectId, cancellationToken);
+        ToastMessage = r.Success ? "Đã duyệt dự án." : r.ErrorMessage;
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRejectProjectAsync(
+        Guid projectId,
+        string? reason,
+        CancellationToken cancellationToken)
+    {
+        var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var r = await _admin.RejectProjectAsync(adminId, projectId, reason, cancellationToken);
+        ToastMessage = r.Success ? "Đã từ chối dự án." : r.ErrorMessage;
+        return RedirectToPage();
     }
 }

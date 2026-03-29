@@ -78,6 +78,12 @@ public sealed class KanbanModel : PageModel
             return;
         }
 
+        if (project.Status != ProjectStatus.Active && project.Status != ProjectStatus.Archived)
+        {
+            ErrorMessage = $"Dự án \"{project.Name}\" đang ở trạng thái {project.Status} và chưa thể truy cập Board.";
+            return;
+        }
+
         ProjectId = project.Id;
         ProjectName = project.Name;
         CurrentUserId = userId;

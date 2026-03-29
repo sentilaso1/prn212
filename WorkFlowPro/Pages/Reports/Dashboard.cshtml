@@ -72,51 +72,65 @@ else if (Model.Dashboard is not null)
         </div>
     </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-lg-6">
-            <h5 class="mb-2">Tỉ lệ task theo trạng thái</h5>
-            <div style="max-height: 360px;">
-                <canvas id="wfPieStatus"></canvas>
+    @if (Model.Dashboard.TotalTasks == 0)
+    {
+        <div class="alert alert-info text-center py-5">
+            <h5>Không có dữ liệu cho bộ lọc đã chọn.</h5>
+            <p class="text-muted mb-0">Hãy thử thay đổi Project hoặc khoảng thời gian khác.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <h5 class="mb-2">Tỉ lệ task theo trạng thái</h5>
+                <div style="max-height: 360px;">
+                    <canvas id="wfPieStatus"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <h5 class="mb-2">Số task theo member (đã nhận, trong kỳ)</h5>
+                <div style="max-height: 360px;">
+                    <canvas id="wfBarMember"></canvas>
+                </div>
             </div>
         </div>
-        <div class="col-lg-6">
-            <h5 class="mb-2">Số task theo member (đã nhận, trong kỳ)</h5>
-            <div style="max-height: 360px;">
-                <canvas id="wfBarMember"></canvas>
-            </div>
-        </div>
-    </div>
 
-    <h5 class="mb-2">Hiệu suất thành viên</h5>
-    <div class="table-responsive">
-        <table class="table table-sm table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>Tên</th>
-                    <th>Level</th>
-                    <th>Completion rate (UC-08)</th>
-                    <th>Avg score (UC-08)</th>
-                    <th>Điểm TB đánh giá (kỳ / project)</th>
-                    <th>Task giao (kỳ / project)</th>
-                    <th>Hoàn thành (kỳ / project)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var m in Model.Dashboard.MemberPerformance)
-                {
+        <h5 class="mb-2">Hiệu suất thành viên</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle">
+                <thead>
                     <tr>
-                        <td>@m.DisplayName</td>
-                        <td>@m.Level</td>
-                        <td>@((m.CompletionRate * 100).ToString("0.##")) %</td>
-                        <td>@m.AvgScore.ToString("0.##")</td>
-                        <td>@(m.AvgEvaluationScoreInProject.HasValue ? m.AvgEvaluationScoreInProject.Value.ToString("0.##") : "—")</td>
-                        <td>@m.AssignedInProjectInPeriod</td>
-                        <td>@m.CompletedInProjectInPeriod</td>
+                        <th>Tên</th>
+                        <th>Level</th>
+                        <th>Completion rate (UC-08)</th>
+                        <th>Avg score (UC-08)</th>
+                        <th>Điểm TB đánh giá (kỳ / project)</th>
+                        <th>Task giao (kỳ / project)</th>
+                        <th>Hoàn thành (kỳ / project)</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.Dashboard.MemberPerformance)
+                    {
+                        <tr>
+                            <td>
+                                <a href="/Profile?userId=@m.UserId" class="text-decoration-none fw-medium">
+                                    @m.DisplayName
+                                </a>
+                            </td>
+                            <td>@m.Level</td>
+                            <td>@((m.CompletionRate * 100).ToString("0.##")) %</td>
+                            <td>@m.AvgScore.ToString("0.##")</td>
+                            <td>@(m.AvgEvaluationScoreInProject.HasValue ? m.AvgEvaluationScoreInProject.Value.ToString("0.##") : "—")</td>
+                            <td>@m.AssignedInProjectInPeriod</td>
+                            <td>@m.CompletedInProjectInPeriod</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @section Scripts {

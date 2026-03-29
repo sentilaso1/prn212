@@ -90,7 +90,7 @@ public sealed class KpiDashboardService : IKpiDashboardService
 
         return await _db.Projects
             .AsNoTracking()
-            .Where(p => p.WorkspaceId == workspaceId)
+            .Where(p => p.WorkspaceId == workspaceId && (p.Status == ProjectStatus.Active || p.Status == ProjectStatus.Archived))
             .OrderBy(p => p.Name)
             .Select(p => new ProjectListItemVm(p.Id, p.Name))
             .ToListAsync(cancellationToken);

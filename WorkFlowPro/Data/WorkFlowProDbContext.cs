@@ -30,8 +30,9 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TaskComment> TaskComments => Set<TaskComment>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
-    public DbSet<RoleChangeLog> RoleChangeLogs => Set<RoleChangeLog>();
     public DbSet<LevelChangeLog> LevelChangeLogs => Set<LevelChangeLog>();
+    public DbSet<LevelAdjustmentRequest> LevelAdjustmentRequests => Set<LevelAdjustmentRequest>();
+    public DbSet<RoleChangeLog> RoleChangeLogs => Set<RoleChangeLog>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<WorkspaceInviteToken> WorkspaceInviteTokens => Set<WorkspaceInviteToken>();
     public DbSet<WorkspaceRoleChangeRequest> WorkspaceRoleChangeRequests => Set<WorkspaceRoleChangeRequest>();
@@ -359,6 +360,33 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.HasOne<ApplicationUser>()
              .WithMany()
              .HasForeignKey(x => x.ChangedByPmId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── LevelAdjustmentRequest (UC-10) ──────────────────────────────────
+        b.Entity<LevelAdjustmentRequest>(e =>
+        {
+            e.ToTable("LevelAdjustmentRequests");
+            e.Property(x => x.ProposedLevel).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasIndex(x => x.TargetUserId);
+            e.HasIndex(x => x.WorkspaceId);
+
+            e.HasOne<Workspace>(x => x.Workspace)
+             .WithMany()
+             .HasForeignKey(x => x.WorkspaceId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<ApplicationUser>()
+             .WithMany()
+             .HasForeignKey(x => x.TargetUserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<ApplicationUser>()
+             .WithMany()
+             .HasForeignKey(x => x.RequestedByUserId)
              .OnDelete(DeleteBehavior.Restrict);
         });
 

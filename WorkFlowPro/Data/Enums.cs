@@ -39,8 +39,10 @@ public enum MemberLevel
 
 public enum ProjectStatus
 {
+    PendingApproval = 0,
     Active = 1,
-    Archived = 2
+    Archived = 2,
+    Rejected = 3
 }
 
 public enum TaskPriority
@@ -105,7 +107,17 @@ public enum NotificationType
     WorkspacePmRoleRequest = 18,
 
     /// <summary>UC-03 Path C: thành viên bị PM xóa khỏi workspace.</summary>
-    RemovedFromWorkspace = 19
+    RemovedFromWorkspace = 19,
+
+    /// <summary>UC-10: Đề xuất thay đổi Level.</summary>
+    LevelAdjustmentRequest = 20
+}
+
+public enum LevelAdjustmentRequestStatus
+{
+    Pending = 0,
+    Approved = 1,
+    Rejected = 2
 }
 
 public enum InviteStatus

@@ -10,6 +10,7 @@ public interface IKanbanService
         TaskStatus newStatus,
         string actorUserId,
         Guid workspaceId,
+        string? reason = null,
         CancellationToken cancellationToken = default);
 }
 
