@@ -60,7 +60,10 @@ public sealed class MemberProfileService : IMemberProfileService
                     m.Role == WorkspaceMemberRole.PM,
                 cancellationToken);
 
-        if (actorUserId != targetUserId && !isPm)
+        var isPlatformAdmin = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+
+        if (actorUserId != targetUserId && !isPm && !isPlatformAdmin)
             return null;
 
         var user = await _db.Users.AsNoTracking()
@@ -245,6 +248,7 @@ public sealed class MemberProfileService : IMemberProfileService
                 ChangedByPmId = pmUserId,
                 OldLevel = oldLevel,
                 NewLevel = newLevel,
+                WorkspaceId = workspaceId,
                 ChangedAt = DateTime.UtcNow
             });
         }

@@ -8,6 +8,11 @@
 
 <h1 class="h3 mb-4">Quản trị nền tảng</h1>
 
+<p class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="/Admin/audit-log">Nhật ký kiểm toán</a>
+    <a class="btn btn-sm btn-outline-secondary ms-1" href="/Admin/system-reports">Báo cáo hệ thống</a>
+</p>
+
 @if (Model.ShowToast)
 {
     <div class="alert alert-info">@Model.ToastMessage</div>
@@ -33,8 +38,10 @@
                     </tr>
                     </thead>
                     <tbody>
+                    @{ var regIdx = 0; }
                     @foreach (var r in Model.PendingRegistrations)
                     {
+                        regIdx++;
                         <tr>
                             <td>@r.Email</td>
                             <td>@(r.DisplayName ?? "—")</td>
@@ -44,10 +51,105 @@
                                     <input type="hidden" name="targetUserId" value="@r.UserId" />
                                     <button type="submit" class="btn btn-sm btn-success">Duyệt & Gán đơn vị</button>
                                 </form>
-                                <form method="post" asp-page-handler="RejectRegistration" class="d-inline ms-1">
-                                    <input type="hidden" name="targetUserId" value="@r.UserId" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                        data-bs-toggle="modal" data-bs-target="#modalRejectPm_@regIdx">Từ chối</button>
+                                <div class="modal fade" id="modalRejectPm_@regIdx" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content text-start">
+                                            <form method="post" asp-page-handler="RejectRegistration">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title">Từ chối đăng ký PM: @r.Email</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="targetUserId" value="@r.UserId" />
+                                                    <label class="form-label small">Lý do từ chối <span class="text-danger">*</span></label>
+                                                    <textarea name="reason" class="form-control" rows="3" maxlength="500" required placeholder="Bắt buộc, tối đa 500 ký tự"></textarea>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                    <button type="submit" class="btn btn-sm btn-danger">Xác nhận từ chối</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Đề xuất đổi level</div>
+    <div class="card-body p-0">
+        @if (Model.PendingLevelAdjustments.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">Không có yêu cầu nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead>
+                    <tr>
+                        <th>Thành viên</th>
+                        <th>Đơn vị</th>
+                        <th>Level hiện tại</th>
+                        <th>Đề xuất</th>
+                        <th>PM gửi</th>
+                        <th>Completion %</th>
+                        <th>Avg score</th>
+                        <th>Luận cứ</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @{ var laIdx = 0; }
+                    @foreach (var a in Model.PendingLevelAdjustments)
+                    {
+                        laIdx++;
+                        <tr>
+                            <td>@a.TargetDisplayName</td>
+                            <td>@a.WorkspaceName</td>
+                            <td>@a.CurrentLevel</td>
+                            <td>@a.ProposedLevel</td>
+                            <td>@a.RequesterDisplayName</td>
+                            <td>@a.CompletionRate.ToString("P0")</td>
+                            <td>@a.AvgScore.ToString("0.##")</td>
+                            <td class="small">@a.Reason</td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" asp-page-handler="ApproveLevelAdjustment" class="d-inline">
+                                    <input type="hidden" name="requestId" value="@a.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success">Duyệt</button>
                                 </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                        data-bs-toggle="modal" data-bs-target="#modalRejectLevel_@laIdx">Từ chối</button>
+                                <div class="modal fade" id="modalRejectLevel_@laIdx" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content text-start">
+                                            <form method="post" asp-page-handler="RejectLevelAdjustment">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title">Từ chối đề xuất level — @a.TargetDisplayName</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="requestId" value="@a.Id" />
+                                                    <label class="form-label small">Lý do từ chối <span class="text-danger">*</span></label>
+                                                    <textarea name="reason" class="form-control" rows="3" maxlength="500" required></textarea>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                    <button type="submit" class="btn btn-sm btn-danger">Xác nhận</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     }
@@ -106,8 +208,8 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <input type="hidden" name="projectId" value="@p.Id" />
-                                                    <label class="form-label small">Lý do từ chối (tùy chọn)</label>
-                                                    <textarea name="reason" class="form-control" rows="3" maxlength="500"></textarea>
+                                                    <label class="form-label small">Lý do từ chối <span class="text-danger">*</span></label>
+                                                    <textarea name="reason" class="form-control" rows="3" maxlength="500" required></textarea>
                                                 </div>
                                                 <div class="modal-footer">
                                                     <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
@@ -187,7 +289,7 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">Hạ PM trực tiếp (tối đa 3 PM / đơn vị; luôn giữ ≥1 PM)</div>
+    <div class="card-header fw-semibold">Hạ PM trực tiếp</div>
     <div class="card-body">
         @if (Model.AllWorkspaces.Count == 0)
         {
@@ -224,16 +326,36 @@
             else
             {
                 <ul class="list-group list-group-flush">
+                    @{ var demIdx = 0; }
                     @foreach (var p in Model.PmsInSelectedWorkspace)
                     {
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                        demIdx++;
+                        <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <span>@p.DisplayName <span class="text-muted small">(@p.Email)</span></span>
-                            <form method="post" asp-page-handler="DemotePmDirect" class="d-inline"
-                                  onsubmit="return confirm('Hạ PM này xuống Member?');">
-                                <input type="hidden" name="workspaceId" value="@Model.DemoteWorkspaceId" />
-                                <input type="hidden" name="targetUserId" value="@p.UserId" />
-                                <button type="submit" class="btn btn-sm btn-outline-warning">Hạ xuống Member</button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                    data-bs-toggle="modal" data-bs-target="#modalDemotePm_@demIdx">Hạ xuống Member</button>
+                            <div class="modal fade" id="modalDemotePm_@demIdx" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content text-start">
+                                        <form method="post" asp-page-handler="DemotePmDirect">
+                                            <div class="modal-header">
+                                                <h6 class="modal-title">Hạ PM → Member: @p.DisplayName</h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <input type="hidden" name="workspaceId" value="@Model.DemoteWorkspaceId" />
+                                                <input type="hidden" name="targetUserId" value="@p.UserId" />
+                                                <label class="form-label small">Lý do <span class="text-danger">*</span></label>
+                                                <textarea name="reason" class="form-control" rows="3" maxlength="500" required placeholder="Bắt buộc nhập lý do"></textarea>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                <button type="submit" class="btn btn-sm btn-warning">Xác nhận hạ</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         </li>
                     }
                 </ul>

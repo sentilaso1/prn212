@@ -126,6 +126,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("IsPM", policy =>
         policy.Requirements.Add(new IsPmRequirement()));
 
+    // UC-09 Path C: KPI / báo cáo — PM workspace hoặc Platform Admin (đọc mọi workspace).
+    options.AddPolicy("PmOrPlatformAdminForReports", policy =>
+        policy.Requirements.Add(new PmOrPlatformAdminForReportsRequirement()));
+
     // UC-09: PM trong workspace hiện tại hoặc Platform Admin (DB / claim).
     options.AddPolicy("CanManageWorkspaceRoles", policy =>
         policy.Requirements.Add(new CanManageWorkspaceRolesRequirement()));
@@ -149,6 +153,7 @@ builder.Services.AddScoped<IKpiDashboardService, KpiDashboardService>();
 builder.Services.AddScoped<IMemberProfileService, MemberProfileService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
+builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -160,6 +165,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddScoped<IClaimsTransformation, WorkspaceClaimsTransformation>();
 
 builder.Services.AddScoped<IAuthorizationHandler, IsPmAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, PmOrPlatformAdminForReportsHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, CanManageWorkspaceRolesHandler>();
 
 var app = builder.Build();

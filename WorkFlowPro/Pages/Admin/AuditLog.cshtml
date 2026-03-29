@@ -1,0 +1,94 @@
+@page "/Admin/audit-log"
+@model WorkFlowPro.Pages.Admin.AuditLogModel
+@using WorkFlowPro.Data
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Nhật ký kiểm toán";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h1 class="h3 mb-0">Nhật ký kiểm toán</h1>
+    <a class="btn btn-sm btn-outline-secondary" href="/Admin">← Về Admin</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<form method="get" class="card shadow-sm mb-4">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small mb-0">Loại hành động</label>
+            <select name="ActionFilter" class="form-select form-select-sm">
+                <option value="">— Tất cả —</option>
+                @foreach (AdminAuditActionType v in Enum.GetValues<AdminAuditActionType>())
+                {
+                    if (Model.ActionFilter == v.ToString())
+                    {
+                        <option value="@v" selected>@v</option>
+                    }
+                    else
+                    {
+                        <option value="@v">@v</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Từ ngày (UTC)</label>
+            <input type="date" name="FromDate" value="@Model.FromDate" class="form-control form-control-sm" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Đến ngày (UTC)</label>
+            <input type="date" name="ToDate" value="@Model.ToDate" class="form-control form-control-sm" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0">User ID (Actor/Target)</label>
+            <input type="text" name="TargetUserId" value="@Model.TargetUserId" class="form-control form-control-sm" placeholder="AspNetUsers.Id" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-0">Từ khóa (mục tiêu / ghi chú / email actor)</label>
+            <input type="search" name="Keyword" value="@Model.Keyword" class="form-control form-control-sm" />
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-sm btn-primary">Lọc / Tìm</button>
+            <a class="btn btn-sm btn-link" href="/Admin/audit-log">Xóa bộ lọc</a>
+        </div>
+    </div>
+</form>
+
+@if (Model.Entries.Count == 0 && string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <p class="text-muted">No audit log entries found for the selected criteria.</p>
+}
+else if (Model.Entries.Count > 0)
+{
+    <div class="table-responsive card shadow-sm">
+        <table class="table table-sm table-striped mb-0 align-middle">
+            <thead class="table-light">
+            <tr>
+                <th>Thời điểm (UTC)</th>
+                <th>Thực hiện bởi</th>
+                <th>Loại</th>
+                <th>Mục tiêu / mô tả</th>
+                <th>Ghi chú / lý do</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var e in Model.Entries)
+            {
+                <tr>
+                    <td class="text-nowrap small">@e.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td class="small">@e.ActorDisplayName</td>
+                    <td class="small">@e.ActionLabel</td>
+                    <td class="small">@e.TargetSummary</td>
+                    <td class="small text-break">@(e.Notes ?? "—")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <p class="small text-muted mt-2 mb-0">Tối đa 500 bản ghi mới nhất. Chỉ đọc — không chỉnh sửa / xóa.</p>
+}

@@ -36,6 +36,7 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<WorkspaceInviteToken> WorkspaceInviteTokens => Set<WorkspaceInviteToken>();
     public DbSet<WorkspaceRoleChangeRequest> WorkspaceRoleChangeRequests => Set<WorkspaceRoleChangeRequest>();
+    public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -325,6 +326,7 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.ToTable("RoleChangeLogs");
             e.Property(x => x.OldRole).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.NewRole).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reason).HasMaxLength(500);
             e.Property(x => x.TimestampUtc).HasDefaultValueSql("GETUTCDATE()");
 
             e.HasIndex(x => x.WorkspaceId);
@@ -356,9 +358,10 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.HasIndex(x => x.TargetUserId);
             e.HasIndex(x => x.WorkspaceId);
 
-            e.HasOne<Workspace>(x => x.Workspace)
+            e.HasOne(x => x.Workspace)
              .WithMany()
              .HasForeignKey(x => x.WorkspaceId)
+             .IsRequired(false)
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasOne<ApplicationUser>()
@@ -430,6 +433,18 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(x => x.WorkspaceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── AdminAuditLog (UC-15) — không query filter (toàn hệ thống).
+        b.Entity<AdminAuditLog>(e =>
+        {
+            e.ToTable("AdminAuditLogs");
+            e.Property(x => x.ActionType).HasMaxLength(80).IsRequired();
+            e.Property(x => x.TimestampUtc).HasDefaultValueSql("GETUTCDATE()");
+            e.HasIndex(x => x.TimestampUtc);
+            e.HasIndex(x => x.ActionType);
+            e.HasIndex(x => x.ActorUserId);
+            e.HasIndex(x => x.TargetUserId);
         });
 
         // ── WorkspaceInviteToken (UC-03) ─────────────────────────────────

@@ -120,6 +120,19 @@ public enum LevelAdjustmentRequestStatus
     Rejected = 2
 }
 
+/// <summary>UC-15: loại sự kiện ghi vào audit log.</summary>
+public enum AdminAuditActionType
+{
+    PmRegistrationApproved = 1,
+    PmRegistrationRejected = 2,
+    LevelAdjustmentApproved = 3,
+    LevelAdjustmentRejected = 4,
+    PmDemotedToMember = 5,
+    ProjectCreationApproved = 6,
+    ProjectCreationRejected = 7,
+    MemberRemovedFromWorkspace = 8
+}
+
 public enum InviteStatus
 {
     Pending = 1,

@@ -1,0 +1,54 @@
+@page "/Admin/system-reports"
+@model WorkFlowPro.Pages.Admin.SystemReportsModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Báo cáo hệ thống";
+}
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1 class="h3 mb-2">Báo cáo &amp; KPI — toàn hệ thống</h1>
+<p class="text-muted small mb-4">
+    Xem KPI theo từng đơn vị. <a href="/Admin">← Quản trị</a>
+</p>
+
+<div class="table-responsive card shadow-sm">
+    <table class="table table-sm table-striped align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+            <th>Workspace</th>
+            <th class="text-end">Thành viên</th>
+            <th class="text-end">Project (Active/Archived)</th>
+            <th class="text-end">Tổng task</th>
+            <th class="text-end">Task Done</th>
+            <th class="text-end">TB Completion rate (member)</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @if (Model.Workspaces.Count == 0)
+        {
+            <tr>
+                <td colspan="7" class="text-muted p-4">Chưa có workspace.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var w in Model.Workspaces)
+            {
+                <tr>
+                    <td class="fw-medium">@w.WorkspaceName</td>
+                    <td class="text-end">@w.MemberCount</td>
+                    <td class="text-end">@w.ProjectCount</td>
+                    <td class="text-end">@w.TotalTasks</td>
+                    <td class="text-end">@w.CompletedTasks</td>
+                    <td class="text-end">@((w.AvgMemberCompletionRate * 100).ToString("0.##")) %</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="/Reports/Dashboard?workspaceId=@w.WorkspaceId.ToString("D")">Xem KPI</a>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>
