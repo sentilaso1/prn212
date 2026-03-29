@@ -1,5 +1,8 @@
 @model WorkFlowPro.ViewModels.WorkspaceMemberRoleRowVm
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    var mid = "u" + Model.UserId.Replace("-", "");
+}
 
 <tr>
     <td>
@@ -15,79 +18,228 @@
     <td class="fw-medium">@Model.DisplayName</td>
     <td class="small text-muted">@Model.Email</td>
     <td>
-        <span class="badge @(Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM ? "bg-primary" : "bg-secondary")">@Model.Role</span>
-        @if (Model.HasPendingPromoteRequest)
+        @if (Model.ShowAdminRoleChangeForm)
         {
-            <span class="badge bg-warning text-dark ms-1">Chờ duyệt nâng PM</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAdminRole_@mid">Đổi role</button>
         }
-        @if (Model.HasPendingDemoteRequest)
+        else
         {
-            <span class="badge bg-warning text-dark ms-1">Chờ duyệt hạ PM</span>
+            <div class="d-flex flex-wrap align-items-center gap-1">
+                <span class="badge @(Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM ? "bg-primary" : "bg-secondary")">@Model.Role</span>
+                @if (Model.HasPendingPromoteRequest)
+                {
+                    <span class="badge bg-warning text-dark">Chờ duyệt nâng PM</span>
+                }
+                @if (Model.HasPendingDemoteRequest)
+                {
+                    <span class="badge bg-warning text-dark">Chờ duyệt hạ PM</span>
+                }
+                @if (Model.HasPendingRemovePmRequest)
+                {
+                    <span class="badge bg-warning text-dark">Chờ duyệt xóa PM</span>
+                }
+            </div>
         }
     </td>
     <td>@(string.IsNullOrWhiteSpace(Model.SubRole) ? "—" : Model.SubRole)</td>
     <td>
-        <div class="d-flex flex-column gap-2">
-            @if (Model.ShowAdminRoleChangeForm)
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+            @if (Model.ShowPmRoleRequestForm)
             {
-                <form method="post" asp-page="/Roles" asp-page-handler="ChangeRole" class="d-flex flex-wrap gap-1 align-items-center"
-                      onsubmit="return confirm('Admin: xác nhận đổi workspace role? Tối đa 3 PM / đơn vị.');">
-                    <input type="hidden" name="ChangeRoleInput.TargetUserId" value="@Model.UserId" />
-                    <select name="ChangeRoleInput.NewRole" class="form-select form-select-sm" style="width:auto;min-width:120px;">
-                        @if (Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
-                        {
-                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM" selected>PM</option>
-                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member">Member</option>
-                        }
-                        else
-                        {
-                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM">PM</option>
-                            <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member" selected>Member</option>
-                        }
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Đổi role (Admin)</button>
-                </form>
-            }
-            else if (Model.ShowPmPromoteRequestForm)
-            {
-                <form method="post" asp-page="/Roles" asp-page-handler="RequestPromoteToPm" class="d-flex flex-wrap gap-1 align-items-end">
-                    <input type="hidden" name="TargetUserId" value="@Model.UserId" />
-                    <div>
-                        <label class="form-label small mb-0">Lý do (tùy chọn)</label>
-                        <input name="Reason" class="form-control form-control-sm" maxlength="500" style="min-width:160px;" />
-                    </div>
-                    <button type="submit" class="btn btn-sm btn-success">Yêu cầu nâng PM</button>
-                </form>
-            }
-            else if (Model.ShowPmDemoteRequestForm)
-            {
-                <form method="post" asp-page="/Roles" asp-page-handler="RequestDemotePm" class="d-flex flex-wrap gap-1 align-items-end">
-                    <input type="hidden" name="TargetUserId" value="@Model.UserId" />
-                    <div>
-                        <label class="form-label small mb-0">Lý do (tùy chọn)</label>
-                        <input name="Reason" class="form-control form-control-sm" maxlength="500" style="min-width:160px;" />
-                    </div>
-                    <button type="submit" class="btn btn-sm btn-outline-warning">Yêu cầu hạ PM</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalRoleReq_@mid">Yêu cầu đổi PM/Member</button>
             }
             else if (Model.CanChangeWorkspaceRole && !Model.IsActorPlatformAdmin && Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
             {
-                <span class="text-muted small">Hạ PM: dùng yêu cầu hoặc Admin.</span>
+                <span class="text-muted small">—</span>
             }
             else if (!Model.CanChangeWorkspaceRole)
             {
-                <span class="text-muted small">Không đổi role của chính bạn</span>
+                <span class="text-muted small">—</span>
+            }
+
+            @if (Model.ShowRequestRemovePmFromWorkspace)
+            {
+                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRemovePm_@mid">Yêu cầu xóa PM</button>
+            }
+
+            @if (Model.ShowRemoveMemberFromWorkspace)
+            {
+                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRemoveMember_@mid">Xóa khỏi đơn vị</button>
             }
 
             @if (Model.CanChangeWorkspaceRole || Model.IsActorPlatformAdmin)
             {
-                <form method="post" asp-page="/Roles" asp-page-handler="ChangeSubRole" class="d-flex flex-wrap gap-1 align-items-center"
-                      onsubmit="return confirm('Xác nhận lưu SubRole?');">
-                    <input type="hidden" name="ChangeSubRoleInput.TargetUserId" value="@Model.UserId" />
-                    <input name="ChangeSubRoleInput.SubRole" class="form-control form-control-sm" style="min-width:140px;max-width:200px;" value="@Model.SubRole" placeholder="BA, DEV, QA..." maxlength="100" list="role-subrole-suggestions" />
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Lưu SubRole</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalSubRole_@mid">SubRole</button>
             }
         </div>
+
+        @if (Model.ShowAdminRoleChangeForm)
+        {
+            <div class="modal fade" id="modalAdminRole_@mid" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" asp-page="/Roles" asp-page-handler="ChangeRole" onsubmit="return confirm('Xác nhận đổi role ngay?');">
+                            <div class="modal-header">
+                                <h6 class="modal-title">Đổi role (Admin)</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="ChangeRoleInput.TargetUserId" value="@Model.UserId" />
+                                <label class="form-label small">Role</label>
+                                <select name="ChangeRoleInput.NewRole" class="form-select form-select-sm">
+                                    @if (Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.PM)
+                                    {
+                                        <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM" selected>PM</option>
+                                        <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member">Member</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@WorkFlowPro.Data.WorkspaceMemberRole.PM">PM</option>
+                                        <option value="@WorkFlowPro.Data.WorkspaceMemberRole.Member" selected>Member</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-sm btn-primary">Áp dụng</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.ShowPmRoleRequestForm)
+        {
+            <div class="modal fade" id="modalRoleReq_@mid" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" asp-page="/Roles" asp-page-handler="RequestWorkspaceRoleChange">
+                            <div class="modal-header">
+                                <h6 class="modal-title">Gửi Admin duyệt</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="TargetUserId" value="@Model.UserId" />
+                                <label class="form-label small">Vai trò mong muốn</label>
+                                <select name="RequestedRole" class="form-select form-select-sm" required>
+                                    @if (Model.Role == WorkFlowPro.Data.WorkspaceMemberRole.Member)
+                                    {
+                                        <option value="@((int)WorkFlowPro.Data.WorkspaceMemberRole.Member)" selected>Member (giữ)</option>
+                                        <option value="@((int)WorkFlowPro.Data.WorkspaceMemberRole.PM)">PM — gửi yêu cầu nâng</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@((int)WorkFlowPro.Data.WorkspaceMemberRole.PM)" selected>PM (giữ)</option>
+                                        <option value="@((int)WorkFlowPro.Data.WorkspaceMemberRole.Member)">Member — gửi yêu cầu hạ</option>
+                                    }
+                                </select>
+                                <label class="form-label small mt-2">Lý do (tùy chọn)</label>
+                                <input name="Reason" class="form-control form-control-sm" maxlength="500" placeholder="Ghi chú cho Admin" />
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-sm btn-primary">Gửi</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.ShowRequestRemovePmFromWorkspace)
+        {
+            <div class="modal fade" id="modalRemovePm_@mid" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" asp-page="/Roles" asp-page-handler="RequestRemovePm">
+                            <div class="modal-header">
+                                <h6 class="modal-title">Yêu cầu xóa PM</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="small text-muted mb-2">Admin sẽ duyệt trước khi người này bị gỡ khỏi đơn vị.</p>
+                                <input type="hidden" name="targetUserId" value="@Model.UserId" />
+                                <label class="form-label small">Lý do <span class="text-danger">*</span></label>
+                                <textarea name="reason" class="form-control form-control-sm" rows="3" maxlength="500" required placeholder="Tối đa 500 ký tự"></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-sm btn-danger">Gửi yêu cầu</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.ShowRemoveMemberFromWorkspace)
+        {
+            <div class="modal fade" id="modalRemoveMember_@mid" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" asp-page="/Roles" asp-page-handler="RemoveMember" onsubmit="return confirm('Xóa thành viên khỏi đơn vị? Task đang giao sẽ về Unassigned.');">
+                            <div class="modal-header">
+                                <h6 class="modal-title">Xóa khỏi đơn vị</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="RemoveMemberInput.TargetUserId" value="@Model.UserId" />
+                                <label class="form-label small">Lý do <span class="text-danger">*</span></label>
+                                <textarea name="RemoveMemberInput.Reason" class="form-control form-control-sm" rows="3" maxlength="2000" required placeholder="Thành viên sẽ nhận trong thông báo"></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.CanChangeWorkspaceRole || Model.IsActorPlatformAdmin)
+        {
+            <div class="modal fade" id="modalSubRole_@mid" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" asp-page="/Roles" asp-page-handler="ChangeSubRole" onsubmit="return confirm('Lưu SubRole?');">
+                            <div class="modal-header">
+                                <h6 class="modal-title">SubRole</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="ChangeSubRoleInput.TargetUserId" value="@Model.UserId" />
+                                <select name="ChangeSubRoleInput.SubRole" class="form-select form-select-sm">
+                                    @{
+                                        var sub = Model.SubRole?.Trim();
+                                        var inList = WorkFlowPro.Data.WorkspacePolicies.IsAllowedMemberSubRole(sub);
+                                    }
+                                    @if (!string.IsNullOrEmpty(sub) && !inList)
+                                    {
+                                        <option value="@sub" selected>@sub (hiện tại)</option>
+                                    }
+                                    @foreach (var sr in WorkFlowPro.Data.WorkspacePolicies.AllowedMemberSubRoles)
+                                    {
+                                        if (string.Equals(sub, sr, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <option value="@sr" selected>@sr</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@sr">@sr</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-sm btn-primary">Lưu</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
     </td>
 </tr>

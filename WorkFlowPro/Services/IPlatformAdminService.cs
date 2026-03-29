@@ -52,6 +52,14 @@ public interface IPlatformAdminService
         string? reason,
         CancellationToken cancellationToken = default);
 
+    /// <summary>PM yêu cầu xóa PM khác khỏi đơn vị — lý do bắt buộc, chờ Admin duyệt.</summary>
+    Task<AdminActionResult> SubmitRemovePmFromWorkspaceRequestAsync(
+        string pmUserId,
+        Guid workspaceId,
+        string targetUserId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AdminWorkspaceListItemVm>> ListAllWorkspacesAsync(
         CancellationToken cancellationToken = default);
 

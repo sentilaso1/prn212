@@ -88,13 +88,14 @@
                 <div>
                     <h2 class="h5 card-title mb-1">Thành viên đơn vị (workspace)</h2>
                     <p class="card-text small text-muted mb-0">
-                        Dự án thuộc đơn vị đang chọn — <strong>không có danh sách member riêng theo từng dự án</strong>.
-                        Đây là mọi người trong cùng workspace; gỡ khỏi đơn vị (UC-03 Path C) thực hiện từ màn quản lý role.
+                        Lời mời (<strong>Mời thành viên</strong>) gắn với <strong>cả đơn vị</strong>, không gắn từng dự án.
+                        Mọi dự án trong đơn vị dùng chung một danh sách người; <strong>vai trò (PM/Member) và SubRole (BA, DEV…)</strong> lưu theo người trong đơn vị — đổi một lần ở <a href="/Roles">/Roles</a> thì hiển thị giống nhau trên mọi dự án.
+                        Xóa khỏi đơn vị cũng thực hiện từ đó.
                     </p>
                 </div>
                 @if (Model.CanManage)
                 {
-                    <a class="btn btn-sm btn-outline-primary" href="/Roles" title="UC-09 / UC-03: quản lý thành viên &amp; role">
+                    <a class="btn btn-sm btn-outline-primary" href="/Roles" title="Quản lý thành viên và vai trò trong đơn vị">
                         Quản lý thành viên &amp; role
                     </a>
                 }
