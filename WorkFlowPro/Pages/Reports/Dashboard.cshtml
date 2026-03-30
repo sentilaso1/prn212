@@ -24,10 +24,19 @@
 else if (Model.Dashboard is not null)
 {
     <form method="get" class="row g-2 align-items-end mb-4">
+
+
+        @if (Model.ReportWorkspaceId.HasValue)
+        {
+            <input type="hidden" name="workspaceId" value="@Model.ReportWorkspaceId.Value" />
+        }
+
+
         @if (Model.IsPlatformAdminViewer && Model.ReportWorkspaceId.HasValue)
         {
             <input type="hidden" name="workspaceId" value="@Model.ReportWorkspaceId.Value" />
         }
+
         <div class="col-md-4">
             <label class="form-label">Project</label>
             <select name="projectId" class="form-select" asp-for="ProjectId">
