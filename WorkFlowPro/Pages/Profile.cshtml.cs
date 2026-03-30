@@ -60,6 +60,9 @@ public sealed class ProfileModel : PageModel
             : userId.Trim();
 
         var workspaceId = _currentWorkspace.CurrentWorkspaceId;
+        if (workspaceId is null)
+            workspaceId = await TryResolveWorkspaceFromProfileQueryAsync(actorUserId, cancellationToken);
+
         WorkspaceId = workspaceId;
 
         if (workspaceId is null)
@@ -147,6 +150,33 @@ public sealed class ProfileModel : PageModel
         PmInput.SubRole = vm.SubRole ?? string.Empty;
 
         return Page();
+    }
+
+    /// <summary>
+    /// KPI drill-down (UC-09): khi session/claim chưa có workspace nhưng URL có ?workspaceId=
+    /// (Platform Admin không thuộc đơn vị vẫn hợp lệ).
+    /// </summary>
+    private async Task<Guid?> TryResolveWorkspaceFromProfileQueryAsync(
+        string actorUserId,
+        CancellationToken cancellationToken)
+    {
+        var queryValues = Request.Query["workspaceId"].ToArray();
+        var raw = queryValues.Length > 0 ? queryValues[^1] : null;
+        if (string.IsNullOrWhiteSpace(raw) || !Guid.TryParse(raw, out var qws))
+            return null;
+
+        if (!await _db.Workspaces.AsNoTracking().AnyAsync(w => w.Id == qws, cancellationToken))
+            return null;
+
+        var isPlatformAdmin =
+            await _db.Users.AsNoTracking().AnyAsync(u => u.Id == actorUserId && u.IsPlatformAdmin, cancellationToken);
+        var inWorkspace = await _db.WorkspaceMembers.AsNoTracking()
+            .AnyAsync(m => m.UserId == actorUserId && m.WorkspaceId == qws, cancellationToken);
+
+        if (!isPlatformAdmin && !inWorkspace)
+            return null;
+
+        return qws;
     }
 
     public async Task<IActionResult> OnPostUpdateProfileAsync(
