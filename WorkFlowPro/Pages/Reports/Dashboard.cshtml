@@ -26,10 +26,14 @@ else if (Model.Dashboard is not null)
     <form method="get" class="row g-2 align-items-end mb-4">
 
 
+        
+
+
         @if (Model.ReportWorkspaceId.HasValue)
         {
             <input type="hidden" name="workspaceId" value="@Model.ReportWorkspaceId.Value" />
         }
+
 
 
         @if (Model.IsPlatformAdminViewer && Model.ReportWorkspaceId.HasValue)
