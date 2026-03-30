@@ -131,6 +131,27 @@ public interface ITaskService
         string? comment,
         MemberLevel? newLevel = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>UC-08: PM khác tranh chấp trong cửa sổ 24h.</summary>
+    Task<EvaluationUpdateResult> DisputeEvaluationAsync(
+        Guid taskId,
+        string actorUserId,
+        Guid workspaceId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>UC-08: PM đánh giá gốc chỉnh điểm một lần sau khi bị tranh chấp.</summary>
+    Task<EvaluationUpdateResult> ReviseEvaluationAsync(
+        Guid taskId,
+        string actorUserId,
+        Guid workspaceId,
+        int newScore,
+        string reason,
+        MemberLevel? newLevel = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Background: khóa mọi evaluation hết hạn 24h.</summary>
+    Task FinalizeExpiredEvaluationsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record SuggestedAssigneeVm(
@@ -205,9 +226,21 @@ public sealed record TaskEvaluationVm(
     string PmDisplayName,
     string? PmAvatarUrl,
     int Score,
+    int OriginalScore,
     string? Comment,
     DateTime EvaluatedAtUtc,
-    bool IsLocked);
+    DateTime WindowEndsAtUtc,
+    bool IsLocked,
+    /// <summary>Open | Disputed | Locked</summary>
+    string UiStatus,
+    bool CanDispute,
+    bool CanRevise,
+    string? DisputeReason,
+    string? DisputedByUserId,
+    string? DisputedByDisplayName,
+    DateTime? DisputedAtUtc,
+    DateTime? RevisedAtUtc,
+    string? RevisedReason);
 
 public sealed record TaskUpdateRequest(
     string? Title,

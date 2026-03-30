@@ -376,7 +376,11 @@ else
             connection.on("CommentAdded", function () { showToast("Có comment mới trong một task.", "primary"); });
             connection.on("CommentUpdated", function () { showToast("Một comment vừa được chỉnh sửa.", "primary"); });
             connection.on("CommentDeleted", function () { showToast("Một comment vừa được xoá.", "primary"); });
-            connection.on("TaskEvaluated", function () { showToast("Một task vừa được đánh giá.", "success"); });
+            connection.on("TaskEvaluated", function () { showToast("Đánh giá task đã chốt (locked).", "success"); });
+            connection.on("EvaluationSubmitted", function () { showToast("Có đánh giá mới — đang mở cửa sổ tranh chấp 24h.", "primary"); });
+            connection.on("EvaluationDisputed", function () { showToast("Có tranh chấp đánh giá.", "warning"); });
+            connection.on("EvaluationRevised", function () { showToast("PM đã chỉnh lại điểm sau tranh chấp.", "info"); });
+            connection.on("EvaluationFinalized", function () { showToast("Đánh giá đã khóa sau 24h.", "success"); });
 
             const style = document.createElement("style");
             style.innerHTML = `

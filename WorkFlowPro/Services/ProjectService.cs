@@ -170,9 +170,9 @@ public sealed class ProjectService : IProjectService
         _db.Projects.Add(project);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // UC-11: Notify Admin for approval (UC-14).
+        // UC-11 / UC-14: thông báo mọi Platform Admin (nhất quán với UC-13).
         var admins = await _db.Users
-            .Where(u => u.UserName == "admin@workflowpro.com") // Demo/Default admin
+            .Where(u => u.IsPlatformAdmin)
             .Select(u => u.Id)
             .ToListAsync(cancellationToken);
 

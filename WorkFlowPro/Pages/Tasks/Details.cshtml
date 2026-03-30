@@ -101,12 +101,26 @@ else if (Model.OverviewVm is not null)
                     });
 
                     if (!res.ok) {
-                        const text = await res.text();
-                        console.error(text);
-                        alert("Có lỗi khi gửi yêu cầu. Vui lòng thử lại.");
+                        let msg = "Có lỗi khi gửi yêu cầu. Vui lòng thử lại.";
+                        try {
+                            const j = await res.json();
+                            if (j && j.error) msg = j.error;
+                        } catch { /* ignore */ }
+                        alert(msg);
                         return;
                     }
-                    // UI will be refreshed by SignalR.
+                    try {
+                        const ct = res.headers.get("content-type") || "";
+                        if (ct.includes("application/json")) {
+                            const j = await res.json();
+                            if (j && j.success === false && j.error) {
+                                alert(j.error);
+                                return;
+                            }
+                        }
+                    } catch { /* ignore */ }
+                    if (typeof refreshEvaluation === "function") await refreshEvaluation();
+                    if (typeof refreshHistory === "function") await refreshHistory();
                 } catch (err) {
                     console.error(err);
                     alert("Có lỗi khi gửi yêu cầu. Vui lòng thử lại.");
@@ -400,6 +414,30 @@ else if (Model.OverviewVm is not null)
             });
 
             connection.on("TaskEvaluated", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshEvaluation();
+                await refreshHistory();
+            });
+
+            connection.on("EvaluationSubmitted", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshEvaluation();
+                await refreshHistory();
+            });
+
+            connection.on("EvaluationDisputed", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshEvaluation();
+                await refreshHistory();
+            });
+
+            connection.on("EvaluationRevised", async function (payload) {
+                if (!payload || payload.taskId !== taskId) return;
+                await refreshEvaluation();
+                await refreshHistory();
+            });
+
+            connection.on("EvaluationFinalized", async function (payload) {
                 if (!payload || payload.taskId !== taskId) return;
                 await refreshEvaluation();
                 await refreshHistory();

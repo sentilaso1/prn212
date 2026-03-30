@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkFlowPro.Data;
 
@@ -11,9 +12,11 @@ using WorkFlowPro.Data;
 namespace WorkFlowPro.Migrations
 {
     [DbContext(typeof(WorkFlowProDbContext))]
-    partial class WorkFlowProDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260329152900_FixLegacyLevelAdjustmentRequestColumns")]
+    partial class FixLegacyLevelAdjustmentRequestColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -237,59 +240,6 @@ namespace WorkFlowPro.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
-                });
-
-            modelBuilder.Entity("WorkFlowPro.Data.AdminAuditLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ActionType")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("ActorUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<Guid?>("TargetProjectId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("TargetSummary")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("TargetUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("TimestampUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<Guid?>("WorkspaceId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActionType");
-
-                    b.HasIndex("ActorUserId");
-
-                    b.HasIndex("TargetUserId");
-
-                    b.HasIndex("TimestampUtc");
-
-                    b.ToTable("AdminAuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("WorkFlowPro.Data.Attachment", b =>
@@ -696,16 +646,6 @@ namespace WorkFlowPro.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<string>("DisputeReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("DisputedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DisputedByUserId")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<DateTime>("EvaluatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -714,22 +654,9 @@ namespace WorkFlowPro.Migrations
                     b.Property<bool>("IsLocked")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("LevelOverride")
-                        .HasColumnType("int");
-
-                    b.Property<int>("OriginalScore")
-                        .HasColumnType("int");
-
                     b.Property<string>("PmUserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("RevisedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("RevisedReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("Score")
                         .HasColumnType("int");
@@ -739,13 +666,9 @@ namespace WorkFlowPro.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DisputedByUserId");
-
                     b.HasIndex("PmUserId");
 
                     b.HasIndex("TaskId");
-
-                    b.HasIndex("IsLocked", "EvaluatedAtUtc");
 
                     b.ToTable("TaskEvaluations", (string)null);
                 });
@@ -1270,11 +1193,6 @@ namespace WorkFlowPro.Migrations
 
             modelBuilder.Entity("WorkFlowPro.Data.TaskEvaluation", b =>
                 {
-                    b.HasOne("WorkFlowPro.Auth.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("DisputedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("WorkFlowPro.Auth.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("PmUserId")

@@ -754,25 +754,22 @@ public sealed class TaskService : ITaskService
         if (!detail.IsPm)
             return null;
 
-        var eval = await (
+        await TryFinalizeEvaluationForTaskIfDueAsync(taskId, workspaceId, cancellationToken);
+
+        var row = await (
             from e in _db.TaskEvaluations
             where e.TaskId == taskId
             join u in _db.Users on e.PmUserId equals u.Id into users
             from pm in users.DefaultIfEmpty()
+            join du in _db.Users on e.DisputedByUserId equals du.Id into disputers
+            from disputer in disputers.DefaultIfEmpty()
             orderby e.EvaluatedAtUtc descending
-            select new TaskEvaluationVm(
-                e.Id,
-                e.TaskId,
-                e.PmUserId,
-                pm != null ? (pm.DisplayName ?? pm.Email ?? pm.UserName ?? pm.Id) : e.PmUserId,
-                pm != null ? pm.AvatarUrl : null,
-                e.Score,
-                e.Comment,
-                e.EvaluatedAtUtc,
-                e.IsLocked))
+            select new { e, pm, disputer })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return eval;
+        return row is null
+            ? null
+            : BuildEvaluationVm(row.e, row.pm, row.disputer, actorUserId, detail.IsPm, DateTime.UtcNow);
     }
 
     public async Task<IReadOnlyList<TaskEvaluationVm>> GetTaskEvaluationsAsync(
@@ -785,25 +782,23 @@ public sealed class TaskService : ITaskService
         if (!detail.IsPm)
             return Array.Empty<TaskEvaluationVm>();
 
-        var list = await (
+        await TryFinalizeEvaluationForTaskIfDueAsync(taskId, workspaceId, cancellationToken);
+
+        var rows = await (
             from e in _db.TaskEvaluations
             where e.TaskId == taskId
             join u in _db.Users on e.PmUserId equals u.Id into users
             from pm in users.DefaultIfEmpty()
+            join du in _db.Users on e.DisputedByUserId equals du.Id into disputers
+            from disputer in disputers.DefaultIfEmpty()
             orderby e.EvaluatedAtUtc descending
-            select new TaskEvaluationVm(
-                e.Id,
-                e.TaskId,
-                e.PmUserId,
-                pm != null ? (pm.DisplayName ?? pm.Email ?? pm.UserName ?? pm.Id) : e.PmUserId,
-                pm != null ? pm.AvatarUrl : null,
-                e.Score,
-                e.Comment,
-                e.EvaluatedAtUtc,
-                e.IsLocked))
+            select new { e, pm, disputer })
             .ToListAsync(cancellationToken);
 
-        return list;
+        var now = DateTime.UtcNow;
+        return rows
+            .Select(r => BuildEvaluationVm(r.e, r.pm, r.disputer, actorUserId, detail.IsPm, now))
+            .ToList();
     }
 
     public async Task<TaskUpdateResult> UpdateTaskAsync(
@@ -1572,15 +1567,15 @@ public sealed class TaskService : ITaskService
         if (acceptedAssignment is null)
             return new EvaluationUpdateResult(false, "Thiếu assignee đã chấp nhận cho task.", null);
 
-        var memberUserId = acceptedAssignment.AssigneeUserId;
         var now = DateTime.UtcNow;
 
-        // UC-08: once evaluated & locked -> cannot evaluate again.
+        await TryFinalizeEvaluationForTaskIfDueAsync(taskId, workspaceId, cancellationToken);
+
         var alreadyEvaluated = await _db.TaskEvaluations.AnyAsync(
             e => e.TaskId == taskId,
             cancellationToken);
         if (alreadyEvaluated)
-            return new EvaluationUpdateResult(false, "Task đã được đánh giá và đã khoá. Không thể đánh giá lại.", null);
+            return new EvaluationUpdateResult(false, "Task đã có đánh giá. Không thể tạo đánh giá mới.", null);
 
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -1589,9 +1584,11 @@ public sealed class TaskService : ITaskService
             TaskId = taskId,
             PmUserId = actorUserId,
             Score = score,
+            OriginalScore = score,
             Comment = normalizedComment,
             EvaluatedAtUtc = now,
-            IsLocked = true
+            IsLocked = false,
+            LevelOverride = newLevel
         };
         _db.TaskEvaluations.Add(eval);
 
@@ -1604,38 +1601,33 @@ public sealed class TaskService : ITaskService
             ActorUserId = actorUserId,
             Action = action,
             OldValue = null,
-            NewValue = null,
+            NewValue = $"Score={score}",
             TimestampUtc = now
         };
         _db.TaskHistoryEntries.Add(entry);
 
         await _db.SaveChangesAsync(cancellationToken);
-
-        await UpdateMemberProfileFromEvaluationsAsync(workspaceId, memberUserId, newLevel, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
-
         await tx.CommitAsync(cancellationToken);
 
-        // Realtime: notify assignee.
-        await _notifications.CreateAndPushAsync(
-            userId: memberUserId,
+        var redirect = $"/Tasks/Details/{taskId}";
+        await NotifyOtherWorkspacePmsAsync(
+            workspaceId,
+            exceptUserId: actorUserId,
             type: NotificationType.TaskEvaluated,
-            message: $"Task \"{task.Title}\" đã được PM đánh giá. Điểm: {score}/10.",
-            workspaceId: workspaceId,
+            message: $"Evaluation for task \"{task.Title}\" is open for review (24h).",
             projectId: project.Id,
             taskId: task.Id,
-            redirectUrl: $"/Tasks/Details/{taskId}",
-            cancellationToken: cancellationToken);
+            redirectUrl: redirect,
+            cancellationToken);
 
-        // Realtime: refresh evaluation + history for viewers.
         await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
             "HistoryAdded",
             new { taskId = taskId, entryId = entry.Id },
             cancellationToken);
 
         await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
-            "TaskEvaluated",
-            new { taskId = taskId, evaluationId = eval.Id, score = score },
+            "EvaluationSubmitted",
+            new { taskId = taskId, evaluationId = eval.Id, score = score, windowEndsAtUtc = eval.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) },
             cancellationToken);
 
         await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
@@ -1644,18 +1636,448 @@ public sealed class TaskService : ITaskService
             cancellationToken);
 
         var pm = await _db.Users.FirstOrDefaultAsync(u => u.Id == actorUserId, cancellationToken);
-        var vm = new TaskEvaluationVm(
-            eval.Id,
-            eval.TaskId,
-            eval.PmUserId,
-            pm != null ? (pm.DisplayName ?? pm.Email ?? pm.UserName ?? pm.Id) : eval.PmUserId,
-            pm?.AvatarUrl,
-            eval.Score,
-            eval.Comment,
-            eval.EvaluatedAtUtc,
-            eval.IsLocked);
+        var vm = BuildEvaluationVm(eval, pm, null, actorUserId, true, DateTime.UtcNow);
 
         return new EvaluationUpdateResult(true, null, vm);
+    }
+
+    public async Task<EvaluationUpdateResult> DisputeEvaluationAsync(
+        Guid taskId,
+        string actorUserId,
+        Guid workspaceId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var detail = await GetTaskDetailAsync(taskId, actorUserId, workspaceId, cancellationToken);
+        if (!detail.IsPm)
+            return new EvaluationUpdateResult(false, "Chỉ PM được tranh chấp đánh giá.", null);
+
+        var normalized = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (string.IsNullOrEmpty(normalized))
+            return new EvaluationUpdateResult(false, "Lý do tranh chấp là bắt buộc.", null);
+        if (normalized.Length > 2000)
+            return new EvaluationUpdateResult(false, "Lý do tối đa 2000 ký tự.", null);
+
+        await TryFinalizeEvaluationForTaskIfDueAsync(taskId, workspaceId, cancellationToken);
+
+        var eval = await _db.TaskEvaluations.FirstOrDefaultAsync(e => e.TaskId == taskId, cancellationToken);
+        if (eval is null)
+            return new EvaluationUpdateResult(false, "Không có đánh giá để tranh chấp.", null);
+
+        if (eval.IsLocked)
+            return new EvaluationUpdateResult(false, "Đánh giá đã khóa, không thể tranh chấp.", null);
+
+        if (eval.PmUserId == actorUserId)
+            return new EvaluationUpdateResult(false, "Bạn là PM đánh giá gốc, không thể tranh chấp chính mình.", null);
+
+        if (eval.DisputedAtUtc.HasValue)
+            return new EvaluationUpdateResult(false, "Đánh giá này đã bị tranh chấp.", null);
+
+        var now = DateTime.UtcNow;
+        if (eval.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) <= now)
+            return new EvaluationUpdateResult(false, "Đã hết thời gian tranh chấp (24h).", null);
+
+        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        if (task is null)
+            return new EvaluationUpdateResult(false, "Task không tồn tại.", null);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(
+            p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId,
+            cancellationToken);
+        if (project is null)
+            return new EvaluationUpdateResult(false, "Project không tồn tại trong workspace.", null);
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        eval.DisputeReason = normalized;
+        eval.DisputedByUserId = actorUserId;
+        eval.DisputedAtUtc = now;
+
+        var reasonLog = normalized.Length > 500 ? normalized[..500] : normalized;
+        var hist = new TaskHistoryEntry
+        {
+            TaskId = taskId,
+            ActorUserId = actorUserId,
+            Action = "Disputed evaluation",
+            OldValue = null,
+            NewValue = reasonLog,
+            TimestampUtc = now
+        };
+        _db.TaskHistoryEntries.Add(hist);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        var disputer = await _db.Users.FirstOrDefaultAsync(u => u.Id == actorUserId, cancellationToken);
+        var disputerName = disputer?.DisplayName ?? disputer?.Email ?? disputer?.UserName ?? actorUserId;
+        await _notifications.CreateAndPushAsync(
+            userId: eval.PmUserId,
+            type: NotificationType.TaskEvaluated,
+            message: $"{disputerName} has disputed your evaluation for task \"{task.Title}\". Reason: {normalized}",
+            workspaceId: workspaceId,
+            projectId: project.Id,
+            taskId: task.Id,
+            redirectUrl: $"/Tasks/Details/{taskId}",
+            cancellationToken: cancellationToken);
+
+        await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
+            "HistoryAdded",
+            new { taskId = taskId, entryId = hist.Id },
+            cancellationToken);
+
+        await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
+            "EvaluationDisputed",
+            new { taskId = taskId, evaluationId = eval.Id, disputedByUserId = actorUserId },
+            cancellationToken);
+
+        var pmUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == eval.PmUserId, cancellationToken);
+        var vm = BuildEvaluationVm(eval, pmUser, disputer, actorUserId, true, DateTime.UtcNow);
+        return new EvaluationUpdateResult(true, null, vm);
+    }
+
+    public async Task<EvaluationUpdateResult> ReviseEvaluationAsync(
+        Guid taskId,
+        string actorUserId,
+        Guid workspaceId,
+        int newScore,
+        string reason,
+        MemberLevel? newLevel = null,
+        CancellationToken cancellationToken = default)
+    {
+        var detail = await GetTaskDetailAsync(taskId, actorUserId, workspaceId, cancellationToken);
+        if (!detail.IsPm)
+            return new EvaluationUpdateResult(false, "Chỉ PM được chỉnh sửa đánh giá.", null);
+
+        if (newScore is < 1 or > 10)
+            return new EvaluationUpdateResult(false, "Score phải nằm trong khoảng 1..10.", null);
+
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (string.IsNullOrEmpty(normalizedReason))
+            return new EvaluationUpdateResult(false, "Lý do chỉnh sửa điểm là bắt buộc.", null);
+        if (normalizedReason.Length > 2000)
+            return new EvaluationUpdateResult(false, "Lý do tối đa 2000 ký tự.", null);
+
+        await TryFinalizeEvaluationForTaskIfDueAsync(taskId, workspaceId, cancellationToken);
+
+        var eval = await _db.TaskEvaluations.FirstOrDefaultAsync(e => e.TaskId == taskId, cancellationToken);
+        if (eval is null)
+            return new EvaluationUpdateResult(false, "Không có đánh giá.", null);
+
+        if (eval.PmUserId != actorUserId)
+            return new EvaluationUpdateResult(false, "Chỉ PM đánh giá gốc mới được chỉnh điểm.", null);
+
+        if (!eval.DisputedAtUtc.HasValue)
+            return new EvaluationUpdateResult(false, "Chỉ được chỉnh điểm sau khi có tranh chấp.", null);
+
+        if (eval.RevisedAtUtc.HasValue)
+            return new EvaluationUpdateResult(false, "Bạn đã dùng hết lượt chỉnh điểm (1 lần).", null);
+
+        if (eval.IsLocked)
+            return new EvaluationUpdateResult(false, "Đánh giá đã khóa.", null);
+
+        var now = DateTime.UtcNow;
+        if (eval.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) <= now)
+            return new EvaluationUpdateResult(false, "Đã hết thời gian chỉnh điểm (24h).", null);
+
+        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+        if (task is null)
+            return new EvaluationUpdateResult(false, "Task không tồn tại.", null);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(
+            p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId,
+            cancellationToken);
+        if (project is null)
+            return new EvaluationUpdateResult(false, "Project không tồn tại trong workspace.", null);
+
+        var oldScore = eval.Score;
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        eval.Score = newScore;
+        eval.RevisedAtUtc = now;
+        eval.RevisedReason = normalizedReason;
+        if (newLevel.HasValue)
+            eval.LevelOverride = newLevel;
+
+        var newVal = $"Score={newScore}; {normalizedReason}";
+        if (newVal.Length > 500) newVal = newVal[..500];
+        var hist = new TaskHistoryEntry
+        {
+            TaskId = taskId,
+            ActorUserId = actorUserId,
+            Action = "Revised evaluation",
+            OldValue = oldScore.ToString(),
+            NewValue = newVal,
+            TimestampUtc = now
+        };
+        _db.TaskHistoryEntries.Add(hist);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        if (!string.IsNullOrEmpty(eval.DisputedByUserId))
+        {
+            await _notifications.CreateAndPushAsync(
+                userId: eval.DisputedByUserId,
+                type: NotificationType.TaskEvaluated,
+                message: $"PM đã chỉnh lại điểm đánh giá cho task \"{task.Title}\" sau tranh chấp: {newScore}/10.",
+                workspaceId: workspaceId,
+                projectId: project.Id,
+                taskId: task.Id,
+                redirectUrl: $"/Tasks/Details/{taskId}",
+                cancellationToken: cancellationToken);
+        }
+
+        await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
+            "HistoryAdded",
+            new { taskId = taskId, entryId = hist.Id },
+            cancellationToken);
+
+        await _hub.Clients.Group(project.Id.ToString("D")).SendAsync(
+            "EvaluationRevised",
+            new { taskId = taskId, evaluationId = eval.Id, score = newScore },
+            cancellationToken);
+
+        var pmUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == eval.PmUserId, cancellationToken);
+        var disputer = await _db.Users.FirstOrDefaultAsync(u => u.Id == eval.DisputedByUserId, cancellationToken);
+        var vm = BuildEvaluationVm(eval, pmUser, disputer, actorUserId, true, DateTime.UtcNow);
+        return new EvaluationUpdateResult(true, null, vm);
+    }
+
+    public async Task FinalizeExpiredEvaluationsAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var ids = await _db.TaskEvaluations
+            .AsNoTracking()
+            .Where(e => !e.IsLocked && e.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) <= now)
+            .Select(e => e.TaskId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var taskId in ids)
+        {
+            try
+            {
+                var task = await _db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken);
+                if (task is null) continue;
+                var project = await _db.Projects.AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.Id == task.ProjectId, cancellationToken);
+                if (project is null) continue;
+                await TryFinalizeEvaluationForTaskIfDueAsync(taskId, project.WorkspaceId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinalizeExpiredEvaluations failed for task {TaskId}", taskId);
+            }
+        }
+    }
+
+    private async Task TryFinalizeEvaluationForTaskIfDueAsync(
+        Guid taskId,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var eval = await _db.TaskEvaluations.FirstOrDefaultAsync(
+            e => e.TaskId == taskId && !e.IsLocked,
+            cancellationToken);
+        if (eval is null)
+            return;
+        if (eval.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) > now)
+            return;
+
+        await FinalizeEvaluationAndNotifyAsync(eval, workspaceId, cancellationToken);
+    }
+
+    private async Task FinalizeEvaluationAndNotifyAsync(
+        TaskEvaluation eval,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (eval.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) > now)
+            return;
+
+        var task = await _db.Tasks.FirstOrDefaultAsync(t => t.Id == eval.TaskId, cancellationToken);
+        if (task is null)
+            return;
+
+        var project = await _db.Projects.FirstOrDefaultAsync(
+            p => p.Id == task.ProjectId && p.WorkspaceId == workspaceId,
+            cancellationToken);
+        if (project is null)
+            return;
+
+        var acceptedAssignment = await _db.TaskAssignments
+            .Where(a => a.TaskId == eval.TaskId && a.Status == TaskAssignmentStatus.Accepted)
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (acceptedAssignment is null)
+            return;
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var evalReload = await _db.TaskEvaluations.FirstOrDefaultAsync(
+            e => e.Id == eval.Id && !e.IsLocked,
+            cancellationToken);
+        if (evalReload is null)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return;
+        }
+
+        if (evalReload.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours) > DateTime.UtcNow)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return;
+        }
+
+        evalReload.IsLocked = true;
+
+        var entry = new TaskHistoryEntry
+        {
+            TaskId = eval.TaskId,
+            ActorUserId = evalReload.PmUserId,
+            Action = "Evaluation finalized",
+            OldValue = null,
+            NewValue = $"Score={evalReload.Score}",
+            TimestampUtc = now
+        };
+        _db.TaskHistoryEntries.Add(entry);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await UpdateMemberProfileFromEvaluationsAsync(
+            workspaceId,
+            acceptedAssignment.AssigneeUserId,
+            evalReload.LevelOverride,
+            cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        var memberUserId = acceptedAssignment.AssigneeUserId;
+        var detailsUrl = $"/Tasks/Details/{task.Id}";
+
+        await _notifications.CreateAndPushAsync(
+            memberUserId,
+            NotificationType.TaskEvaluated,
+            $"Task \"{task.Title}\" evaluation is final. Score: {evalReload.Score}/10.",
+            workspaceId: workspaceId,
+            projectId: project.Id,
+            taskId: task.Id,
+            redirectUrl: detailsUrl,
+            cancellationToken: cancellationToken);
+
+        await _notifications.CreateAndPushAsync(
+            evalReload.PmUserId,
+            NotificationType.TaskEvaluated,
+            $"Evaluation for task \"{task.Title}\" is locked (24h window ended). Final score: {evalReload.Score}/10.",
+            workspaceId: workspaceId,
+            projectId: project.Id,
+            taskId: task.Id,
+            redirectUrl: detailsUrl,
+            cancellationToken: cancellationToken);
+
+        if (!string.IsNullOrEmpty(evalReload.DisputedByUserId) &&
+            evalReload.DisputedByUserId != evalReload.PmUserId &&
+            evalReload.DisputedByUserId != memberUserId)
+        {
+            await _notifications.CreateAndPushAsync(
+                evalReload.DisputedByUserId,
+                NotificationType.TaskEvaluated,
+                $"Evaluation for task \"{task.Title}\" is locked. Final score: {evalReload.Score}/10.",
+                workspaceId: workspaceId,
+                projectId: project.Id,
+                taskId: task.Id,
+                redirectUrl: detailsUrl,
+                cancellationToken: cancellationToken);
+        }
+
+        var group = project.Id.ToString("D");
+        await _hub.Clients.Group(group).SendAsync(
+            "HistoryAdded",
+            new { taskId = task.Id, entryId = entry.Id },
+            cancellationToken);
+        await _hub.Clients.Group(group).SendAsync(
+            "EvaluationFinalized",
+            new { taskId = task.Id, evaluationId = evalReload.Id, score = evalReload.Score },
+            cancellationToken);
+        await _hub.Clients.Group(group).SendAsync(
+            "TaskEvaluated",
+            new { taskId = task.Id, evaluationId = evalReload.Id, score = evalReload.Score },
+            cancellationToken);
+    }
+
+    private async Task NotifyOtherWorkspacePmsAsync(
+        Guid workspaceId,
+        string exceptUserId,
+        NotificationType type,
+        string message,
+        Guid projectId,
+        Guid taskId,
+        string redirectUrl,
+        CancellationToken cancellationToken)
+    {
+        var pmIds = await _db.WorkspaceMembers
+            .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM)
+            .Select(m => m.UserId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var uid in pmIds)
+        {
+            if (uid == exceptUserId)
+                continue;
+
+            await _notifications.CreateAndPushAsync(
+                uid,
+                type,
+                message,
+                workspaceId: workspaceId,
+                projectId: projectId,
+                taskId: taskId,
+                redirectUrl: redirectUrl,
+                cancellationToken: cancellationToken);
+        }
+    }
+
+    private static TaskEvaluationVm BuildEvaluationVm(
+        TaskEvaluation e,
+        ApplicationUser? pmUser,
+        ApplicationUser? disputerUser,
+        string actorUserId,
+        bool viewerIsPm,
+        DateTime utcNow)
+    {
+        var windowEnd = e.EvaluatedAtUtc.AddHours(TaskEvaluation.DisputeWindowHours);
+        var inWindow = utcNow < windowEnd && !e.IsLocked;
+        var uiStatus = e.IsLocked ? "Locked" : e.DisputedAtUtc.HasValue ? "Disputed" : "Open";
+        var canDispute = viewerIsPm && actorUserId != e.PmUserId && !e.IsLocked && inWindow && e.DisputedAtUtc is null;
+        var canRevise = viewerIsPm && actorUserId == e.PmUserId && !e.IsLocked && e.DisputedAtUtc.HasValue &&
+                        e.RevisedAtUtc is null && inWindow;
+
+        return new TaskEvaluationVm(
+            e.Id,
+            e.TaskId,
+            e.PmUserId,
+            pmUser != null ? (pmUser.DisplayName ?? pmUser.Email ?? pmUser.UserName ?? e.PmUserId) : e.PmUserId,
+            pmUser?.AvatarUrl,
+            e.Score,
+            e.OriginalScore,
+            e.Comment,
+            e.EvaluatedAtUtc,
+            windowEnd,
+            e.IsLocked,
+            uiStatus,
+            canDispute,
+            canRevise,
+            e.DisputeReason,
+            e.DisputedByUserId,
+            disputerUser != null && e.DisputedByUserId is not null
+                ? (disputerUser.DisplayName ?? disputerUser.Email ?? disputerUser.UserName ?? e.DisputedByUserId)
+                : null,
+            e.DisputedAtUtc,
+            e.RevisedAtUtc,
+            e.RevisedReason);
     }
 
     private async Task UpdateMemberProfileFromEvaluationsAsync(
@@ -1667,7 +2089,7 @@ public sealed class TaskService : ITaskService
         var scores = await _db.TaskEvaluations
             .Join(_db.Tasks, e => e.TaskId, t => t.Id, (e, t) => new { e, t })
             .Join(_db.Projects.Where(p => p.WorkspaceId == workspaceId), x => x.t.ProjectId, p => p.Id, (x, _) => x)
-            .Where(x => _db.TaskAssignments.Any(a =>
+            .Where(x => x.e.IsLocked && _db.TaskAssignments.Any(a =>
                 a.TaskId == x.t.Id &&
                 a.AssigneeUserId == memberUserId &&
                 a.Status == TaskAssignmentStatus.Accepted))

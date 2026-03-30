@@ -11,5 +11,8 @@ public sealed class RoleChangeLog
     public WorkspaceMemberRole NewRole { get; set; }
 
     public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>UC-13 Section 3: lý do Admin hạ PM (hoặc ghi chú tương đương).</summary>
+    public string? Reason { get; set; }
 }
 

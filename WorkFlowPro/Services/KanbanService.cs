@@ -189,6 +189,35 @@ public sealed class KanbanService : IKanbanService
             reason, // Pass reason to notification.
             cancellationToken);
 
+        if (newStatus == TaskStatus.Done)
+        {
+            try
+            {
+                var pmIds = await _db.WorkspaceMembers
+                    .AsNoTracking()
+                    .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM)
+                    .Select(m => m.UserId)
+                    .ToListAsync(cancellationToken);
+                var redirect = $"/Tasks/Details/{taskId}";
+                foreach (var pmId in pmIds)
+                {
+                    await _notifications.CreateAndPushAsync(
+                        pmId,
+                        NotificationType.TaskDoneNeedsEvaluation,
+                        $"Task \"{task.Title}\" needs evaluation.",
+                        workspaceId: workspaceId,
+                        projectId: project.Id,
+                        taskId: taskId,
+                        redirectUrl: redirect,
+                        cancellationToken: cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify PMs for Done task {TaskId}", taskId);
+            }
+        }
+
         return new MoveTaskServiceResult { Success = true };
     }
 

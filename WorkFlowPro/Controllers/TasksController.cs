@@ -379,15 +379,24 @@ public sealed class TasksController : ControllerBase
 
         if (task.Status == TaskStatus.Done)
         {
-            await _notifications.CreateAndPushAsync(
-                userId: project.OwnerUserId,
-                type: NotificationType.TaskDoneNeedsEvaluation,
-                message: $"Task \"{task.Title}\" đã Done — cần đánh giá.",
-                workspaceId: workspaceId,
-                projectId: projectId,
-                taskId: task.Id,
-                redirectUrl: $"/board?projectId={projectId}",
-                cancellationToken: HttpContext.RequestAborted);
+            var pmIds = await _db.WorkspaceMembers
+                .AsNoTracking()
+                .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceMemberRole.PM)
+                .Select(m => m.UserId)
+                .ToListAsync(HttpContext.RequestAborted);
+            var redirect = $"/Tasks/Details/{task.Id}";
+            foreach (var pmId in pmIds)
+            {
+                await _notifications.CreateAndPushAsync(
+                    userId: pmId,
+                    type: NotificationType.TaskDoneNeedsEvaluation,
+                    message: $"Task \"{task.Title}\" needs evaluation.",
+                    workspaceId: workspaceId,
+                    projectId: projectId,
+                    taskId: task.Id,
+                    redirectUrl: redirect,
+                    cancellationToken: HttpContext.RequestAborted);
+            }
         }
 
         return Ok();

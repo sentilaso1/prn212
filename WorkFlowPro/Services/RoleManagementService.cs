@@ -12,17 +12,20 @@ public sealed class RoleManagementService : IRoleManagementService
     private readonly WorkFlowProDbContext _db;
     private readonly INotificationService _notifications;
     private readonly IHubContext<TaskHub> _taskHub;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<RoleManagementService> _logger;
 
     public RoleManagementService(
         WorkFlowProDbContext db,
         INotificationService notifications,
         IHubContext<TaskHub> taskHub,
+        IAdminAuditService audit,
         ILogger<RoleManagementService> logger)
     {
         _db = db;
         _notifications = notifications;
         _taskHub = taskHub;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -390,6 +393,19 @@ public sealed class RoleManagementService : IRoleManagementService
             await tx.RollbackAsync(cancellationToken);
             throw;
         }
+
+        var removedUser = await _db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+        var removeSummary =
+            $"{removedUser?.DisplayName ?? removedUser?.Email ?? targetUserId} — «{workspaceDisplayName}»";
+        await _audit.AppendAsync(
+            actionRecordedAsUserId,
+            AdminAuditActionType.MemberRemovedFromWorkspace,
+            removeSummary,
+            notes: reason,
+            targetUserId: targetUserId,
+            workspaceId: workspaceId,
+            cancellationToken: cancellationToken);
 
         var reasonInMessage = reason.Length > 800 ? reason[..800] + "…" : reason;
         var message =

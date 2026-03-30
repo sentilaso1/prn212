@@ -378,6 +378,68 @@ public sealed class DetailsModel : PageModel
         return LocalRedirect($"/Tasks/Details/{taskId}");
     }
 
+    public async Task<IActionResult> OnPostDisputeEvaluationAsync(Guid taskId, string reason, CancellationToken cancellationToken)
+    {
+        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
+        var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (workspaceId is null || string.IsNullOrWhiteSpace(actorUserId))
+            return Unauthorized();
+
+        var result = await _taskService.DisputeEvaluationAsync(taskId, actorUserId, workspaceId.Value, reason, cancellationToken);
+        if (!result.Success)
+        {
+            ErrorMessage = result.ErrorMessage ?? "Không thể tranh chấp đánh giá.";
+            if (IsAjaxRequest())
+                return new JsonResult(new { success = false, error = ErrorMessage }) { StatusCode = 400 };
+
+            return await ReloadPageAsync(taskId, workspaceId.Value, actorUserId, cancellationToken);
+        }
+
+        if (IsAjaxRequest())
+            return new JsonResult(new { success = true });
+
+        return LocalRedirect($"/Tasks/Details/{taskId}");
+    }
+
+    public async Task<IActionResult> OnPostReviseEvaluationAsync(
+        Guid taskId,
+        int newScore,
+        string reason,
+        string? newLevel,
+        CancellationToken cancellationToken)
+    {
+        var workspaceId = _currentWorkspaceService.CurrentWorkspaceId;
+        var actorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (workspaceId is null || string.IsNullOrWhiteSpace(actorUserId))
+            return Unauthorized();
+
+        MemberLevel? level = null;
+        if (!string.IsNullOrWhiteSpace(newLevel) && Enum.TryParse<MemberLevel>(newLevel, true, out var parsed))
+            level = parsed;
+
+        var result = await _taskService.ReviseEvaluationAsync(
+            taskId,
+            actorUserId,
+            workspaceId.Value,
+            newScore,
+            reason,
+            level,
+            cancellationToken);
+        if (!result.Success)
+        {
+            ErrorMessage = result.ErrorMessage ?? "Không thể chỉnh điểm đánh giá.";
+            if (IsAjaxRequest())
+                return new JsonResult(new { success = false, error = ErrorMessage }) { StatusCode = 400 };
+
+            return await ReloadPageAsync(taskId, workspaceId.Value, actorUserId, cancellationToken);
+        }
+
+        if (IsAjaxRequest())
+            return new JsonResult(new { success = true, score = result.Evaluation?.Score });
+
+        return LocalRedirect($"/Tasks/Details/{taskId}");
+    }
+
     // ────────────────────────────────────────────────────────────────
     // JSON endpoints for SignalR refresh (no full reload)
     // ────────────────────────────────────────────────────────────────
