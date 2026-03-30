@@ -102,7 +102,7 @@ public sealed class LevelAdjustmentService : ILevelAdjustmentService
         // Hoặc đơn giản là gửi thông báo tới các Platform Admin.
         
         var admins = await _db.Users
-            .Where(u => u.UserName == "admin@workflowpro.com") // Demo/Default admin
+            .Where(u => u.IsPlatformAdmin)
             .Select(u => u.Id)
             .ToListAsync(cancellationToken);
 

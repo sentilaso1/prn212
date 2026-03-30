@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkFlowPro.Data;
 
@@ -11,9 +12,11 @@ using WorkFlowPro.Data;
 namespace WorkFlowPro.Migrations
 {
     [DbContext(typeof(WorkFlowProDbContext))]
-    partial class WorkFlowProDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260329154414_AddAdminAuditLog")]
+    partial class AddAdminAuditLog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -696,16 +699,6 @@ namespace WorkFlowPro.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<string>("DisputeReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("DisputedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DisputedByUserId")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<DateTime>("EvaluatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -714,22 +707,9 @@ namespace WorkFlowPro.Migrations
                     b.Property<bool>("IsLocked")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("LevelOverride")
-                        .HasColumnType("int");
-
-                    b.Property<int>("OriginalScore")
-                        .HasColumnType("int");
-
                     b.Property<string>("PmUserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("RevisedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("RevisedReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("Score")
                         .HasColumnType("int");
@@ -739,13 +719,9 @@ namespace WorkFlowPro.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DisputedByUserId");
-
                     b.HasIndex("PmUserId");
 
                     b.HasIndex("TaskId");
-
-                    b.HasIndex("IsLocked", "EvaluatedAtUtc");
 
                     b.ToTable("TaskEvaluations", (string)null);
                 });
@@ -1270,11 +1246,6 @@ namespace WorkFlowPro.Migrations
 
             modelBuilder.Entity("WorkFlowPro.Data.TaskEvaluation", b =>
                 {
-                    b.HasOne("WorkFlowPro.Auth.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("DisputedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("WorkFlowPro.Auth.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("PmUserId")

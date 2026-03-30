@@ -120,11 +120,15 @@ builder.Services.AddAuthorization(options =>
         .Build();
 
     options.AddPolicy("PlatformAdmin", policy =>
-        policy.RequireClaim("platform_role", "admin"));
+        policy.Requirements.Add(new PlatformAdminRequirement()));
 
     // UC-12: Only PM in current workspace can CRUD Projects.
     options.AddPolicy("IsPM", policy =>
         policy.Requirements.Add(new IsPmRequirement()));
+
+    // UC-09 Path C: KPI / báo cáo — PM workspace hoặc Platform Admin (đọc mọi workspace).
+    options.AddPolicy("PmOrPlatformAdminForReports", policy =>
+        policy.Requirements.Add(new PmOrPlatformAdminForReportsRequirement()));
 
     // UC-09: PM trong workspace hiện tại hoặc Platform Admin (DB / claim).
     options.AddPolicy("CanManageWorkspaceRoles", policy =>
@@ -142,6 +146,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddHostedService<EvaluationFinalizationHostedService>();
 builder.Services.AddScoped<ITaskAssignmentService, TaskAssignmentService>();
 builder.Services.AddScoped<IKanbanService, KanbanService>();
 builder.Services.AddScoped<ILevelAdjustmentService, LevelAdjustmentService>();
@@ -149,6 +154,7 @@ builder.Services.AddScoped<IKpiDashboardService, KpiDashboardService>();
 builder.Services.AddScoped<IMemberProfileService, MemberProfileService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
+builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -159,7 +165,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 // UC-15/UC-02: bơm claim CurrentWorkspaceId/workspace_id theo request/user.
 builder.Services.AddScoped<IClaimsTransformation, WorkspaceClaimsTransformation>();
 
+builder.Services.AddScoped<IAuthorizationHandler, PlatformAdminHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, IsPmAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, PmOrPlatformAdminForReportsHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, CanManageWorkspaceRolesHandler>();
 
 var app = builder.Build();

@@ -16,6 +16,22 @@ public interface IPlatformAdminService
     Task<AdminActionResult> RejectPmRegistrationAsync(
         string adminUserId,
         string targetUserId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>UC-13 Section 2 — đề xuất đổi level (UC-10) chờ Admin.</summary>
+    Task<IReadOnlyList<PendingLevelAdjustmentVm>> GetPendingLevelAdjustmentsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<AdminActionResult> ApproveLevelAdjustmentAsync(
+        string adminUserId,
+        int requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<AdminActionResult> RejectLevelAdjustmentAsync(
+        string adminUserId,
+        int requestId,
+        string reason,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<WorkspaceRoleRequestListVm>> GetPendingWorkspaceRoleRequestsAsync(
@@ -36,6 +52,7 @@ public interface IPlatformAdminService
         string adminUserId,
         Guid workspaceId,
         string targetUserId,
+        string reason,
         CancellationToken cancellationToken = default);
 
     Task<AdminActionResult> SubmitPromoteToPmRequestAsync(
@@ -117,3 +134,18 @@ public sealed record AdminActionResult(bool Success, string? ErrorMessage = null
 public sealed record AdminWorkspaceListItemVm(Guid Id, string Name);
 
 public sealed record AdminPmRowVm(string UserId, string DisplayName, string Email);
+
+public sealed record PendingLevelAdjustmentVm(
+    int Id,
+    Guid WorkspaceId,
+    string WorkspaceName,
+    string TargetUserId,
+    string TargetDisplayName,
+    MemberLevel CurrentLevel,
+    MemberLevel ProposedLevel,
+    string RequestedByUserId,
+    string RequesterDisplayName,
+    string Reason,
+    decimal CompletionRate,
+    decimal AvgScore,
+    DateTime CreatedAtUtc);

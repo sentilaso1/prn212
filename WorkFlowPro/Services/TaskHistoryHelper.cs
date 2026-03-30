@@ -58,6 +58,12 @@ public static class TaskHistoryHelper
                 BuildEvaluationAction(newValue),
             _ when action.StartsWith("Evaluated task with score ", StringComparison.OrdinalIgnoreCase) =>
                 $"Đánh giá task với điểm {action["Evaluated task with score ".Length..].Trim()}",
+            "Disputed evaluation" =>
+                $"Tranh chấp đánh giá: {newValue ?? "-"}",
+            "Revised evaluation" =>
+                $"Chỉnh lại điểm đánh giá từ {oldValue ?? "-"} — {newValue ?? "-"}",
+            "Evaluation finalized" =>
+                $"Kết thúc đánh giá (khóa). Điểm cuối: {newValue ?? "-"}",
             _ =>
                 action
         };

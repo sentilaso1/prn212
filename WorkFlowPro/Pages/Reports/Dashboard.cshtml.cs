@@ -3,21 +3,28 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
+using WorkFlowPro.Data;
 using WorkFlowPro.Services;
 
 namespace WorkFlowPro.Pages.Reports;
 
-[Authorize(Policy = "IsPM")]
+[Authorize(Policy = "PmOrPlatformAdminForReports")]
 public sealed class DashboardModel : PageModel
 {
     private readonly IKpiDashboardService _kpi;
     private readonly ICurrentWorkspaceService _currentWorkspace;
+    private readonly WorkFlowProDbContext _db;
 
-    public DashboardModel(IKpiDashboardService kpi, ICurrentWorkspaceService currentWorkspace)
+    public DashboardModel(
+        IKpiDashboardService kpi,
+        ICurrentWorkspaceService currentWorkspace,
+        WorkFlowProDbContext db)
     {
         _kpi = kpi;
         _currentWorkspace = currentWorkspace;
+        _db = db;
     }
 
     public IReadOnlyList<ProjectListItemVm> Projects { get; private set; } = Array.Empty<ProjectListItemVm>();
@@ -25,6 +32,13 @@ public sealed class DashboardModel : PageModel
     public ProjectDashboardVm? Dashboard { get; private set; }
 
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>Workspace đang dùng cho KPI (dùng trong link Profile / hidden field).</summary>
+    public Guid? ReportWorkspaceId { get; private set; }
+
+    public bool IsPlatformAdminViewer { get; private set; }
+
+    public string? WorkspaceNameHint { get; private set; }
 
     [BindProperty(SupportsGet = true)]
     public Guid? ProjectId { get; set; }
@@ -58,6 +72,10 @@ public sealed class DashboardModel : PageModel
             return;
         }
 
+        ReportWorkspaceId = workspaceId;
+        IsPlatformAdminViewer = User.HasClaim("platform_role", "admin")
+            || await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsPlatformAdmin, cancellationToken);
+
         var toUtc = ParseDateUtcEnd(To);
         var fromUtc = ParseDateUtcStart(From);
         if (fromUtc > toUtc)
@@ -66,7 +84,18 @@ public sealed class DashboardModel : PageModel
         FromDefault = fromUtc.ToString("yyyy-MM-dd");
         ToDefault = toUtc.ToString("yyyy-MM-dd");
 
-        Projects = await _kpi.ListProjectsForPmAsync(userId, workspaceId.Value, cancellationToken);
+        if (IsPlatformAdminViewer)
+        {
+            WorkspaceNameHint = await _db.Workspaces.AsNoTracking()
+                .Where(w => w.Id == workspaceId.Value)
+                .Select(w => w.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        Projects = IsPlatformAdminViewer
+            ? await _kpi.ListProjectsInWorkspaceAsync(workspaceId.Value, cancellationToken)
+            : await _kpi.ListProjectsForPmAsync(userId, workspaceId.Value, cancellationToken);
+
         if (Projects.Count == 0)
         {
             ErrorMessage = "Không có project trong workspace.";
@@ -76,17 +105,24 @@ public sealed class DashboardModel : PageModel
         var selectedId = ProjectId ?? Projects[0].Id;
         ProjectId = selectedId;
 
-        Dashboard = await _kpi.GetProjectDashboardAsync(
-            userId,
-            workspaceId.Value,
-            selectedId,
-            fromUtc,
-            toUtc,
-            cancellationToken);
+        Dashboard = IsPlatformAdminViewer
+            ? await _kpi.GetProjectDashboardForWorkspaceAsync(
+                workspaceId.Value,
+                selectedId,
+                fromUtc,
+                toUtc,
+                cancellationToken)
+            : await _kpi.GetProjectDashboardAsync(
+                userId,
+                workspaceId.Value,
+                selectedId,
+                fromUtc,
+                toUtc,
+                cancellationToken);
 
         if (Dashboard is null)
         {
-            ErrorMessage = "Không tải được dashboard (quyền PM hoặc project không hợp lệ).";
+            ErrorMessage = "Không tải được dashboard (project không hợp lệ).";
             return;
         }
 

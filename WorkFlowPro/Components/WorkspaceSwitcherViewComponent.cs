@@ -1,9 +1,10 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using WorkFlowPro.Auth;
+using WorkFlowPro.Data;
 using WorkFlowPro.Services;
 using WorkFlowPro.ViewModels;
 
@@ -14,13 +15,16 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
 {
     private readonly IUserWorkspaceService _userWorkspaceService;
     private readonly ICurrentWorkspaceService _currentWorkspaceService;
+    private readonly WorkFlowProDbContext _db;
 
     public WorkspaceSwitcherViewComponent(
         IUserWorkspaceService userWorkspaceService,
-        ICurrentWorkspaceService currentWorkspaceService)
+        ICurrentWorkspaceService currentWorkspaceService,
+        WorkFlowProDbContext db)
     {
         _userWorkspaceService = userWorkspaceService;
         _currentWorkspaceService = currentWorkspaceService;
+        _db = db;
     }
 
     public async Task<IViewComponentResult> InvokeAsync()
@@ -32,7 +36,7 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
         var items = await _userWorkspaceService.GetUserWorkspacesAsync(userId, HttpContext.RequestAborted);
         if (items.Count == 0)
         {
-            var isAdmin = HttpContext.User.HasClaim("platform_role", "admin");
+            var isAdmin = await IsPlatformAdminAsync(userId, HttpContext.RequestAborted);
             var emptyVm = new WorkspaceSwitcherEmptyVm { IsPlatformAdmin = isAdmin };
             return View("/Pages/Shared/_WorkspaceSwitcherEmpty.cshtml", emptyVm);
         }
@@ -60,10 +64,18 @@ public sealed class WorkspaceSwitcherViewComponent : ViewComponent
                 Role = i.Role
             }).ToList(),
             ReturnUrl = returnUrl,
-            IsPlatformAdmin = HttpContext.User.HasClaim("platform_role", "admin")
+            IsPlatformAdmin = await IsPlatformAdminAsync(userId, HttpContext.RequestAborted)
         };
 
         return View("/Pages/Shared/_WorkspaceSwitcher.cshtml", vm);
+    }
+
+    private async Task<bool> IsPlatformAdminAsync(string userId, CancellationToken cancellationToken)
+    {
+        if (HttpContext.User.HasClaim("platform_role", "admin"))
+            return true;
+
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsPlatformAdmin, cancellationToken);
     }
 }
 
