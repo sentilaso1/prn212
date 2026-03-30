@@ -92,7 +92,7 @@ public sealed class MemberProfileService : IMemberProfileService
         if (taskIds.Count > 0)
         {
             var evals = await _db.TaskEvaluations.AsNoTracking()
-                .Where(e => taskIds.Contains(e.TaskId))
+                .Where(e => taskIds.Contains(e.TaskId) && e.IsLocked)
                 .Select(e => new { e.TaskId, e.EvaluatedAtUtc, e.Score })
                 .ToListAsync(cancellationToken);
 

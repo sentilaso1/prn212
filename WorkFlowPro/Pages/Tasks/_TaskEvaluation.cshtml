@@ -4,7 +4,8 @@
     var isPm = Model.isPm;
     var status = Model.status;
     var history = Model.evaluations ?? Array.Empty<WorkFlowPro.Services.TaskEvaluationVm>();
-    var alreadyLocked = history.Any();
+    var hasEvaluation = history.Count > 0;
+    var current = hasEvaluation ? history[0] : null;
 }
 
 @if (!isPm)
@@ -16,8 +17,8 @@ else
     <div class="card shadow-sm">
         <div class="card-header bg-light py-3">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-semibold">Đánh giá Task</h5>
-                <span class="text-muted small">@history.Count evaluation(s)</span>
+                <h5 class="mb-0 fw-semibold">Đánh giá Task (UC-08)</h5>
+                <span class="text-muted small">@(hasEvaluation ? "1" : "0") evaluation</span>
             </div>
         </div>
 
@@ -25,7 +26,7 @@ else
             <style>
                 .wf-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; object-fit: cover; }
                 .wf-avatar--text { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #e9ecef; color: #495057; font-weight: 700; font-size: 14px; }
-                .wf-eval-history { max-height: 280px; overflow-y: auto; }
+                .wf-eval-history { max-height: 420px; overflow-y: auto; }
             </style>
 
             @if (status != WorkFlowPro.Data.TaskStatus.Done)
@@ -35,93 +36,168 @@ else
                 </div>
             }
 
-            @if (history.Count == 0)
+            @if (!hasEvaluation)
             {
-                <div class="alert alert-info mb-3">Chưa có đánh giá nào cho task này.</div>
+                <div class="alert alert-info mb-3">Chưa có đánh giá. Sau khi gửi, cửa sổ tranh chấp <strong>24 giờ</strong> sẽ mở cho PM khác.</div>
             }
-            else
+            else if (current is not null)
             {
+                var badgeClass = current.UiStatus switch
+                {
+                    "Locked" => "bg-secondary",
+                    "Disputed" => "bg-warning text-dark",
+                    _ => "bg-info text-dark"
+                };
                 <div class="mb-4">
-                    <div class="fw-semibold mb-2">Lịch sử đánh giá</div>
+                    <div class="fw-semibold mb-2">Đánh giá hiện tại</div>
                     <div class="list-group wf-eval-history">
-                        @foreach (var e in history)
-                        {
-                            <div class="list-group-item py-3">
-                                <div class="d-flex gap-3">
-                                    <div class="flex-shrink-0">
-                                        @if (!string.IsNullOrWhiteSpace(e.PmAvatarUrl))
+                        <div class="list-group-item py-3">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0">
+                                    @if (!string.IsNullOrWhiteSpace(current.PmAvatarUrl))
+                                    {
+                                        <img src="@current.PmAvatarUrl" class="wf-avatar" alt="avatar" />
+                                    }
+                                    else
+                                    {
+                                        <div class="wf-avatar wf-avatar--text">
+                                            @(string.IsNullOrWhiteSpace(current.PmDisplayName) ? "?" : current.PmDisplayName[0].ToString().ToUpperInvariant())
+                                        </div>
+                                    }
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                        <div class="fw-semibold">@current.PmDisplayName</div>
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <span class="badge @badgeClass">@current.UiStatus</span>
+                                            <span class="text-muted small">@TaskHistoryHelper.FormatRelativeTime(current.EvaluatedAtUtc)</span>
+                                        </div>
+                                    </div>
+                                    <div class="small mt-2">
+                                        <strong>Điểm hiện tại:</strong> @current.Score / 10
+                                        @if (current.OriginalScore != current.Score)
                                         {
-                                            <img src="@e.PmAvatarUrl" class="wf-avatar" alt="avatar" />
+                                            <span class="text-muted">(ban đầu: @current.OriginalScore)</span>
                                         }
-                                        else
-                                        {
-                                            <div class="wf-avatar wf-avatar--text">
-                                                @(string.IsNullOrWhiteSpace(e.PmDisplayName) ? "?" : e.PmDisplayName[0].ToString().ToUpperInvariant())
+                                    </div>
+                                    @if (!current.IsLocked)
+                                    {
+                                        <div class="small text-muted mt-1">
+                                            Cửa sổ tranh chấp kết thúc: <strong>@current.WindowEndsAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong> (giờ địa phương)
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(current.Comment))
+                                    {
+                                        <div class="small mt-2 text-muted" style="white-space: pre-wrap;">@current.Comment</div>
+                                    }
+
+                                    @if (current.DisputedAtUtc.HasValue)
+                                    {
+                                        <div class="alert alert-light border mt-3 mb-0 small">
+                                            <div class="fw-semibold text-warning">Tranh chấp</div>
+                                            <div class="mt-1">Bởi: <strong>@(current.DisputedByDisplayName ?? current.DisputedByUserId ?? "-")</strong> — @TaskHistoryHelper.FormatRelativeTime(current.DisputedAtUtc.Value)</div>
+                                            <div class="mt-2" style="white-space: pre-wrap;">@(current.DisputeReason ?? "")</div>
+                                        </div>
+                                    }
+
+                                    @if (current.RevisedAtUtc.HasValue && !string.IsNullOrWhiteSpace(current.RevisedReason))
+                                    {
+                                        <div class="alert alert-light border mt-2 mb-0 small">
+                                            <div class="fw-semibold">Chỉnh sửa điểm</div>
+                                            <div class="mt-1 text-muted" style="white-space: pre-wrap;">@current.RevisedReason</div>
+                                        </div>
+                                    }
+
+                                    @if (current.CanDispute)
+                                    {
+                                        <div class="mt-3">
+                                            <button class="btn btn-outline-danger btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#wf-dispute-@current.Id" aria-expanded="false">
+                                                Dispute
+                                            </button>
+                                            <div class="collapse mt-2" id="wf-dispute-@current.Id">
+                                                <form method="post" asp-page-handler="DisputeEvaluation" data-wf-ajax="true" class="border rounded p-3 bg-light">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="taskId" value="@Model.taskId" />
+                                                    <label class="form-label">Lý do tranh chấp <span class="text-danger">*</span></label>
+                                                    <textarea class="form-control" name="reason" rows="3" maxlength="2000" required></textarea>
+                                                    <button class="btn btn-danger mt-2" type="submit">Gửi tranh chấp</button>
+                                                </form>
                                             </div>
-                                        }
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex justify-content-between">
-                                            <div class="fw-semibold">@e.PmDisplayName</div>
-                                            <div class="text-muted small">@TaskHistoryHelper.FormatRelativeTime(e.EvaluatedAtUtc)</div>
                                         </div>
-                                        <div class="small mt-1">
-                                            <strong>Điểm:</strong> @e.Score / 10
-                                            @if (e.IsLocked)
-                                            {
-                                                <span class="badge bg-secondary ms-2">Đã khóa</span>
-                                            }
+                                    }
+
+                                    @if (current.CanRevise)
+                                    {
+                                        <div class="mt-3 border-top pt-3">
+                                            <div class="fw-semibold small mb-2">Chỉnh điểm (1 lần duy nhất sau tranh chấp)</div>
+                                            <form method="post" asp-page-handler="ReviseEvaluation" data-wf-ajax="true">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="taskId" value="@Model.taskId" />
+                                                <div class="row g-2">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Điểm mới (1–10)</label>
+                                                        <input class="form-control" type="number" name="newScore" min="1" max="10" value="@current.Score" required />
+                                                    </div>
+                                                    <div class="col-md-8">
+                                                        <label class="form-label">Cập nhật Level</label>
+                                                        <select class="form-select" name="newLevel">
+                                                            <option value="">— Giữ / tự động khi khóa —</option>
+                                                            <option value="Junior">Junior</option>
+                                                            <option value="Mid">Mid</option>
+                                                            <option value="Senior">Senior</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2">
+                                                    <label class="form-label">Lý do chỉnh điểm <span class="text-danger">*</span></label>
+                                                    <textarea class="form-control" name="reason" rows="2" maxlength="2000" required></textarea>
+                                                </div>
+                                                <button class="btn btn-primary mt-2" type="submit">Lưu điểm đã chỉnh</button>
+                                            </form>
                                         </div>
-                                        @if (!string.IsNullOrWhiteSpace(e.Comment))
-                                        {
-                                            <div class="small mt-2 text-muted" style="white-space: pre-wrap;">@e.Comment</div>
-                                        }
-                                    </div>
+                                    }
                                 </div>
                             </div>
-                        }
+                        </div>
                     </div>
                 </div>
             }
 
-            @if (status == WorkFlowPro.Data.TaskStatus.Done)
+            @if (status == WorkFlowPro.Data.TaskStatus.Done && !hasEvaluation)
             {
-                if (alreadyLocked)
-                {
-                    <div class="alert alert-secondary mb-0">
-                        Task đã được đánh giá và khóa. Không thể đánh giá lại.
+                <form method="post" asp-page-handler="UpsertEvaluation" data-wf-ajax="true">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="taskId" value="@Model.taskId" />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Điểm số (1 - 10)</label>
+                            <input class="form-control" type="number" name="score" min="1" max="10" value="8" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cập nhật Level (áp dụng khi khóa)</label>
+                            <select class="form-select" name="newLevel">
+                                <option value="">— Tự động theo điểm —</option>
+                                <option value="Junior">Junior</option>
+                                <option value="Mid">Mid</option>
+                                <option value="Senior">Senior</option>
+                            </select>
+                        </div>
                     </div>
-                }
-                else
-                {
-                    <form method="post" asp-page-handler="UpsertEvaluation" data-wf-ajax="true">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="taskId" value="@Model.taskId" />
 
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Điểm số (1 - 10)</label>
-                                <input class="form-control" type="number" name="score" min="1" max="10" value="8" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Cập nhật Level</label>
-                                <select class="form-select" name="newLevel">
-                                    <option value="">— Tự động theo điểm —</option>
-                                    <option value="Junior">Junior</option>
-                                    <option value="Mid">Mid</option>
-                                    <option value="Senior">Senior</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div class="mt-3">
+                        <label class="form-label">Nhận xét (tùy chọn)</label>
+                        <textarea class="form-control" name="comment" rows="3" maxlength="2000"></textarea>
+                    </div>
 
-                        <div class="mt-3">
-                            <label class="form-label">Nhận xét (tùy chọn)</label>
-                            <textarea class="form-control" name="comment" rows="3" maxlength="2000"></textarea>
-                        </div>
-
-                        <button class="btn btn-primary mt-3" type="submit">Gửi đánh giá</button>
-                    </form>
-                }
+                    <button class="btn btn-primary mt-3" type="submit">Gửi đánh giá (mở cửa sổ 24h)</button>
+                </form>
+            }
+            else if (status == WorkFlowPro.Data.TaskStatus.Done && hasEvaluation && current is { IsLocked: true })
+            {
+                <div class="alert alert-secondary mb-0">
+                    Đánh giá đã khóa. AvgScore / CompletionRate của member đã được cập nhật.
+                </div>
             }
         </div>
     </div>

@@ -1,0 +1,1183 @@
+﻿COURSE PROJECT REPORT
+Subject: PRN222
+
+
+
+
+        
+        
+
+
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+–2026 –
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Table of Contents
+Record of Changes        3
+I. Overview        4
+I.1 Project Information        4
+I.2 Project Team        4
+II. Requirement Specification        4
+II.1 Problem description        4
+II.2 Major Features        4
+II.3 Context Diagram        4
+II.4 Nonfunctional requirements        5
+II.5 Functional requirements        5
+II.5.1 Actors        5
+II.5.2 Use Cases        5
+II.5.2 .1 Diagram(s)        5
+II.5.2.2 Use case descriptions        6
+II.5.3 Activity diagram        7
+III. Analysis models.        8
+III.1 Interaction diagrams        8
+III.2 State diagram        9
+IV. Design specification        10
+IV.1 Integrated Communication Diagrams        10
+IV.2 System High-Level Design        10
+IV.3 Component and Package Diagram        10
+IV.3.1 Component Diagram        10
+IV.3.1 . Package Diagram        11
+IV.4 Class diagram        12
+IV.5 Database Design        12
+V. Implementation        12
+V.1 Map architecture to the structure of the project        12
+V.2 Map Class Diagram and Interaction Diagram to Code        12
+VI. Applying Alternative Architecture Patterns        12
+VI.1 Applying the ………….. (ex: Service-Oriented Architecture (SOA))  architecture        12
+VI.2 Applying Service Discovery Pattern in the service-oriented architecture        12
+
+
+________________
+
+
+Record of Changes
+Date
+	A*
+M, D
+	In charge
+	Change Description
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	*A - Added M - Modified D - Deleted
+
+
+________________
+
+
+I. Overview
+I.1 Project Information
+* Project name: WorkFlowPro
+* Group name: <<PRN222-G8>>
+* Software type: Web
+I.2 Project Team
+Full Name
+	Roll Number
+	
+
+	
+
+	
+
+	
+
+	Nguyen Van Gia Bao
+	HE194012
+	
+
+	
+
+	
+
+	
+
+	II. Requirement Specification
+II.1 Problem description
+WorkFlowPro is a web-based team task management platform built to replace fragmented collaboration through chat messages and spreadsheets. The system is designed for small and medium teams that need one shared workspace to create projects, assign tasks, coordinate execution, monitor status in real time, review outcomes, and maintain a transparent activity history. Compared with manual task tracking, WorkFlowPro centralizes task ownership, workflow states, member roles, notifications, and KPI-oriented reporting so that project managers and members can collaborate more consistently.
+II.2 Major Features 
+1. FE-01: User Authentication and Account Security: Allows users (Guest, Member, Project Manager) to register accounts, verify via OTP, sign in with Email, sign out, reset passwords, and manage account security. Admin accounts are provisioned directly via the system database.
+2. FE-02:  Task Evaluation and Performance Scoring System: Allows Admins to evaluate completed tasks by providing scores and feedback. The system automatically calculates performance scores for Members based on task completion, deadlines, and evaluation results.
+3. FE-03:  Performance Dashboard and Analytics: Provides Admins and Project Managers with performance dashboards, including evaluation scores, historical performance trends, and user levels (Junior, Mid, Senior) to support level adjustment decisions.
+4. FE-04:User Level Adjustment Request Workflow (PM → Admin):Allows Project Managers to submit requests to adjust user levels (e.g., promotion or demotion such as Junior, Mid-level, Senior) based on performance data. All requests must be reviewed and approved by Admins before taking effect. The system does not support role changes, only level adjustments within a role.
+5. FE-05: User Profile and Performance Management (Admin):Allows Admins to view and manage user profiles, including roles (fixed), levels (Junior, Mid, Senior)
+II.3 Context Diagram
+  
+
+II.4 Nonfunctional requirements 
+
+
+#
+	Feature
+	System Function
+	Description
+	1
+	<<Feature Name>>
+	<<Function Name1>>
+	<<Function Name1 Description>>
+	2
+	…
+	
+
+	
+
+	
+
+II.5 Functional requirements
+II.5.1 Actors
+
+
+#
+	Actor
+	Description
+	1
+	Guest
+	A user accessing the system without registering or logging in. This actor can perform basic functions such as viewing general system information, exploring available workspaces or projects (if public), and initiating account registration.
+	2
+	PM
+	A user responsible for managing projects and workflows. The Project Manager can create projects (subject to Admin approval), assign tasks to Members, monitor project progress, view performance dashboards, and submit requests to adjust user levels (Junior, Mid, Senior) based on performance.
+	3
+	Admin
+	The user with the highest privilege, managing the entire system. The Admin can evaluate completed tasks, review and approve project creation requests, approve or reject level adjustment requests, view performance data of all Members and Project Managers, and manage user accounts and system operations. Admin accounts are provisioned directly via the system database and cannot be self-registered.
+	4
+	Member
+	
+
+
+
+	A user who has registered and logged into the system. The Member can participate in projects, receive and complete assigned tasks, view their task history, and track their own performance scores and level (Junior, Mid, Senior).
+
+
+
+
+	
+
+	5
+	Email Delivery Service
+	An external service used to deliver outgoing email notifications (e.g.,OTP,Invite link...).
+	
+
+II.5.2 Use Cases
+II.5.2 .1 Diagram(s)
+                  
+
+
+Figure 5.2.1.1: Project Management
+
+
+
+
+
+
+Figure 5.2.1.2: Use Case Diagram — Task Management
+
+
+
+
+  
+
+
+
+          
+Figure 5.2.1.3: Use Case Diagram — Workspace Management
+
+
+II.5.2.2 Use case descriptions
+
+
+ID
+	Use Case
+	Actors
+	Use Case Description
+	01
+	Register Account
+	Guest
+	Register as Member (OTP verified) or PM (pending Admin approval).
+	02
+	Sign In
+	Member, PM, Admin
+	Log in with email/password; includes Reset Password (SF-01) and Workspace Switching.
+	03
+	Manage Members
+	PM
+	PM invites or removes Members from a project.
+	04
+	Create Task
+	PM
+	Create a task with Smart Suggest Assignee table; assign immediately or leave Unassigned.
+	05
+	Accept / Reject Task
+	Member
+	Accept (→ To Do) or reject (with reason) a Pending task.
+	06
+	Manage Kanban Board
+	PM, Member
+	6-column Kanban board with realtime updates; PM can move tasks backward with reason; filter and sort panel.
+	07
+	View / Edit Task Detail
+	PM, Member
+	Full-page task view with 5 tabs: Overview, Attachments, Comments, History, Evaluation.
+	08
+	Evaluate Task
+	PM
+	Score a Done task (1–10); 24h dispute window for other PMs; scores finalized after lock.
+	09
+	View KPI Dashboard
+	PM, Member, Admin
+	PM views project KPI + member profiles; Member edits own profile; Admin views cross-Workspace reports.
+	10
+	Propose Level Adjustment
+	PM
+	Submit a level change proposal (Junior/Mid/Senior) for a Member, forwarded to Admin (UC-13 Section 2).
+	11
+	Manage Project
+	PM
+	Submit project creation request (Admin approves); edit, archive, or delete active projects.
+	12
+	Receive Notifications
+	All users
+	Realtime in-app notifications via SignalR for all key events; queued when offline.
+	13
+	Manage Admin Dashboard
+	Admin
+	3-section dashboard: (1) approve/reject PM registrations, (2) approve/reject level adjustments, (3) directly demote PM to Member.
+	14
+	Approve Project Creation
+	Admin
+	Review and approve/reject project creation requests submitted by PMs 
+	15
+	View Audit Log
+	Admin
+	View system-wide append-only log of all Admin actions with filter and search.
+	
+
+
+
+01_Register Account 
+
+
+UC ID and Name:
+	1. Register Account
+	Created By:
+	BaoNVG
+	Date Created:
+	27/03/2026
+	Primary Actor:
+	Guest
+	Secondary Actors:
+	Email Delivery Service, Admin
+	Summary:
+	Allows a Guest to create a new account by selecting an account type (Member or PM). Member accounts are verified via OTP and activated immediately. PM accounts skip OTP and wait for Admin approval before gaining access.0
+	Preconditions:
+	The user does not have an existing account.
+
+
+	Postconditions:
+	(Member) Account is active; user is logged in and can join a Workspace. (PM) Account is in Pending Approval state; user can only view the waiting page until Admin approves (UC-13).
+	Dependency: 
+	UC-13 (Admin approves PM registration)
+	Description of main sequence:
+	Description of main sequence (Path A — Register as Member):
+1. Guest navigates to /register.
+2. Guest selects account type: Member.
+3. Guest fills in: email (must be @gmail.com domain), display name (optional), password (≥8 characters, at least 1 uppercase + 1 number), confirm password.
+4. Guest clicks "Create account".
+5. System validates input, then sends a 6-digit OTP to the provided email (valid for 10 minutes).
+6. Guest enters the OTP on the verification screen.
+7. System verifies OTP → activates account with role Member.
+8. System automatically logs the user in and redirects to the Workspace joining page.
+Description of main sequence (Path B — Register as PM):
+1. Guest navigates to /register.
+2. Guest selects account type: PM — workspace will be created after Admin approval.
+3. Guest fills in: email (any domain accepted), organization / company name (required — becomes the Workspace name upon approval), display name (optional), password (≥8 characters, at least 1 uppercase + 1 number), confirm password.
+4. Guest clicks "Create account".
+5. System validates input → creates account with status Pending Approval and notifies Admin of a new PM request (UC-13).
+6. User is redirected to a waiting page: "Your PM account request is under review. You will be notified via email once approved."
+	Description of alternative sequences:
+	Step 3 (Path A): Email is not a @gmail.com address → display: "Member accounts require a Gmail address (@gmail.com)."
+Step 3 (Path A or B): Email already registered → display: "This email is already registered. Please sign in or use a different email."
+Step 3 (Path A or B): Password and confirm password do not match → display: "Passwords do not match."
+Step 6 (Path A): OTP entered is incorrect → display: "Invalid OTP. Please try again." Allow up to 3 attempts.
+Step 6 (Path A): OTP expired → display: "OTP has expired." Provide "Resend OTP" option; new OTP invalidates the previous one.
+Step 6 (Path A): After 3 failed OTP attempts → session terminated; user must restart from Step 1.
+
+
+	Exceptions:
+	Step 5 (Path A): Email Delivery Service fails → display: "Unable to send OTP. Please try again later."
+	Nonfunctional requirements:
+	* Password must be hashed (bcrypt) before storing in the database.
+* OTP is 6 digits, valid for 10 minutes, single-use, invalidated upon resend.
+
+
+	Outstanding questions:
+	
+
+	
+
+02_ Sign In
+
+
+UC ID and Name:
+	2.Sign In
+	Created By:
+	BaoNVG
+	Date Created:
+	17/01/2026
+	Primary Actor:
+	Guest,member,PM,Admin
+	Secondary Actors:
+	Email Delivery Service
+	Summary:
+	Allows a registered and verified user to log in using email and password. Includes Reset Password as an alternative flow (SF-01) and Workspace Switching when the user belongs to multiple Workspaces.
+	Preconditions:
+	User has a valid, verified, and active account.
+	Postconditions:
+	User is authenticated with a valid JWT token and redirected to the appropriate dashboard.
+	Dependency: 
+	UC-03 (Workspace context loaded after login)
+	Description of main sequence:
+	1. User navigates to /login and enters email and password.
+2. System validates credentials and issues a JWT token.
+3. If user belongs to 1 Workspace → redirect to that Workspace dashboard.
+4. If user belongs to multiple Workspaces → display Workspace selection screen; user selects a Workspace → system loads context for selected Workspace.
+
+
+	Description of alternative sequences:
+	Step 2: Incorrect password → increment failed attempt counter; display remaining attempts.
+Step 2: Account is Pending Approval (PM) → display: "Your account is awaiting Admin approval." Redirect to waiting page.
+Step 2: Forgot password → trigger SF-01 Reset Password:
+1. User clicks "Forgot password?" and enters their email.
+2. System generates a secure reset token (hashed, expires in 1 hour, single-use) and sends a reset link via Email Delivery Service.
+3. User clicks the link → directed to password reset page.
+4. User enters new password (≥8 characters, at least 1 uppercase + 1 number) and confirms.
+5. System hashes and saves new password, marks token as used → redirect to /login.
+* SF-01 alternative: Email not found → display generic message: "If this email is registered, you will receive a reset link shortly."
+* SF-01 alternative: Token expired or already used → display: "This link is invalid or has expired." Offer resend option.
+* SF-01 alternative: New password same as old → display: "New password must be different from your current password."
+Step 4: User was removed from a Workspace during switching → display: "You are no longer a member of this Workspace."
+	Exceptions:
+	Step 2: After 5 failed attempts → account temporarily locked for 15 minutes. Display: "Too many failed attempts. Please try again in 15 minutes."
+	Nonfunctional requirements:
+	* JWT token must expire after a defined session duration.
+* All login attempts must be logged for security audit.
+* Reset token valid for 1 hour, single-use only.
+	Outstanding questions:
+	
+
+	03_Manage Members
+
+
+UC ID and Name:
+	UC-03. Manage Members
+	Created By:
+	BaoNVG
+	Date Created:
+	17/01/2026
+	Primary Actor:
+	PM (invite, remove)
+	Secondary Actors:
+	Email Delivery Service
+	Summary:
+	Covers all member management within a Workspace: PM can invite Members and remove them; PM accounts cannot be created via invite — they must register through UC-01 Path B and be approved via UC-13.
+	Preconditions:
+	PM is logged in and inside a Workspace. Admin is logged in (for role change).
+	Postconditions:
+	Invited user appears in the Workspace member list; removed user loses access; role change takes effect immediately with notification sent.
+	Dependency: 
+	1. UC-13 (PM registration is separate from invite), UC-12 (notifications sent on role change)
+	Description of main sequence:
+	Description of main sequence (Path A — PM invites Member):
+1. PM navigates to Members → clicks "Invite Member".
+2. PM enters the invitee's email and selects a sub-role (e.g., BA / DEV / Designer).
+3. System sends simultaneously:
+   * A realtime notification to the invitee (if they have an existing account).
+   * An invitation email to the invitee containing an acceptance link valid for 24 hours.
+4. Invitee accepts via notification click or email link → automatically joins the Workspace as Member.
+   * If invitee declines → system prompts for a reason (required) → PM receives notification: "[User] declined your invitation. Reason: [reason]."
+5. Member appears in the Workspace member list.
+Description of main sequence (Path B — PM removes Member):
+1. PM navigates to Members → clicks "Remove" next to a member.
+2. System displays confirmation dialog and requires PM to enter a reason (required).
+3. PM enters reason → confirms → system removes the member from the Workspace; member's active tasks are returned to Unassigned.
+4. Removed member receives notification: "You have been removed from Workspace [Name]. Reason: [reason]."
+Description of main sequence (Path C — PM changes Member sub-role):
+1. PM navigates to Members → clicks "Edit" next to a member.
+2. System displays a dropdown of available sub-roles (BA / DEV / Designer / Tester / Other).
+3. PM selects a new sub-role → confirms.
+4. System updates the member's sub-role immediately; no Admin approval required.
+5. Member receives notification: "Your sub-role in Workspace [Name] has been updated to [Sub-role]."
+	Description of alternative sequences:
+	Path A, Step 3: Invitee does not have an account → system sends email only (no notification); user must register via UC-01 Path A first, then click the email link to join.
+Path A, Step 3: Invitee is already a member of this Workspace → display: "This user is already in your Workspace."
+Path A, Step 4: Invitation email link expired (24h) → display: "This invitation has expired." PM must resend.
+Path B, Step 3: Member has tasks In Progress → system warns: "This member has active tasks. They will be returned to Unassigned."
+
+
+	Exceptions:
+	Email Delivery Service fails (Path A): Notification still sent if account exists; display warning to PM: "Invitation email could not be sent, but an in-app notification has been delivered.""
+	Nonfunctional requirements:
+	* Invitation email link must be single-use and expire after 24 hours.
+* Sub-role changes take effect immediately; no approval required.
+	Outstanding questions:
+	
+
+	
+
+04_Create Task 
+
+
+UC ID and Name:
+	4. Create Task 
+	Created By:
+	BaoNVG
+	Date Created:
+	17/01/2026
+	Primary Actor:
+	PM
+	Secondary Actors:
+	None
+	Summary:
+	PM creates a task within an approved project. If members exist in the project, the system displays a Smart Suggest Assignee table ranked by workload, completion rate, average score, and level. PM can either create the task unassigned or select a member and assign immediately.
+	Preconditions:
+	PM is inside an active (approved) project (UC-11).
+	Postconditions:
+	Task is created with status Unassigned (no assignee) or Pending (assignee selected); if Pending, assigned Member receives a realtime notification (UC-12).
+	Dependency: 
+	UC-11 (project must exist), UC-05 (member responds to task), UC-12 (notification)
+	Description of main sequence:
+	PM navigates to a project → clicks "+ Create Task".
+PM fills in: title (required), description, priority (Low / Medium / High / Critical), due date (optional).
+System displays the Smart Suggest Assignee section:
+* Default option selected: "No assignee (task status will be Unassigned)".
+* If members exist in the project: system displays a table of all members with columns — Select, Name, Level, Completion Rate, AvgScore, CurrentWorkload — sorted by best fit (lowest CurrentWorkload, highest Completion Rate / AvgScore, most suitable Level).
+PM chooses one of two actions:
+* "Create task" — creates the task with no assignee; task status is Unassigned.
+* "Create + Assign" — PM selects a member from the table first, then clicks this button; task is created and assigned; task status is Pending; Member receives realtime notification.
+
+
+	Description of alternative sequences:
+	Step 3: No members in the project yet → Smart Suggest table is empty; only "Create task" button is available; task is created as Unassigned.
+Step 4: PM clicks "Create + Assign" without selecting a member → system blocks; display: "Please select a member to assign."
+Step 2: No due date selected → task displays label "No deadline".
+After creation: PM can reassign an Unassigned task at any time from the task detail (UC-07). If task is Pending and PM changes assignee → old assignment cancelled with reason required; old member notified of revocation; new member notified.
+	Exceptions:
+	Step 4: Realtime notification fails → task is still created; notification queued for delivery.
+	Nonfunctional requirements:
+	* Smart Suggest Assignee table must load within 300ms.
+* Task list API must respond within 200ms for projects under 500 tasks.
+	Outstanding questions:
+	
+
+	
+
+05_Accept / Reject Task
+
+
+UC ID and Name:
+	5. Accept / Reject Task
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	Member
+	Secondary Actors:
+	None
+	Summary:
+	A Member who has been assigned a task decides to accept or reject it. Accepting moves the task to To Do on the Kanban board; rejecting returns it to Unassigned and notifies the PM with the reason.
+	Preconditions:
+	* Member has been assigned a task with status Pending (UC-04).
+	Postconditions:
+	Task status changes to To Do (Accept) or Unassigned (Reject); PM receives realtime notification.
+	Dependency: 
+	UC-04 (task must be assigned), UC-06 (Kanban updated after accept), UC-12 (notification)
+	Description of main sequence:
+	1. Member receives realtime notification: "You have been assigned task [Task Name]."
+2. Member opens the notification or Pending task list and reviews task details.
+3. Accept: Member clicks "Accept" → task status changes to To Do → task appears on Kanban board → PM receives notification: "[Member] has accepted task [Task Name]."
+4. Reject: Member clicks "Reject" → system requires Member to enter a rejection reason (mandatory) → task returns to Unassigned → PM receives notification with reason.
+	Description of alternative sequences:
+	No response after 24h: System sends 1st reminder to Member.
+No response after 48h: System sends 2nd reminder to Member + warning notification to PM.
+No response after 72h: PM receives proactive notification to manually reassign or follow up.
+PM revokes task before Member responds: PM must enter a reason (required) → task returns to Unassigned; Member receives revocation notification with reason: "Task [Name] has been revoked. Reason: [reason]."
+	Exceptions:
+	Accept/Reject sent twice: System is idempotent — second request is ignored, no duplicate record created.
+	Nonfunctional requirements:
+	* Accept/Reject operation must be idempotent.
+* Rejection reason is encrypted at rest in the database.
+	Outstanding questions:
+	
+
+	
+
+
+
+
+
+06_ Manage Kanban Board
+
+
+UC ID and Name:
+	6.  Manage Kanban Board
+	Created By:
+	BaoNVG
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	Member PM
+	Secondary Actors:
+	SignalR
+	Summary:
+	Displays a 6-column Kanban board (Unassigned / Pending / To Do / In Progress / Review/Testing / Done) for a project. Members can drag and drop their own accepted tasks between columns. PM can drag any task including moving tasks backward to request rework. All changes are broadcast in realtime. Users can filter and sort tasks directly on the board.
+	Preconditions:
+	User is inside a specific active project.
+	Postconditions:
+	Task status saved to the database; all users on the board see the updated state immediately.
+	Dependency: 
+	* UC-05 (task must be Accepted before appearing), UC-07 (open task detail from card), UC-08 (task moved to Done triggers evaluation)
+	Description of main sequence:
+	1. User opens the Kanban Board → columns displayed: Unassigned / Pending / To Do / In Progress / Review/Testing / Done.
+2. Member drags their own accepted task to a new column. Optimistic UI updates immediately on screen.
+3. PM can drag any task to any column at any time, including moving a task backward (e.g., Done → To Do or Review/Testing → To Do) to indicate the work does not meet requirements. PM must enter a reason when moving a task backward (required).
+4. System saves the new status to the database.
+5. SignalR broadcasts TASK_MOVED event to all members currently viewing the board.
+6. All users see the card move in realtime.
+7. If task is dragged to Done by Member → PM receives realtime notification to evaluate the task (UC-08).
+8. If PM moves task backward → Member receives realtime notification: "Task [Name] has been moved back to [Column] by PM. Reason: [reason]." Evaluation is not triggered.
+Filter & Sort (sub-flow):
+1. User opens the filter panel on the Kanban Board or List View.
+2. User selects filter criteria: Assignee (multi-select), Status, Priority, Due date (Today / This week / This month / Overdue).
+3. System applies filters and updates the displayed task list immediately.
+4. User selects sort order: by Due Date, Priority, or Created Date (ascending / descending).
+5. User clears filters → all tasks in scope are displayed again.
+* Member filter scope: tasks in projects they have joined only.
+* PM filter scope: all tasks in the Workspace.
+	Description of alternative sequences:
+	SignalR disconnects: Banner warning appears; drag-and-drop is temporarily locked; system attempts auto-reconnect every 5 seconds.
+Member tries to drag a task they have not accepted or another member's task: Action is blocked; tooltip: "You do not have permission to move this task."
+PM moves task backward without entering a reason: System blocks the move; display: "Please enter a reason for moving this task back."
+No tasks match filter criteria: Display: "No tasks match your current filters."
+Admin view mode: Admin can open any Workspace's Kanban board in read-only mode. Drag-and-drop is disabled.
+
+
+	Exceptions:
+	Server returns error after drag: UI rolls back the card to its previous column; displays: "Update failed. Please try again."
+Drag response exceeds 500ms: Considered a performance violation; UI rolls back and displays error.
+Drag-and-drop must respond under 500ms.
+Optimistic UI with rollback on failure.
+Filter API must respond within 300ms.
+	Nonfunctional requirements:
+	Drag-and-drop must respond under 500ms.
+Optimistic UI with rollback on failure.
+Filter API must respond within 300ms.
+	Outstanding questions:
+	
+
+	
+
+07_ View / Edit Task Detail
+
+
+UC ID and Name:
+	7. View / Edit Task Detail
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	PM, Member
+	Secondary Actors:
+	None
+	Summary:
+	Opens a full-page task detail view with 5 tabs: Overview, Attachments, Comments, History, and Evaluation. PM can edit all fields. The assigned Member can edit limited fields. Other Members have read-only access.
+	Preconditions:
+	* Task exists and user has access to the project it belongs to.
+	Postconditions:
+	* Changes saved to the database; all actions recorded in the activity log; members involved receive notifications.
+	Dependency: 
+	UC-06 (task card clicked from Kanban), UC-08 (evaluation triggered from Done status)
+	Description of main sequence:
+	1. User clicks a task card on the Kanban board or task list → navigates to the Task Details page.
+2. System displays the page with 5 tabs:
+   1. Overview: project name, status badge, title, priority, due date, assignee (dropdown), description. PM can edit all fields; assigned Member can edit description only; others read-only.
+   2. Attachments: list of uploaded files; upload new file (max 5MB); delete own uploads.
+   3. Comments: add, edit, delete comments (see Comments sub-flow below).
+   4. History: activity log entries for this task (see History sub-flow below).
+   5. Evaluation: evaluation form and results; only visible/active when task status is Done (see UC-08).
+3. PM clicks "Save changes" on the Overview tab → system validates and saves to database; all changes appended to History tab automatically.
+Comments tab (sub-flow):
+1. User navigates to the "Comments" tab → text area displays placeholder: "Write your comment..." → user types → clicks "Send comment".
+2. Comment saved and displayed with commenter avatar, name, timestamp, and comment count updated.
+3. User edits their own comment → content updated; displays label "(edited)".
+4. User deletes their own comment:
+   * No replies → comment permanently deleted.
+   * Has replies → content replaced with "[Comment deleted]".
+5. PM may delete any Member's comment; action logged in History.
+History tab (sub-flow):
+1. User navigates to the "History" tab → system displays all activity log entries for this task, sorted newest first, showing entry count (e.g., "3 entry(s)").
+2. Each entry shows: actor avatar + name, action description (e.g., "Rejected task (Pending → Unassigned)"), old/new value if applicable, timestamp (relative, e.g., "9 hours ago").
+3. Automatically logged actions: task created, status changed (with old/new values), assignee changed, rejection reason recorded, due date / priority changed, task accepted / rejected, file uploaded / deleted, comment added / edited / deleted, evaluation submitted.
+Evaluation tab (sub-flow):
+1. User navigates to the "Evaluation" tab.
+2. If task status is not Done → button disable
+3. If task status is Done → PM can submit evaluation (see UC-08 for full flow).
+4. Submitted evaluations displayed with count (e.g., "0 evaluation(s)").
+	Description of alternative sequences:
+	* Two users edit simultaneously: Last-write-wins policy applied.
+* File attachment exceeds 5MB: Upload rejected; display: "File size must not exceed 5MB."
+* Member attempts to edit a restricted field: Field is displayed as disabled.
+* Empty comment submitted: System prevents submission; input field highlighted.
+* Task not found (deleted concurrently): Display: "This task no longer exists." Close modal.
+	Nonfunctional requirements:
+	Task detail API must respond within 200ms for projects under 500 tasks.
+Activity log is append-only; no entries may be deleted.
+Comments with replies cannot be permanently deleted.
+File size limit: 5MB per file.
+
+
+	Outstanding questions:
+	
+
+	08_Evaluate Task
+
+
+UC ID and Name:
+	8. Evaluate Task
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	PM
+	Secondary Actors:
+	None
+	Summary:
+	After a task reaches Done, PM scores the task (1–10) and optionally proposes a level change for the assigned Member. The evaluation is open for dispute by other PMs in the Workspace within 24 hours. After 24 hours the evaluation is locked and scores are finalized.
+	Preconditions:
+	* Task has been moved to the Done column (UC-06).
+	Postconditions:
+	* TaskEvaluation record saved; Average Score and Completion Rate updated after the 24h window closes; Member notified of final result.
+	Dependency: 
+	UC-06 (triggers evaluation), UC-10 (level change proposal), UC-12 (notification)
+	Description of main sequence:
+	Task moved to Done → PM receives realtime notification: "Task [Name] needs evaluation."
+PM opens the evaluation modal and enters:
+* Score (1–10, required)
+* Comment / feedback (optional)
+System saves the evaluation with status Open and starts a 24-hour dispute window.
+All other PMs in the Workspace receive a notification: "Evaluation for task [Name] is open for review (24h)."
+During the 24h window, any other PM can open the evaluation and submit a dispute (see alternative flow).
+After 24 hours, the evaluation window closes automatically:
+* If no dispute: evaluation is locked; scores finalized.
+* If dispute exists: the disputing PM's comment is attached; the original PM is notified and may revise their score once before final lock.
+System calculates and updates:
+* Completion Rate = Tasks Done on time / Total tasks assigned
+* Average Score = Mean of all evaluated task scores
+System saves finalized evaluation to TaskEvaluations and updates MemberProfile.
+Member receives realtime notification with their final score and feedback.
+(Optional) If PM believes a level change is warranted → PM submits a Level Adjustment Proposal (UC-10).
+	Description of alternative sequences:
+	Another PM disputes the evaluation (within 24h):
+1. Disputing PM opens the evaluation → clicks "Dispute" → enters reason (required).
+2. System attaches the dispute to the evaluation record and notifies the original PM.
+3. Original PM may revise the score once and must enter a reason for the revision (required) before the 24h window closes.
+4. If original PM does not revise → score remains as-is and locks at 24h.
+PM has not evaluated after 3 days: System sends daily reminder to PM.
+Task was overdue at completion: System automatically records the task as late in Completion Rate before PM scores it.
+
+
+	Exceptions:
+	Score entered outside 1–10 range: System validates and rejects; display: "Score must be between 1 and 10."
+Dispute submitted after 24h window: System blocks; display: "The evaluation window for this task has closed."
+
+
+	Nonfunctional requirements:
+	Evaluation locks automatically exactly 24 hours after initial submission — no manual action required.
+Completion Rate and Average Score update only after the evaluation is finalized (locked).
+
+
+	Outstanding questions:
+	
+
+	
+
+09_View KPI Dashboard
+
+
+UC ID and Name:
+	9. View KPI Dashboard
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	PM Admin  Member
+	Secondary Actors:
+	None
+	Summary:
+	Combines KPI reporting and Member Profile into one UC since PM accesses KPI data directly from member profiles. PM views project and member performance within their Workspace. Admin has an additional cross-Workspace overview. Members view and edit their own profile.
+	Preconditions:
+	* PM: logged in with at least 1 active project. Member: logged in. Admin: logged in
+	Postconditions:
+	* Dashboard and profile data displayed; no data modified (except profile self-edits).
+	Dependency: 
+	UC-08 (source of evaluation data), UC-10 (PM proposes level change from profile view),UC-12
+	Description of main sequence:
+	Description of main sequence (Path A — Member views own profile):
+1. Member clicks avatar → "My Profile" → views: full name, email, sub-role, level, Completion Rate, Average Score, last 30 days of task history.
+2. Member can edit: display name, avatar (≤2MB, JPG/PNG only). Cannot edit: email, level, score.
+Description of main sequence (Path B — PM views KPI + member profile):
+1. PM navigates to "Reports & KPI Dashboard".
+2. PM selects a project from the dropdown and sets a date range (From date / To date UTC) → clicks "Apply".
+3. System displays 4 summary cards:
+   * Total tasks (in period)
+   * Completed
+   * Overdue (in period, excluding Done/Cancelled)
+   * Completion rate (%)
+4. System renders 2 charts:
+   * Pie chart: task distribution by status (e.g., Completed).
+   * Bar chart: number of tasks per member (accepted, in period).
+5. System displays member performance table with columns: Name, Level, Completion Rate (UC-08), Avg Score (UC-08), Average evaluation score (period / project), Tasks assigned (period / project), Tasks completed (period / project).
+6. PM clicks a member's name → opens full profile view (Path A).
+7. From profile view, PM can click "Propose Level Change" → triggers UC-10.
+Description of main sequence (Path C — Admin views cross-Workspace KPI):
+1. Admin navigates to "System Reports".
+2. System displays cross-Workspace overview: all Workspaces listed with aggregate completion rate, total members, total tasks, average member score.
+3. Admin can drill down into any Workspace to see the same PM-level view (Path B).
+4. Admin clicks a member name → views full profile (Path A, read-only).
+5. Admin clicks "View Kanban" from member profile → opens UC-06 in Admin read-only mode → can see all tasks of that member across projects.
+	Description of alternative sequences:
+	* No task history yet: Display: "No data available yet."
+* No tasks in selected project/time range: Display: "No data available for the selected filters."
+* Avatar file exceeds 2MB or wrong format: Display: "Avatar must be JPG or PNG and under 2MB."
+* PM tries to view profile of member outside their Workspace: System returns 403 Forbidden.
+	Exceptions:
+	1. Profile save fails: Display: "Unable to update profile. Please try again."
+2. Data retrieval failure: Display: "Unable to load report data. Please try again later."
+	Nonfunctional requirements:
+	* Dashboard must load within 3 seconds.
+* Profile updates must reflect immediately in the assignment suggestion engine (UC-04).
+	Outstanding questions:
+	
+
+	10_ Propose Level Adjustment
+
+
+UC ID and Name:
+	10.  Propose Level Adjustment
+	Created By:
+	BaoNVG
+	Date Created:
+	27/03/2026
+	Primary Actor:
+	PM
+	Secondary Actors:
+	None
+	Summary:
+	PM reviews a Member's performance data and submits a proposal to adjust their level (Junior / Mid / Senior). The request is forwarded to Admin for approval (UC-13). A Member can only have one active pending request at a time.
+	Preconditions:
+	* PM is logged in. Target Member belongs to PM's Workspace.
+	Postconditions:
+	* A LevelAdjustmentRequest record is created with status Pending. Member receives notification that their level is under review. Admin is notified of the new request.
+	Dependency: 
+	UC-09 (proposal initiated from member profile view), UC-13 (Admin reviews and approves via Section 2)
+	Description of main sequence:
+	1. PM opens a Member's profile (UC-09, Path B) → reviews: current level, Average Score, Completion Rate, task history.
+2. PM clicks "Propose Level Change" → selects proposed new level (Junior / Mid / Senior) and enters a written justification (required) explaining why the level change is warranted.
+3. System validates: proposed level must differ from current level; Member must not already have an active pending request.
+4. System creates a LevelAdjustmentRequest record (status: Pending) and notifies Admin (UC-12).
+5. Member receives notification: "Your PM has submitted a level adjustment proposal. It is currently under Admin review."
+	Description of alternative sequences:
+	* Proposed level is the same as current level: System blocks submission; display: "The proposed level must differ from the current level."
+* Member already has an active pending request: System blocks submission; display: "A level adjustment request for this member is already pending."
+* Member has no evaluated tasks: System warns: "This member has no evaluation data. Are you sure you want to proceed?" PM can still submit.
+	Exceptions:
+	* Member no longer in Workspace: Display: "This member is no longer part of your Workspace." Block submission.
+	Nonfunctional requirements:
+	* A Member can only have one active (Pending) level adjustment request at a time.
+
+
+	Outstanding questions:
+	
+
+	11_ Manage Project
+
+
+UC ID and Name:
+	11.  Manage Project
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	PM
+	Secondary Actors:
+	Admin
+	Summary:
+	PM submits a request to create a new project. Admin must approve before the project becomes active and visible. PM can also edit, archive, or delete their own approved projects.
+	Preconditions:
+	* PM is logged in and inside a Workspace.
+	Postconditions:
+	* (On approval) Project is active and visible; PM and Workspace members notified. Tasks can now be created (UC-04).
+	Dependency: 
+	UC-14 (Admin approves project creation), UC-04 (project must exist before creating tasks)
+	Description of main sequence:
+	1. PM clicks "+ Create Project" → fills in: name (required), description, start/end date, identifying color.
+2. System validates: name must not be empty and must be unique within the Workspace.
+3. System creates a project record with status Pending Approval and notifies Admin (UC-14).
+4. PM does not see the project yet — invisible until approved.
+5. Admin approves the project (UC-14) → project status changes to Active.
+6. System creates default 6-column Kanban board; assigns PM as project Owner.
+7. SignalR broadcasts PROJECT_CREATED to all Workspace members; PM receives approval notification.
+Edit / Archive / Delete (after project is Active):
+* PM edits project info via Project Settings at any time.
+* PM archives project → project becomes read-only; tasks cannot be moved.
+* PM deletes project → confirmation required; if tasks are In Progress, additional warning displayed.
+	Description of alternative sequences:
+	* Duplicate project name within Workspace: Display: "A project with this name already exists in your Workspace."
+* Deleting project with tasks In Progress: Display: "This project has unfinished tasks. Are you sure you want to delete it?"
+* Admin rejects project: PM receives notification with rejection reason; project is discarded.
+	Exception
+	* SignalR broadcast fails: Project still created and activated; members will see it on next page load.
+* Session expires during project creation: System redirects to login page; unsaved form data is lost.
+
+
+	Nonfunctional requirements:
+	* SignalR broadcast on project creation/deletion.
+	Outstanding questions:
+	
+
+	12_Receive Notifications
+
+
+UC ID and Name:
+	12.Receive Notifications
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	All users
+	Secondary Actors:
+	SignalR
+	Summary:
+	The system delivers instant in-app notifications via SignalR for key events across all UC triggers. Notifications are stored persistently. This UC is not triggered directly by users — it is called by other UCs.
+	Preconditions:
+	* User is logged in; SignalR connection is established.
+	Postconditions:
+	* User receives notification immediately if online; queued and synced if offline.
+	Dependency: 
+	Triggered by: UC-04, UC-05, UC-06, UC-08, UC-10, UC-11, UC-13, UC-14, UC-15
+	Triggering events:
+	New task assigned /(Pending)Assigned Member
+Task rejected with reason/PM
+Task accepted/PM
+Task moved to Done — needs evaluation/PM
+Evaluation result published/Evaluated Member
+Role changed/Affected user
+Workspace invitation sent/Invitee
+Task deadline within 24h/Assigned Member
+Project created / deleted/All Workspace members
+PM registration approved / rejected (UC-13)Applicant
+Project creation approved / rejected (UC-14)PM who submitted
+Level adjustment approved / rejected (UC-13)PM who proposed + affected Member
+	Description of main sequence:
+	1. Triggering event occurs in the system.
+2. Notification pop-up appears in the bottom-right corner; auto-dismisses after 5 seconds.
+3. Notification simultaneously saved to "My Notifications" (red unread badge).
+4. User clicks notification → navigated to the relevant screen.
+5. User marks notifications as read (individually or all at once) or deletes them
+	Description of alternative sequences:
+	* User is offline: Notification queued; delivered and synced when user reconnects.
+* Notification list exceeds 200 items: Oldest read notifications are automatically deleted.
+	Exceptions:
+	
+
+SignalR connection fails: System retries connection; queued notifications delivered on reconnect.
+	Nonfunctional requirements:
+	* SignalR must auto-reconnect on disconnection.
+	Outstanding questions:
+	
+
+	
+
+13_Manage Admin Dashboard
+Functional Description Template
+UC ID and Name:
+	13. Manage Admin Dashboard
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	Admin
+	Secondary Actors:
+	Email Delivery Service
+	Summary:
+	The Admin management page (/Admin) consolidates all administrative actions into a single dashboard with 3 sections: (1) approve/reject pending PM registrations, (2) review level adjustment requests submitted by PMs, and (3) directly demote PM to Member (max 3 PMs per Workspace, always keep ≥1 PM). Admin accounts are created directly in the database and cannot be self-registered.
+	Preconditions:
+	* Admin is logged in. At least one account is in Pending Approval status with role PM.
+	Postconditions:
+	* Relevant records updated immediately; affected users notified via realtime notification and/or email.
+	Dependency: 
+	UC-01 Path B (triggers PM registration requests), UC-10 (triggers level adjustment requests), UC-12 (notifications)
+	Description of main sequence:
+	Description of main sequence (Section 1 — Approve PM registration):
+1. Admin navigates to /Admin → sees section "PM Registration Pending Approval" listing pending PM registration requests: name, email, organization name, registration date.
+2. Admin reviews a request.
+3. Approve: Admin clicks "Approve" → system activates the account with role PM and creates the Workspace using the organization name → user receives email: "Your PM account has been approved. You can now log in."
+4. Reject: Admin clicks "Reject" → enters rejection reason (required) → account remains inactive → user receives email with reason: "Your PM request was not approved. Reason: [reason]."
+5. System logs the decision to audit log (UC-15).
+Description of main sequence (Section 2 — Review level adjustment requests):
+1. Admin sees section "Level Adjustment Requests" listing pending requests: Member name, current level, proposed level, PM name, justification, Average Score, Completion Rate.
+2. Admin reviews the supporting performance data.
+3. Approve: Admin clicks "Approve" → system updates MemberProfile.level immediately → PM and Member both receive notification: "Level adjustment approved: [Name] is now [Level]."
+4. Reject: Admin clicks "Reject" → enters rejection reason (required) → level unchanged → PM and Member notified with reason.
+5. System logs the decision to audit log (UC-15).
+Description of main sequence (Section 3 — Demote PM to Member):
+1. Admin sees section "Direct PM Demotion (max 3 PMs / Workspace; always keep ≥1 PM)".
+2. Admin selects a Workspace from the dropdown → system displays list of current PMs with name and email.
+3. Admin clicks "Demote to Member" next to a PM → enters reason (required) → confirms.
+4. System validates: Workspace must retain ≥1 PM; Workspace must not exceed 3 PMs total.
+5. System updates role to Member immediately → writes record to RoleChangeLogs with reason.
+6. Affected user receives realtime notification: "Your role has been changed to Member in Workspace [Name]. Reason: [reason]."
+7. System logs the action to audit log (UC-15).
+
+
+	Description of alternative sequences:
+	* Section 1: No pending PM registrations → display: "No pending requests."
+* Section 2: No pending level adjustment requests → display: "No pending requests."
+* Section 3: Demoting the only PM in a Workspace → system blocks; display: "This Workspace must have at least 1 PM."
+* Section 3: Workspace already has 3 PMs → display: "This Workspace has reached the maximum of 3 PMs." (validation on create, not demote)
+	Exceptions:
+	* Email Delivery Service fails (Section 1): Account status still updated; failure logged; Admin sees warning: "Status updated, but notification email could not be sent."
+* Level update fails (Section 2): Display: "Unable to update level. Please try again." No change applied.
+	Nonfunctional requirements:
+	* All decisions logged to audit log immediately with Admin ID and timestamp.
+* Level changes take effect immediately upon approval.
+* Role changes take effect immediately upon confirmation.
+* Max 3 PMs per Workspace enforced at system level.
+	Outstanding questions:
+	
+
+	
+
+14_Approve Project Creation
+Functional Description Template
+UC ID and Name:
+	14. Approve Project Creation
+	Created By:
+	Baonvg
+	Date Created:
+	14/01/2026
+	Primary Actor:
+	Admin
+	Secondary Actors:
+	none
+	Summary:
+	Admin reviews project creation requests submitted by PMs (UC-11). Approved projects become active and visible to Workspace members. Rejected requests are discarded with a reason sent to the PM.
+	Preconditions:
+	* Admin is logged in. At least one project is in Pending Approval status.
+	Postconditions:
+	* (Approve) Project is active; PM and Workspace members notified. (Reject) Project discarded; PM notified with reason.
+	Dependency: 
+	UC-11 (PM submits project creation request), UC-12 (notification to PM),UC-15 (audit log)
+	Description of main sequence:
+	1. Admin navigates to /admin/pending-projects → system displays pending project requests: project name, Workspace, submitting PM, submission date.
+2. Admin selects a request and reviews the project details.
+3. Approve: Admin clicks "Approve" → system sets project status to Active, creates default Kanban board, assigns PM as Owner → PM and all Workspace members receive notifications (UC-12).
+4. System logs the approval action to audit log (UC-15).
+	Description of alternative sequences:
+	* Reject: Admin clicks "Reject" → system prompts for a rejection reason (required) → project record is discarded → PM receives notification: "Your project '[Name]' was not approved. Reason: [reason]."
+* No pending project requests: Display: "No pending project requests."
+	Exceptions:
+	* Notification delivery fails: Project status still updated; failure logged; Admin sees warning: "Status updated, but notification could not be delivered."
+* Session expires during review: System redirects Admin to login page.
+	Nonfunctional requirements:
+	* Approval takes effect immediately.
+* All decisions logged with Admin ID and timestamp.
+	Outstanding questions:
+	
+
+	
+
+15_View Audit Log
+Functional Description Template
+UC ID and Name:
+	15. View Audit Log
+	Created By:
+	Baonvg
+	Date Created:
+	15/01/2026
+	Primary Actor:
+	Admin
+	Secondary Actors:
+	none
+	Summary:
+	Admin views a system-wide audit log of all administrative actions — approvals, rejections, and role changes — with filtering and search capabilities. The log is automatically populated by other UCs; Admin does not need to take any action to generate it.
+	Preconditions:
+	* Admin is logged in.
+	Postconditions:
+	* Audit log displayed read-only; no data modified.
+	Dependency: 
+	UC-03, UC-13, UC-14
+	Description of main sequence:
+	Admin navigates to /admin/audit-log → system displays all audit log entries sorted by timestamp descending.
+Each entry shows:
+* Admin who performed the action
+* Action type (e.g., Approved PM Registration, Rejected Project, Changed Role)
+* Target entity (user name / project name)
+* Reason / notes (if applicable)
+* Timestamp
+Admin filters log by: action type, date range, or target user.
+Admin searches by user name or keyword.
+Automatically logged events:
+* PM registration approved / rejectedUC-13 Section 1
+* Level adjustment approved / rejectedUC-13 Section 2
+* PM demoted to MemberUC-13 Section 3
+* Project creation approved / rejectedUC-14
+* Member removed from WorkspaceUC-03 Path B
+* 	Description of alternative sequences:
+	1. No entries match the filter: Display: "No audit log entries found for the selected criteria."
+	Exceptions:
+	* Log retrieval fails: Display: "Unable to load audit log. Please try again later."
+	Nonfunctional requirements:
+	* Audit log is append-only; no entries may be edited or deleted.
+* All admin approval/rejection actions must be logged automatically without exception.
+	Outstanding questions:
+	
+
+	
+
+
+
+Functional Description Contents

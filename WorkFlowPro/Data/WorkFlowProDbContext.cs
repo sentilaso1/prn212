@@ -209,10 +209,14 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
         {
             e.ToTable("TaskEvaluations");
             e.Property(x => x.Score).IsRequired();
+            e.Property(x => x.OriginalScore).IsRequired();
             e.Property(x => x.Comment).HasMaxLength(2000);
             e.Property(x => x.EvaluatedAtUtc).HasDefaultValueSql("GETUTCDATE()");
+            e.Property(x => x.DisputeReason).HasMaxLength(2000);
+            e.Property(x => x.RevisedReason).HasMaxLength(2000);
 
             e.HasIndex(x => x.TaskId);
+            e.HasIndex(x => new { x.IsLocked, x.EvaluatedAtUtc });
 
             e.HasOne<TaskItem>()
              .WithMany()
@@ -222,6 +226,11 @@ public sealed class WorkFlowProDbContext : IdentityDbContext<ApplicationUser>
             e.HasOne<ApplicationUser>()
              .WithMany()
              .HasForeignKey(x => x.PmUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne<ApplicationUser>()
+             .WithMany()
+             .HasForeignKey(x => x.DisputedByUserId)
              .OnDelete(DeleteBehavior.Restrict);
         });
 

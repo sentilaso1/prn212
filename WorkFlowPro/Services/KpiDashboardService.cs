@@ -351,6 +351,7 @@ public sealed class KpiDashboardService : IKpiDashboardService
             join t in _db.Tasks.AsNoTracking() on e.TaskId equals t.Id
             join a in _db.TaskAssignments.AsNoTracking() on e.TaskId equals a.TaskId
             where t.ProjectId == projectId &&
+                  e.IsLocked &&
                   e.EvaluatedAtUtc >= rangeStartUtc &&
                   e.EvaluatedAtUtc <= rangeEndUtc &&
                   a.Status == TaskAssignmentStatus.Accepted &&
